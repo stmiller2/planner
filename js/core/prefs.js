@@ -8,7 +8,7 @@
 const DAY_HOURS = [4, 6, 8, 10, 12, 16, 24];   // choices for how many hours the day view fits in the window
 const isBool = v => typeof v === 'boolean', isNum = v => typeof v === 'number', oneOf = (...xs) => v => xs.includes(v);
 const UI_PREFS = {
-  weeks:         { def: 3, ok: oneOf(1, 2, 3, 4), key: 'weeks3' },             // weeks shown on the calendar (header buttons / keys 1–4)
+  weeks:         { def: 3, ok: oneOf(1, 2, 3, 4, 5), key: 'weeks3' },          // weeks shown on the calendar (header buttons / keys 1–5)
   weekStart:     { def: 1, ok: oneOf(0, 1), setting: true },
   narrowWe:      { def: true, ok: isBool, setting: true },
   shiftLater:    { def: true, ok: isBool, setting: true },

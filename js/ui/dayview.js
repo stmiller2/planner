@@ -220,12 +220,13 @@ const setStripX = x => {
   $$('#dayview .dv-grid, #dayview .dv-heads, #dayview .dv-conf').forEach(el => { el.style.transform = x ? `translateX(${-x}px)` : ''; });
   $$('#dayview .dv-hours, #dayview .dv-heads>div:first-child, #dayview .dv-cfg').forEach(el => { el.style.transform = x ? `translateX(${x}px)` : ''; });
 };
-function enterStrip() {
+// the timeline also holds `before` days before the view and `after` days after it (one each for a swipe; more for T)
+function enterStrip(before = 1, after = 1) {
   if (dayStrip) return;
   closeTimePop(false); hideTip();
   const col = $('#dayview .dv-col'), W = col ? col.getBoundingClientRect().width : 300;
-  dayStrip = { W, days: [addDays(ui.dayView, -1), ...dvDays(), addDays(ui.dayView, ui.dayCount)] };
-  renderDayTimeline($('#dayview')); setStripX(W);
+  dayStrip = { W, days: Array.from({ length: before + ui.dayCount + after }, (_, i) => addDays(ui.dayView, i - before)) };
+  renderDayTimeline($('#dayview')); setStripX(W * before);
 }
 function exitStrip(newDay) {
   if (dayAnim) { dayAnim.cancel(); dayAnim = null; }
@@ -244,13 +245,15 @@ function glide(x1, ms, land, list) {
   }, done);
   dayAnim = { cancel: tw.cancel, finish: () => { tw.cancel(); done(); } };   // finish: jump to the end and land
 }
-// slide one day later (dir 1) or earlier (-1): a swipe, ‹ / › or ← / →. A step during a slide lands that one first.
-function daySlide(dir) {
+// slide one day later (dir 1) or earlier (-1): a swipe, ‹ / › or ← / →; or m days at once (T: jump to today).
+// A step during a slide lands that one first.
+function daySlide(dir, m = 1) {
   if (dayAnim) dayAnim.finish();
-  enterStrip();
-  const box = $('#dayview'), oldDays = dvDays(), newFirst = addDays(ui.dayView, dir), listEl = $('.dv-list', box), s0 = listEl.scrollTop;
-  // the list holds the old days and the arriving one while it scrolls to the new first day
-  const union = dir > 0 ? [...oldDays, addDays(oldDays[oldDays.length - 1], 1)] : [newFirst, ...oldDays];
+  if (m > 1 && dayStrip) exitStrip(null);   // (a swipe's strip only reaches one day either side)
+  enterStrip(dir < 0 ? m : 1, dir > 0 ? m : 1);
+  const box = $('#dayview'), oldDays = dvDays(), newFirst = addDays(ui.dayView, dir * m), listEl = $('.dv-list', box), s0 = listEl.scrollTop;
+  // the list holds the old days and the arriving ones while it scrolls to the new first day
+  const lo = dir > 0 ? oldDays[0] : newFirst, union = Array.from({ length: ui.dayCount + m }, (_, i) => addDays(lo, i));
   renderDayList(box, union, newFirst);
   const adj = ui.dayCount > 1 ? 2 : 0;   // 2: a later section's top border
   const top = d => { const el = listEl.querySelector(`.dv-day[data-date="${d}"]`); return el ? el.getBoundingClientRect().top - listEl.getBoundingClientRect().top + listEl.scrollTop + adj : 0; };
@@ -263,7 +266,8 @@ function daySlide(dir) {
   if (far > listEl.scrollHeight - listEl.clientHeight) listEl.insertAdjacentHTML('beforeend', `<div style="height:${Math.ceil(far + listEl.clientHeight)}px"></div>`);
   listEl.scrollTop = from; listEl.classList.add('gliding');
   setRange(newFirst);
-  glide(dayStrip.W + dir * dayStrip.W, WEEK_SLIDE_MS * 1.15, () => exitStrip(newFirst), [from, to]);
+  const x0 = dayStrip.W * (dir < 0 ? m : 1);
+  glide(x0 + dir * m * dayStrip.W, (WEEK_SLIDE_MS + 50 * (m - 1)) * 1.15, () => exitStrip(newFirst), [from, to]);
 }
 const dayWheel = wheelSteps({
   pull: DAY_PULL,

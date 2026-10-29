@@ -57,10 +57,10 @@ header .tip-r::after{left:auto;right:0;transform:none}
 .btn.on{background:color-mix(in srgb,var(--accent) 14%,var(--panel));border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
 #prev{margin-left:24px}
 #range{font-weight:650;font-size:15px;min-width:180px;padding-left:6px;white-space:nowrap}
-/* ‹ Today › and the dates: calendar and day view; 1–4 weeks: calendar only; 1–5 days: day view only */
+/* ‹ Today › and the dates: calendar and day view; 1–5 weeks: calendar only; 1–5 days: day view only */
 #app.admon .calctl{visibility:hidden}
 #app:not(.dayon) #dvcount,#app.dayon #wkcount,#app.admon .dvcount{display:none}
-/* right end of the header. With the scratch board open, it takes that panel's width, so 1–4 weeks / 1–5 days sits the
+/* right end of the header. With the scratch board open, it takes that panel's width, so 1–5 weeks / days sits the
    same 16px left of the panel's edge as the view switcher sits left of the sidebar's (24px margin + 8px gap, as for #prev) */
 .hright{display:flex;align-items:center;gap:8px;flex:none;justify-content:flex-end}
 #app.scon:not(.admon) .hright{width:calc(var(--scw) - 28px);min-width:max-content}

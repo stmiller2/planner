@@ -114,39 +114,38 @@ const WEEK_PULL = 70;   // px of scrolling needed to change week
 let weekAnim = null;   // { cancel, finish } while a week is sliding in
 // px height of each week row as currently laid out
 const rowHeights = () => { const ds = $$('#grid .day'); return Array.from({ length: Math.floor(ds.length / 7) }, (_, w) => ds[w * 7].getBoundingClientRect().height); };
-/* Slide one week up (dir 1) or down (dir -1). The grid briefly holds the old and new views together (one extra
-   week) and scrolls from where it is now to where the new view sits, so you see the calendar move. Row heights
-   blend along the way: the slide starts laid out exactly like the old view and ends exactly like the new one,
-   so neither the start nor the landing jumps, even when a busy week sits next to a light one. */
-function weekShift(dir) {
+/* Slide one week up (dir 1) or down (dir -1), or m weeks at once (T: jump to today). The grid briefly holds the old
+   and new views together (m extra weeks) and scrolls from where it is now to where the new view sits, so you see the
+   calendar move. Row heights blend along the way: the slide starts laid out exactly like the old view and ends exactly
+   like the new one, so neither the start nor the landing jumps, even when a busy week sits next to a light one. Weeks
+   that are in neither view (a slide of more weeks than are shown) pass by at an average height. */
+function weekShift(dir, m = 1) {
   if (weekAnim) weekAnim.finish();
   const g = $('#grid');
   const pulled = -(parseFloat((g.style.transform.match(/-?[\d.]+/) || [0])[0]) || 0);   // how far the pull already moved it
   g.classList.remove('settle'); g.style.transform = '';
   const oldStart = ui.viewStart, oldRows = rowHeights();
-  ui.viewStart = addDays(oldStart, 7 * dir); render();                  // the new view, for its row heights (and header)
+  ui.viewStart = addDays(oldStart, 7 * dir * m); render();              // the new view, for its row heights (and header)
   const newRows = rowHeights(), n = ui.weeks;
   if (oldRows.length !== n || newRows.length !== n) return;
-  // strip of n+1 weeks; each row's height goes from a → b, and the scroll position from s0 → s1
-  let a, b, s0, s1, start;
-  if (dir > 0) {   // [leaving week, shared weeks…, arriving week]
-    start = oldStart;
-    a = [oldRows[0], ...oldRows.slice(1), newRows[n - 1]];
-    b = [oldRows[0], ...newRows.slice(0, n - 1), newRows[n - 1]];
-    s0 = pulled; s1 = oldRows[0];
-  } else {         // [arriving week, shared weeks…, leaving week]
-    start = ui.viewStart;
-    a = [newRows[0], ...oldRows.slice(0, n - 1), oldRows[n - 1]];
-    b = [newRows[0], ...newRows.slice(1), oldRows[n - 1]];
-    s0 = newRows[0] + pulled; s1 = 0;
+  // strip of n+m weeks: the old view at strip row oi, the new one at ni. Each row's height goes from a (laid out as the
+  // old view) to b (as the new one), and the scroll position from s0 to s1.
+  const oi = dir > 0 ? 0 : m, ni = dir > 0 ? m : 0, avg = [...oldRows, ...newRows].reduce((x, y) => x + y, 0) / (2 * n);
+  const hOf = (rows, at, i) => i >= at && i < at + n ? rows[i - at] : null;
+  const a = [], b = [];
+  for (let i = 0; i < n + m; i++) {
+    a.push(hOf(oldRows, oi, i) ?? hOf(newRows, ni, i) ?? avg);
+    b.push(hOf(newRows, ni, i) ?? hOf(oldRows, oi, i) ?? avg);
   }
+  const sum = (rows, k) => rows.slice(0, k).reduce((x, y) => x + y, 0);
+  const start = dir > 0 ? oldStart : ui.viewStart, s0 = sum(a, oi) + pulled, s1 = sum(b, ni);
   weekAnim = { cancel() {}, finish: null };
-  renderCal({ start, weeks: n + 1, rows: a });
+  renderCal({ start, weeks: n + m, rows: a });
   if (hl) setHL(hl, true);
   g.style.overflow = 'hidden'; g.scrollTop = s0;
   const land = () => { weekAnim.cancel(); weekAnim = null; g.style.overflow = ''; g.scrollTop = 0; render(); };
   weekAnim.finish = land;
-  weekAnim.cancel = tween(WEEK_SLIDE_MS, k => {
+  weekAnim.cancel = tween(WEEK_SLIDE_MS + 50 * (m - 1), k => {
     g.style.gridTemplateRows = a.map((h, i) => (h + (b[i] - h) * k).toFixed(2) + 'px').join(' ');
     g.scrollTop = s0 + (s1 - s0) * k;
   }, land).cancel;

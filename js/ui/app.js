@@ -137,13 +137,25 @@ function navStep(dir) {
   if (!ui.dayView) return weekShift(dir);
   if (!dv && !cfDrag) daySlide(dir);
 }
-// Today: a slide when today is one step away, otherwise a jump
+// Today: a quick slide to it. From far away, the view first jumps to TODAY_SLIDE steps short of today and slides
+// the rest of the way, so the slide stays short. (Already there: day view just scrolls the hours to now, as openDay does.)
+const TODAY_SLIDE = 6;
 function navToday() {
   const t = todayISO();
-  if (ui.dayView) { const n = diffDays(t, ui.dayView); return Math.abs(n) === 1 ? navStep(n) : openDay(t); }
+  if (ui.dayView) {
+    const n = diffDays(t, ui.dayView);
+    if (!n || dv || cfDrag) return openDay(t);
+    if (dayAnim) dayAnim.finish();
+    const dir = Math.sign(n), m = Math.min(Math.abs(n), TODAY_SLIDE);
+    if (Math.abs(n) > m) { ui.dayView = addDays(t, -dir * m); dvAdd = null; renderDay(); }
+    return daySlide(dir, m);
+  }
+  if (weekAnim) weekAnim.finish();
   const w = weekStartOf(t), n = diffDays(w, ui.viewStart) / 7;
-  if (Math.abs(n) === 1) return navStep(n);
-  ui.viewStart = w; render();
+  if (!n) return;
+  const dir = Math.sign(n), m = Math.min(Math.abs(n), TODAY_SLIDE);
+  if (Math.abs(n) > m) { ui.viewStart = addDays(w, -7 * dir * m); render(); }
+  weekShift(dir, m);
 }
 $('#prev').onclick = () => navStep(-1);
 $('#next').onclick = () => navStep(1);
@@ -152,10 +164,10 @@ $('#todayBtn').onclick = navToday;
 $$('.views button').forEach(b => { b.innerHTML = ICON[{ c: 'calendar', d: 'day', '-': 'timeline' }[b.dataset.view]]; b.onclick = () => switchView(b.dataset.view); });
 // day view: how many days side by side
 $('#dvcount').innerHTML = [1, 2, 3, 4, 5].map(n => `<button data-n="${n}"><span>${n}</span><span class="dl">${n > 1 ? ' days' : ' day'}</span></button>`).join('');
-$('#dvcount').onclick = e => { const b = e.target.closest('button'); if (b) setDayCount(+b.dataset.n); };
-// calendar: how many weeks (also keys 1–4)
-$('#wkcount').innerHTML = [1, 2, 3, 4].map(n => `<button data-n="${n}"><span>${n}</span><span class="dl">${n > 1 ? ' weeks' : ' week'}</span></button>`).join('');
-$('#wkcount').onclick = e => { const b = e.target.closest('button'); if (b) setWeekCount(+b.dataset.n); };
+$('#dvcount').onclick = e => { const b = e.target.closest('button'); if (b) { b.blur(); setDayCount(+b.dataset.n); } };   // (blur: no focus ring left behind once you use the keys)
+// calendar: how many weeks (also keys 1–5)
+$('#wkcount').innerHTML = [1, 2, 3, 4, 5].map(n => `<button data-n="${n}"><span>${n}</span><span class="dl">${n > 1 ? ' weeks' : ' week'}</span></button>`).join('');
+$('#wkcount').onclick = e => { const b = e.target.closest('button'); if (b) { b.blur(); setWeekCount(+b.dataset.n); } };
 function setWeekCount(n) {
   if (ui.dayView || admOpen || n === ui.weeks) return;
   if (weekAnim) weekAnim.finish();
@@ -226,8 +238,7 @@ document.addEventListener('keydown', e => {
   else if (admOpen) return;
   else if (!mod && !e.altKey && e.key.toLowerCase() === 'x') toggleScratch();
   else if (!mod && !e.altKey && e.key.toLowerCase() === 'n' && ui.scw) { e.preventDefault(); scNew(); }   // (no 'n' typed into the box)
-  else if (!mod && !e.altKey && ui.dayView && /^[1-5]$/.test(e.key)) setDayCount(+e.key);
-  else if (!mod && !e.altKey && !ui.dayView && /^[1-4]$/.test(e.key)) setWeekCount(+e.key);
+  else if (!mod && !e.altKey && /^[1-5]$/.test(e.key)) ui.dayView ? setDayCount(+e.key) : setWeekCount(+e.key);
   else if (!mod && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) { e.preventDefault(); navStep(-1); }
   else if (!mod && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) { e.preventDefault(); navStep(1); }
   else if (!mod && e.key.toLowerCase() === 't') navToday();
