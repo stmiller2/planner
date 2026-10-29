@@ -16,7 +16,7 @@ Everything runs on your own computer. Your plan is stored locally in one file, `
 ## Getting it
 
 ```
-git clone <this repository's URL> Planner
+git clone https://github.com/stmiller2/planner Planner
 ```
 
 or download the ZIP from GitHub and unzip it anywhere. The folder you get is just the app. Your plan is kept
