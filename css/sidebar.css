@@ -16,9 +16,8 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 .proj{margin:2px 0 10px}
 .prow,.trow{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;min-height:28px}
 .prow:hover,.trow:hover{background:var(--hover)}
-/* project rows: a light gray box, setting them apart from threads */
-.prow{--pbg:color-mix(in srgb,var(--ink) 7%,var(--panel));background:var(--pbg)}
-.prow:hover{--pbg:color-mix(in srgb,var(--ink) 10%,var(--panel));background:var(--pbg)}
+/* project rows: a thin outline, setting them apart from threads (inset shadow: no change in size) */
+.prow{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ink) 18%,var(--panel))}
 .prow.alldone .pname{color:var(--muted)}
 .tw{border:0;background:transparent;width:14px;padding:0;cursor:pointer;color:var(--muted);font-size:9px;flex:none}
 .dot{width:12px;height:12px;border-radius:50%;background:var(--cs);position:relative;cursor:pointer;flex:none}
@@ -42,7 +41,6 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 .add.idle{font-size:12px}
 .trow,.prow{position:relative}
 .trow>.acts,.prow>.acts{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:var(--hover);border-radius:6px;padding:1px;box-shadow:-10px 0 8px -2px var(--hover)}
-.prow>.acts{background:var(--pbg);box-shadow:-10px 0 8px -2px var(--pbg)}
 .trow[draggable=true]{cursor:grab}
 .prow.tdrop,.trow.tdrop{background:color-mix(in srgb,var(--accent) 14%,transparent);box-shadow:inset 0 0 0 1.5px var(--accent)}
 .tasks{margin-left:16px;padding-bottom:8px}
