@@ -36,11 +36,12 @@ function shortcutsHTML() {
     ['<kbd>⌥ Option</kbd> + drop', 'Move only the task you dragged, unlinking from other tasks if applicable'],
     ['<kbd>←</kbd> / <kbd>→</kbd> or <kbd>↑</kbd> / <kbd>↓</kbd>', 'Previous / next week (previous / next day in day view)'],
     ['<kbd>T</kbd>', 'Jump to today'],
-    ['<kbd>C</kbd> / <kbd>D</kbd> / <kbd>-</kbd>', 'Switch to the calendar / day view / timeline'],
+    ['<kbd>C</kbd> (or <kbd>W</kbd>) / <kbd>D</kbd> / <kbd>-</kbd>', 'Switch to the calendar / day view / timeline'],
     ['<kbd>⌘Z</kbd>', 'Undo'],
     ['<kbd>⇧⌘Z</kbd> or <kbd>⌘Y</kbd>', 'Redo'],
     ['<kbd>S</kbd> or <kbd>⌃⇧,</kbd>', 'Open Settings'],
     ['<kbd>H</kbd>', 'Open Help'],
+    ['<kbd>1</kbd> – <kbd>4</kbd>', 'Calendar: show that many weeks'],
     ['<kbd>1</kbd> – <kbd>5</kbd>', 'Day view: show that many days side by side'],
     ['<kbd>X</kbd>', 'Open / close the scratch board'],
     ['<kbd>N</kbd>', 'New task on the scratch board (while it’s open)'],
@@ -74,7 +75,7 @@ function applySetting(key, v) {
     resetSettings();
     ui.viewStart = weekStartOf(addDays(ui.viewStart, 3));   // mid-week anchor, so the view stays on the same week
   } else if (key === 'weekStart') { ui.weekStart = +v; ui.viewStart = weekStartOf(addDays(ui.viewStart, 3)); }   // mid-week anchor keeps the view on the same week
-  else if (key === 'snap' || key === 'dayHours' || key === 'weeks') ui[key] = +v;
+  else if (key === 'snap' || key === 'dayHours') ui[key] = +v;
   else ui[key] = v;
   // the scratch board in the view you're in follows at once (scratchForView does nothing while remembering)
   if (key === null || key === 'scratchRemember' || (key === 'scratchDay') === !!ui.dayView && /^scratch(Cal|Day)$/.test(key)) scratchForView();
@@ -100,7 +101,6 @@ function renderSettings() {
       <p>Fully completed chains never move. Hold <b>⌥ Option</b> while dropping to just move that task.</p>
       <div>Dragging task 2 from Tue to Thu (+2 days):</div>${example}`, sw('shiftLater'))}
     <h4>Calendar view</h4>
-    ${row('Weeks shown', 'How many weeks the calendar shows at once.', seg('weeks', [[2, '2 weeks'], [3, '3 weeks'], [4, '4 weeks']]))}
     ${row('Narrow weekends', 'Make the Saturday and Sunday columns narrower, leaving more room for weekdays.', sw('narrowWe'))}
     ${row('Week starts on', 'The first column of the calendar.', seg('weekStart', [[1, 'Monday'], [0, 'Sunday']]))}
     ${row('Sidebar dates', 'How the date button on each task in the sidebar reads.', seg('dateLabels', [['relative', 'Tues, Next Wed'], ['absolute', 'Oct 22']]))}

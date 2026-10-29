@@ -56,7 +56,7 @@ test('saved preferences: bad values fall back to defaults; settings reset', () =
   assert.strictEqual(saved.weeks3, 4);
   assert.strictEqual(saved.sbw, 200);
   P.resetSettings();
-  assert.strictEqual(P.ui.weeks, 3);
+  assert.strictEqual(P.ui.weeks, 4);   // not a setting (header buttons): kept
   assert.strictEqual(P.ui.snap, 15);
   assert.strictEqual(P.ui.sbw, 200);   // not a setting: kept
 });

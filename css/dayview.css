@@ -34,7 +34,7 @@
 .dv-main{display:flex;flex-direction:column;min-height:0;min-width:0}
 .dvcount button{transition:background-color .22s ease,color .22s ease}
 .dvcount .dl{display:inline-block;max-width:0;opacity:0;overflow:hidden;white-space:pre;vertical-align:bottom;transition:max-width .26s cubic-bezier(.2,.8,.2,1),opacity .2s ease}
-.dvcount button.on .dl{max-width:3.4em;opacity:1}
+.dvcount button.on .dl{max-width:4em;opacity:1}
 .dv-scroll{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;isolation:isolate}
 .dv-grid{position:relative;display:grid;grid-template-columns:58px minmax(0,1fr);margin:12px 18px 12px 0}
 .dv-main{position:relative;overflow:hidden}

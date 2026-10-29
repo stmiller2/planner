@@ -27,14 +27,14 @@ try { var th = JSON.parse(localStorage.getItem('planner.ui') || '{}').theme;
 <div id="app">
   <header>
     <div class="brand"><span class="bname" data-act="rename-b" data-id="title"></span>
-      <div class="views"><button class="ic" data-view="c" data-tip="Calendar (c)" aria-label="Calendar"></button><button class="ic" data-view="d" data-tip="Day view (d)" aria-label="Day view"></button><button class="ic" data-view="-" data-tip="Timeline (-)" aria-label="Timeline"></button></div>
+      <div class="views"><button class="ic" data-view="c" data-tip="Calendar (c or w)" aria-label="Calendar"></button><button class="ic" data-view="d" data-tip="Day view (d)" aria-label="Day view"></button><button class="ic" data-view="-" data-tip="Timeline (-)" aria-label="Timeline"></button></div>
     </div>
     <button class="calctl btn" id="prev">‹</button>
     <button class="calctl btn" id="todayBtn" data-tip="Jump to today (t)">Today</button>
     <button class="calctl btn" id="next">›</button>
     <div class="calctl" id="range"></div>
     <div class="spacer"></div>
-    <div class="seg dvcount" id="dvcount"></div>
+    <div class="seg dvcount" id="dvcount"></div><div class="seg dvcount" id="wkcount"></div>
     <div class="hright">
     <span id="fb" hidden><button class="btn" id="exportBtn">Export</button> <button class="btn" id="importBtn">Import</button><input type="file" id="importFile" accept=".json,application/json" hidden></span>
     <button id="status"></button>

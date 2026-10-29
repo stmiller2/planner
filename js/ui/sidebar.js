@@ -90,7 +90,7 @@ function renderThread(p, t, isSub) {
       <button class="tw" data-act="toggle" data-id="${t.id}">${tc ? '▶' : '▼'}</button>
       <label class="dot"><input type="color" value="${esc(c)}" data-act="color" data-id="${t.id}"></label>
       <span class="tname" data-act="rename-t" data-id="${t.id}">${esc(t.name)}</span>
-      <span class="meta">${done}/${all.length}${uns ? ` · ${uns} unsched.` : ''}</span>
+      ${uns ? `<span class="meta">${uns} unsched.</span>` : ''}
       <span class="acts">
         <button class="mini" data-act="add-task" data-id="${t.id}">+ task</button>
         <button class="mini" data-act="add-sub" data-id="${t.id}">+ sub</button>

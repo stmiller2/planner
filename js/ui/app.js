@@ -21,6 +21,7 @@ function renderHeader() {
   document.title = name;
   setRange();
   const cur = admOpen ? '-' : ui.dayView ? 'd' : 'c';
+  $$('#wkcount button').forEach(b => b.classList.toggle('on', +b.dataset.n === ui.weeks));
   $$('.views button').forEach(b => b.classList.toggle('on', b.dataset.view === cur));
 }
 // the dates in view, beside ‹ Today ›: the calendar's weeks, or day view's day(s) (`first` = day view's first day)
@@ -152,7 +153,15 @@ $$('.views button').forEach(b => { b.innerHTML = ICON[{ c: 'calendar', d: 'day',
 // day view: how many days side by side
 $('#dvcount').innerHTML = [1, 2, 3, 4, 5].map(n => `<button data-n="${n}"><span>${n}</span><span class="dl">${n > 1 ? ' days' : ' day'}</span></button>`).join('');
 $('#dvcount').onclick = e => { const b = e.target.closest('button'); if (b) setDayCount(+b.dataset.n); };
-// (also keys 1–5) a slide in progress lands first
+// calendar: how many weeks (also keys 1–4)
+$('#wkcount').innerHTML = [1, 2, 3, 4].map(n => `<button data-n="${n}"><span>${n}</span><span class="dl">${n > 1 ? ' weeks' : ' week'}</span></button>`).join('');
+$('#wkcount').onclick = e => { const b = e.target.closest('button'); if (b) setWeekCount(+b.dataset.n); };
+function setWeekCount(n) {
+  if (ui.dayView || admOpen || n === ui.weeks) return;
+  if (weekAnim) weekAnim.finish();
+  ui.weeks = n; saveUI(); render();
+}
+// day view: (also keys 1–5) a slide in progress lands first
 function setDayCount(n) {
   if (!ui.dayView || dv || cfDrag || n === ui.dayCount) return;
   if (dayAnim) dayAnim.finish(); else if (dayStrip) exitStrip(null);
@@ -204,19 +213,21 @@ document.addEventListener('keydown', e => {
     // in Help or Settings, a letter shortcut closes the window and then does its thing (H in Help / S in Settings just
     // close it). Other windows, and the arrow keys (they scroll the window), are left alone.
     const kind = $('#modal').dataset.kind, k = e.key.toLowerCase();
-    if (!kind || mod || e.altKey || !['c', 'd', '-', 't', 'h', 's', 'x'].includes(k)) return;
+    if (!kind || mod || e.altKey || !['c', 'w', 'd', '-', 't', 'h', 's', 'x'].includes(k)) return;
     hideModal();
     if (k === kind[0]) return;   // 'h'elp / 's'ettings
   }
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
   else if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
   else if (!mod && !e.altKey && ['c', 'd', '-'].includes(e.key.toLowerCase())) switchView(e.key.toLowerCase());
+  else if (!mod && !e.altKey && e.key.toLowerCase() === 'w') switchView('c');   // (W for weeks: the calendar too)
   else if (!mod && !e.altKey && e.key.toLowerCase() === 'h') { closeMenu(); showHelp(); }
   else if (!mod && !e.altKey && e.key.toLowerCase() === 's') showSettings();
   else if (admOpen) return;
   else if (!mod && !e.altKey && e.key.toLowerCase() === 'x') toggleScratch();
   else if (!mod && !e.altKey && e.key.toLowerCase() === 'n' && ui.scw) { e.preventDefault(); scNew(); }   // (no 'n' typed into the box)
   else if (!mod && !e.altKey && ui.dayView && /^[1-5]$/.test(e.key)) setDayCount(+e.key);
+  else if (!mod && !e.altKey && !ui.dayView && /^[1-4]$/.test(e.key)) setWeekCount(+e.key);
   else if (!mod && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) { e.preventDefault(); navStep(-1); }
   else if (!mod && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) { e.preventDefault(); navStep(1); }
   else if (!mod && e.key.toLowerCase() === 't') navToday();
