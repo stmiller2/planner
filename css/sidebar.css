@@ -3,9 +3,11 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 #resizer{position:absolute;top:50px;bottom:0;left:calc(var(--sbw) - 4px);width:8px;cursor:col-resize;z-index:6}
 #resizer::after{content:'';position:absolute;left:3px;top:0;bottom:0;width:2px;background:transparent;transition:background .12s}
 #resizer:hover::after,body.resizing #resizer::after{background:var(--accent)}
-#app.sbhidden #resizer{left:0;width:10px}
-#app.sbhidden #resizer::after{background:var(--line);width:4px;left:0}
-.sb-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 6px}
+/* collapsed: the sidebar (and day view's task list) shrink to a slim labeled tab (.sc-tab look, scratch.css) */
+#app:not(.sbhidden) .sb-tab{display:none}
+#app.sbhidden aside>:not(.sb-tab),#app.sbhidden .dv-side>:not(.sb-tab){display:none}
+.sb-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:2px 6px;padding:10px 12px 6px}
+.sb-head>span{flex-wrap:wrap}
 .sb-head h2{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
 #tree{overflow:auto;flex:1;padding:0 6px 40px;isolation:isolate}   /* (scrollbar in front: see .items in calendar.css) */
 #tree.drop{outline:2px dashed var(--accent);outline-offset:-5px;border-radius:8px}
@@ -14,9 +16,15 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 .proj{margin:2px 0 10px}
 .prow,.trow{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;min-height:28px}
 .prow:hover,.trow:hover{background:var(--hover)}
+/* project rows: a light gray box, setting them apart from threads */
+.prow{--pbg:color-mix(in srgb,var(--ink) 7%,var(--panel));background:var(--pbg)}
+.prow:hover{--pbg:color-mix(in srgb,var(--ink) 10%,var(--panel));background:var(--pbg)}
+.prow.alldone .pname{color:var(--muted)}
 .tw{border:0;background:transparent;width:14px;padding:0;cursor:pointer;color:var(--muted);font-size:9px;flex:none}
 .dot{width:12px;height:12px;border-radius:50%;background:var(--cs);position:relative;cursor:pointer;flex:none}
 .dot input{position:absolute;inset:-2px;opacity:0;width:16px;height:16px;cursor:pointer;border:0;padding:0}
+.trow.alldone .dot{opacity:.35}   /* every task in the thread (and its sub-threads) is done */
+.trow.alldone .tname{color:var(--muted)}
 .pname{font-weight:680;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tname{font-weight:560;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta{font-size:11px;color:var(--muted);white-space:nowrap}
@@ -34,6 +42,7 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 .add.idle{font-size:12px}
 .trow,.prow{position:relative}
 .trow>.acts,.prow>.acts{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:var(--hover);border-radius:6px;padding:1px;box-shadow:-10px 0 8px -2px var(--hover)}
+.prow>.acts{background:var(--pbg);box-shadow:-10px 0 8px -2px var(--pbg)}
 .trow[draggable=true]{cursor:grab}
 .prow.tdrop,.trow.tdrop{background:color-mix(in srgb,var(--accent) 14%,transparent);box-shadow:inset 0 0 0 1.5px var(--accent)}
 .tasks{margin-left:16px;padding-bottom:8px}
@@ -73,3 +82,22 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 #menu button:hover{background:var(--hover)}
 #menu button.cur{font-weight:650}
 #menu .k{width:26px;font-size:10px;font-weight:650;text-align:center;color:var(--muted)}
+/* "Collapse completed tasks": the "+ N completed" line, laid out like a task row (checkbox gap, number column) */
+.drun{display:flex;align-items:center;gap:6px;padding:0 4px 0 6px;min-height:24px;position:relative;border-radius:6px;cursor:pointer;color:var(--muted);font-size:12px;user-select:none}
+.drun:hover{background:var(--hover);color:var(--ink)}
+.drun .drk{visibility:hidden;margin:0;flex:none}   /* (a real checkbox, so the number column lines up in every browser) */
+.drun .drn{min-width:18px;flex:none;position:relative;align-self:stretch}
+.drun.open{min-height:20px;font-size:11.5px}
+/* a linked chain crossing the line: the bar on the left (as .task.g) and the number box sides (same day) or joining
+   line (next day), each fading toward the line's middle; carried straight through above an opened run */
+.drun.lu::before,.drun.ld::before{content:'';position:absolute;left:-9px;top:0;bottom:0;width:3px;background:var(--cs);pointer-events:none}
+.drun .drn::before,.drun .drn::after{content:'';position:absolute;left:0;right:0;height:50%;pointer-events:none;--lk:1.5px solid color-mix(in srgb,var(--cs) 65%,transparent)}
+.drun .drn::before{top:0}
+.drun .drn::after{bottom:0}
+.drun.us .drn::before,.drun.ds .drn::after{border-left:var(--lk);border-right:var(--lk)}
+.drun.un .drn::before,.drun.dn .drn::after{left:calc(50% - .75px);right:auto;border-left:var(--lk)}
+.drun:not(.open).lu::before{-webkit-mask-image:linear-gradient(#000,transparent 50%);mask-image:linear-gradient(#000,transparent 50%)}
+.drun:not(.open).ld::before{-webkit-mask-image:linear-gradient(transparent 50%,#000);mask-image:linear-gradient(transparent 50%,#000)}
+.drun:not(.open).lu.ld::before{-webkit-mask-image:linear-gradient(#000,transparent 40%,transparent 60%,#000);mask-image:linear-gradient(#000,transparent 40%,transparent 60%,#000)}
+.drun:not(.open) .drn::before{-webkit-mask-image:linear-gradient(#000,transparent);mask-image:linear-gradient(#000,transparent)}
+.drun:not(.open) .drn::after{-webkit-mask-image:linear-gradient(transparent,#000);mask-image:linear-gradient(transparent,#000)}

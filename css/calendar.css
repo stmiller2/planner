@@ -45,7 +45,7 @@ main{position:relative}
 .chip.done input{opacity:.7}
 .chip.done .tt{text-decoration:line-through}
 .chip.hl{box-shadow:0 0 0 2px var(--cs),0 3px 10px rgba(0,0,0,.15)}
-.task.hl{background:color-mix(in srgb,var(--cs) 20%,transparent)}
+.task.hl,.drun.hl{background:color-mix(in srgb,var(--cs) 20%,transparent)}
 .add.ins{margin-left:24px;width:calc(100% - 28px);background:var(--hover);border:1px solid var(--accent)}
 .grp{display:flex;flex-direction:column;gap:0;border-radius:5px}   /* same-day group: chips stacked flush into one bubble */
 /* outline that follows the chips' own rounded shapes (incl. the notches between them) */

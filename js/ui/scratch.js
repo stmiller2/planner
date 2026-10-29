@@ -7,7 +7,7 @@
    ones. The panel resizes from its left edge and collapses to a slim tab (drag it narrow, double-click the edge, the
    » button, or X); its width is ui.scw (0 = collapsed), shown through --scw on #app (#app's third grid column; day
    view stops short of it; the header lines up with it). */
-const SC_MIN = 200, SC_TAB = 30;   // narrower than SC_MIN while dragging = collapse; the collapsed tab's width
+const SC_MIN = 100, SC_TAB = 30;   // narrower than SC_MIN while dragging = collapse; the collapsed tab's width
 let scAdd = null;      // open new-task box while typing: { beforeId } (null = at the end)
 let scFocus = false;   // put the cursor in that box after the next draw
 let scDrag = null;     // id of the scratch task being dragged
@@ -40,7 +40,7 @@ function renderScratch() {
   el.innerHTML = `
     <div class="sc-head">
       <div class="sc-ttl"><h2>Scratch board</h2><div class="sc-sub">Unscheduled one-off tasks</div></div>
-      <span class="sc-btns">${nDone ? `<button class="mini" data-act="sc-clear" title="Delete the ${plural(nDone, 'completed task')}">Clear done</button>` : ''}<button class="ic" data-act="sc-hide" title="Collapse (x)">${ICON.dright}</button></span>
+      <span class="sc-btns">${nDone ? `<button class="ic" data-act="sc-clear" data-hint="Delete completed tasks" aria-label="Delete completed tasks">${ICON.clearDone}</button>` : ''}<button class="ic" data-act="sc-hide" data-hint="Collapse (x)" aria-label="Collapse">${ICON.dright}</button></span>
     </div>
     <div class="sc-list">${rows}</div>`;
   el.querySelector('.sc-list').scrollTop = top;
@@ -53,6 +53,8 @@ function renderScratch() {
 const scEl = $('#scratch');
 const scBox = e => e.target.closest && e.target.closest('.sc-add');
 function scStop() { if (!scAdd) return; scAdd = null; renderScratch(); }
+// N (while the board is open): the new-task box at the end, ready to type
+function scNew() { scAdd = { beforeId: null }; scFocus = true; renderScratch(); }
 scEl.addEventListener('focusin', e => {   // the idle "+ Add task" box becomes the box for typing at the end
   const b = scBox(e); if (!b || !b.classList.contains('idle')) return;
   if (scAdd && scAdd.beforeId) { scAdd = { beforeId: null }; scFocus = true; renderScratch(); return; }   // (closes a box open higher up)

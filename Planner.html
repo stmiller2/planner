@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Planner</title>
+<title>Experiment Planner</title>
 <script>
 // before the first paint: the planner's own name for the window title, and the theme in effect (see applyTheme in js/ui/app.js)
 try { var t = localStorage.getItem('planner.title'); if (t) document.title = t; } catch (e) {}
@@ -38,7 +38,7 @@ try { var th = JSON.parse(localStorage.getItem('planner.ui') || '{}').theme;
     <div class="hright">
     <span id="fb" hidden><button class="btn" id="exportBtn">Export</button> <button class="btn" id="importBtn">Import</button><input type="file" id="importFile" accept=".json,application/json" hidden></span>
     <button id="status"></button>
-    <button class="ic" id="themeBtn"></button>
+    <button class="ic" id="themeBtn" data-tip="Style" aria-label="Style"></button>
     <button class="ic" id="setBtn" data-tip="Settings (s)" aria-label="Settings"></button>
     <button class="btn tip-r" id="helpBtn" data-tip="Help (h)" aria-label="Help">?</button>
     </div>

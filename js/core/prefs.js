@@ -16,6 +16,7 @@ const UI_PREFS = {
   snap:          { def: 15, ok: oneOf(5, 10, 15, 30), setting: true },
   clock:         { def: '12', ok: oneOf('12', '24'), setting: true },
   dateLabels:    { def: 'relative', ok: oneOf('relative', 'absolute'), setting: true },
+  collapseDone:  { def: false, ok: isBool, setting: true },                   // sidebar: 2+ done tasks in a row -> one "+ N completed" line
   confirmDelete: { def: true, ok: isBool, setting: true },
   orderWarn:     { def: true, ok: isBool, setting: true },
   conflictWarn:  { def: true, ok: isBool, setting: true },

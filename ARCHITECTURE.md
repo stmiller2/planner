@@ -135,7 +135,7 @@ If you ever change `state` in place outside `mutate()` (only conflict dragging d
 | the Timeline view | `admireData` (ui/timeline-data.js), `renderAdmire`, `admTipHTML` (ui/timeline.js) + css/timeline.css |
 | a setting | `UI_PREFS` (core/prefs.js), `renderSettings` / `applySetting` (ui/dialogs.js) |
 | the header: view switcher, ‹ Today ›, the dates in view, 1–5 days | markup in Planner.html; `renderHeader`, `setRange`, `navStep` / `navToday` (ui/app.js) + css/base.css |
-| keyboard shortcuts | the keydown handler at the end of ui/app.js, `switchView` for C / D / - (and list them in `renderSettings`) |
+| keyboard shortcuts | the keydown handler at the end of ui/app.js, `switchView` for C / D / - (and list them in `shortcutsHTML` in ui/dialogs.js, shown at the end of Help) |
 | a button's action | its `data-act` case in the click dispatcher (ui/app.js) |
 | help text | `showHelp` (ui/dialogs.js) |
 | colors, theme | tokens at the top of css/base.css (light, then `[data-theme="dark"]`) |

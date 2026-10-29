@@ -3,8 +3,13 @@
    tasks (end-of-thread box, click-between-items insert line, multi-line paste), and drag & drop inside the sidebar
    (reorder tasks / threads, move between threads, drop a calendar chip here to unschedule it). The Conflicts
    section at the bottom of the sidebar is in conflicts.js. */
+// "Collapse completed tasks" (Settings): ids of tasks in a "+ N completed" run that was clicked open (until reload)
+const drOpen = new Set();
+// a task's row in the sidebar, or the "+ N completed" line it's folded into
+const taskEl = id => $(`.task[data-id="${id}"]`) || $(`#tree .drun[data-has~="${id}"]`);
 function reveal(id) {
   const f = findTask(id); if (!f) return;
+  drOpen.add(id);
   if (!ui.sbw) setSbw(ui.sbwLast || 330);
   ui.collapsed[f.p.id] = false;
   for (let x = f; x; x = x.parent ? findThread(x.parent.id) : null) ui.collapsed[x.t.id] = false;
@@ -21,9 +26,9 @@ function renderTree() {
   // keep any half-typed text in an open new-task box across re-renders
   const keep = {}; $$('.add', tree).forEach(i => { if (i.value) keep[(i.classList.contains('ins') ? 'ins:' : 'end:') + i.dataset.tid] = i.value; });
   tree.innerHTML = state.projects.map((p, pi) => {
-    const pc = ui.collapsed[p.id];
+    const pc = ui.collapsed[p.id], pk = p.threads.flatMap(subtreeTasks), pDone = pk.length > 0 && pk.every(k => k.done);   // fully completed: muted name
     return `<section class="proj" data-pid="${p.id}">
-      <div class="prow" data-pdrop="${p.id}">
+      <div class="prow ${pDone ? 'alldone' : ''}" data-pdrop="${p.id}">
         <button class="tw" data-act="toggle" data-id="${p.id}">${pc ? '▶' : '▼'}</button>
         <span class="pname" data-act="rename-p" data-id="${p.id}">${esc(p.name)}</span>
         <span class="acts">
@@ -47,13 +52,29 @@ function renderThread(p, t, isSub) {
   const tc = ui.collapsed[t.id], c = colorOf(t);
   const all = subtreeTasks(t);
   const uns = all.filter(x => !x.date && !x.done).length, done = all.filter(x => x.done).length;
+  const allDone = all.length > 0 && done === all.length;   // fully completed (sub-threads included): muted dot
   let body = '';
   if (!tc) {
     const L = layout(t); let i = 0;
     const insAt = inserting && inserting.tid === t.id ? layoutIndex(L, inserting.refId, inserting.side) : -1;
     const insBox = () => `<input class="add ins" data-tid="${t.id}" placeholder="New task (Enter to add, Esc to stop)">`;
+    // collapse completed tasks: runs of 2+ done tasks in a row (no sub-thread between) fold into one line, unless the
+    // whole thread is done. layout index where a run starts -> index just past it
+    const runs = new Map();
+    if (ui.collapseDone && !allDone) for (let a = 0; a < L.length;) {
+      if (L[a].kind !== 'task' || !L[a].obj.done) { a++; continue; }
+      let b = a; while (b < L.length && L[b].kind === 'task' && L[b].obj.done) b++;
+      if (b - a >= 2) runs.set(a, b);
+      a = b;
+    }
     while (i < L.length) {
       if (i === insAt) body += insBox();
+      const end = runs.get(i);
+      if (end) {   // the run's line; clicked open, its tasks follow as usual
+        const ks = L.slice(i, end).map(x => x.obj), open = ks.some(k => drOpen.has(k.id));
+        body += doneRunLine(t, ks, open);
+        if (!open) { if (insAt > i && insAt < end) body += insBox(); i = end; continue; }
+      }
       if (L[i].kind === 'task') { const k = L[i].obj; body += renderTaskRow(t, k, t.tasks.indexOf(k)); i++; }
       else {                       // consecutive sub-threads = one parallel block
         let blk = ''; do { blk += renderThread(p, L[i].obj, true); i++; } while (i < L.length && L[i].kind === 'sub' && i !== insAt);
@@ -65,7 +86,7 @@ function renderThread(p, t, isSub) {
     if (empty || addOpen === t.id) body += `<input class="add${empty && addOpen !== t.id ? ' idle' : ''}" data-tid="${t.id}" placeholder="${empty && addOpen !== t.id ? '+ Add task' : 'New task at the end (Enter to add, Esc to stop)'}">`;
   }
   return `<div class="thread" data-tid="${t.id}" style="--c:${esc(c)}">
-    <div class="trow" draggable="true" data-tdrag="${t.id}">
+    <div class="trow ${allDone ? 'alldone' : ''}" draggable="true" data-tdrag="${t.id}">
       <button class="tw" data-act="toggle" data-id="${t.id}">${tc ? '▶' : '▼'}</button>
       <label class="dot"><input type="color" value="${esc(c)}" data-act="color" data-id="${t.id}"></label>
       <span class="tname" data-act="rename-t" data-id="${t.id}">${esc(t.name)}</span>
@@ -80,6 +101,17 @@ function renderThread(p, t, isSub) {
     </div>
     ${tc ? '' : `<div class="tasks">${body}</div>`}
   </div>`;
+}
+// "+ N completed" (or, opened, "− N completed" above those tasks). A linked chain crossing into the run carries its
+// bar and number box into the line, fading out (top half: link from the task above; bottom half: link to the task
+// below); above an opened run the line sits inside that link, so it carries straight through.
+function doneRunLine(t, ks, open) {
+  const a = t.tasks.indexOf(ks[0]), b = t.tasks.indexOf(ks[ks.length - 1]), nx = t.tasks[b + 1];
+  const up = a > 0 ? ks[0].linkToPrev : null, dn = open ? up : nx && nx.linkToPrev;
+  const k = { sameDay: 's', nextDay: 'n' };
+  const cls = ['drun', open && 'open', up && 'lu', dn && 'ld', up && 'u' + k[up], dn && 'd' + k[dn]].filter(Boolean).join(' ');
+  return `<div class="${cls}" data-act="dr-toggle" data-has="${ks.map(x => x.id).join(' ')}" title="${open ? 'Hide' : 'Show'} these completed tasks">
+    <input type="checkbox" class="drk" tabindex="-1" aria-hidden="true" disabled><span class="drn"></span><span class="drt">${open ? '−' : '+'} ${ks.length} completed</span></div>`;
 }
 function renderTaskRow(t, k, i) {
   const nx = t.tasks[i + 1];
@@ -171,7 +203,7 @@ function treeTarget(e) {
     const [s, en] = runOf(g.t, g.i);                     // snap to the edges of a linked chain
     const anchor = g.t.tasks[before ? s : en];
     if (isTask && movingIds(drag.id, splitHeld(e)).includes(anchor.id)) return null;
-    const ar = $(`.task[data-id="${anchor.id}"]`).getBoundingClientRect();
+    const ar = taskEl(anchor.id).getBoundingClientRect();
     tg = { spot: { tid: g.t.id, refId: anchor.id, side: before ? 'before' : 'after' }, line: [before ? ar.top : ar.bottom, ar.left] };
   } else if (tr) {                                       // thread header: top edge = before it; otherwise into it
     const thEl = tr.closest('.thread'), x = findThread(tr.dataset.tdrag); if (!x) return null;
@@ -216,7 +248,7 @@ function spotLine(tid, at) {
   const tasksEl = thEl.querySelector(':scope > .tasks'), tr = thEl.querySelector(':scope > .trow').getBoundingClientRect();
   const left = tasksEl ? tasksEl.getBoundingClientRect().left : tr.left + 20;
   const L = layout(x.t);
-  const elOf = it => it.kind === 'task' ? $(`.task[data-id="${it.obj.id}"]`) : $(`.thread[data-tid="${it.obj.id}"]`);
+  const elOf = it => it.kind === 'task' ? taskEl(it.obj.id) : $(`.thread[data-tid="${it.obj.id}"]`);
   let y;
   if (at < L.length && elOf(L[at])) y = elOf(L[at]).getBoundingClientRect().top;
   else if (L.length && elOf(L[L.length - 1])) y = elOf(L[L.length - 1]).getBoundingClientRect().bottom;

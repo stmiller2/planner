@@ -4,7 +4,7 @@ A planner for lab work. **Projects** (e.g. "build library") hold **threads** (e.
 (e.g. "purify GoldenGate reaction"), which can be linked to happen on the same day or the next day. You can schedule
 them on a multi-week **calendar**, plan the hours of a day in **day view**, keep one-off to-dos on the
 **scratch board**, and look back at what you've finished in the **timeline**. The **?** button in the app explains
-the rest, and Settings lists the keyboard shortcuts.
+the rest, including the keyboard shortcuts.
 
 Everything runs on your own computer. Your plan is stored locally in one file, `planner.json`.
 

@@ -187,7 +187,7 @@ function setHL(id, force) {
   hl = id;
   $$('.hl').forEach(x => x.classList.remove('hl'));
   if (!id) return;
-  $$(`.task[data-id="${id}"]`).forEach(x => x.classList.add('hl'));                       // sidebar: just that task
+  $$(`.task[data-id="${id}"], #tree .drun[data-has~="${id}"]`).forEach(x => x.classList.add('hl'));   // sidebar: just that task (or its folded line)
   $$(`.chip[data-id="${id}"]`).forEach(c => (c.closest('.grp') || c).classList.add('hl'));  // calendar: its whole same-day group
 }
 

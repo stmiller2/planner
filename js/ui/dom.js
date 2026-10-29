@@ -14,6 +14,7 @@ const ICON = {
   auto: svg('<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>'),
   dleft: svg('<path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/>'),
   dright: svg('<path d="m6 17 5-5-5-5M13 17l5-5-5-5"/>'),
+  clearDone: svg('<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="m9 13 2 2 4-4"/>'),
   up: svg('<path d="m18 15-6-6-6 6"/>'),
   down: svg('<path d="m6 9 6 6 6-6"/>'),
   calendar: svg('<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9.5h18M9 9.5V21M15 9.5V21M3 15.25h18"/>'),
@@ -101,7 +102,7 @@ function startRename(kind, id, el) {
   else if (kind === 't') { const f = findThread(id); cur = f.t.name; commit = v => mutate(() => f.t.name = v); }
   else if (kind === 'c') { const c = confs().find(x => x.id === id); cur = c.title; commit = v => mutate(() => c.title = v); }
   else if (kind === 's') { const x = (state.scratch || []).find(s => s.id === id); if (!x) return; cur = x.title; commit = v => renameScratch(id, v); }
-  else if (kind === 'b') { cur = state.title || 'Planner'; commit = v => mutate(() => { if (v === 'Planner') delete state.title; else state.title = v; }); }
+  else if (kind === 'b') { cur = state.title || DEFAULT_TITLE; commit = v => mutate(() => { if (v === DEFAULT_TITLE) delete state.title; else state.title = v; }); }
   else { const f = findTask(id); cur = f.task.title; commit = v => mutate(() => f.task.title = v); }
   const inp = document.createElement('input'); inp.className = 'inl'; inp.value = cur;
   el.replaceChildren(inp); el.style.overflow = 'visible'; el.classList.add('editing');
@@ -145,6 +146,24 @@ function framedModal(title, body) {
   card.querySelector('.mx').onclick = hideModal;
   return card.querySelector('.mbody');
 }
+/* ---------- hover hints (data-hint) ----------
+   Like the header's labels (data-tip), but drawn on top of everything, so panels that hide their overflow (the scratch
+   board) can't clip them: below the element after a moment, kept inside the window. */
+const hintEl = document.createElement('div'); hintEl.id = 'hint'; document.body.appendChild(hintEl);
+let hintFor = null;
+function hideHint() { hintFor = null; hintEl.classList.remove('on'); }
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest && e.target.closest('[data-hint]');
+  if (el === hintFor) return;
+  hideHint(); if (!el) return;
+  hintFor = el; hintEl.textContent = el.dataset.hint;
+  const r = el.getBoundingClientRect(), w = hintEl.offsetWidth;
+  hintEl.style.left = clamp(r.left + r.width / 2 - w / 2, 6, innerWidth - w - 6) + 'px'; hintEl.style.top = (r.bottom + 7) + 'px';
+  void hintEl.offsetWidth; hintEl.classList.add('on');
+});
+document.addEventListener('pointerdown', hideHint, true);
+document.addEventListener('mouseleave', hideHint);
+
 /* ---------- guide lines ----------
    dropline: where a dragged item will land; insline: the "+" line for click-to-insert (sidebar and day list).
    Shown at height y, from x to the right edge `right` of the list it belongs to. */

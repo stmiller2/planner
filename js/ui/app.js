@@ -12,10 +12,11 @@ function render() {
 }
 
 let dataLoaded = false;
+const DEFAULT_TITLE = 'Experiment Planner';   // the planner's name until it's renamed (state.title)
 function renderHeader() {
   let name;
-  if (dataLoaded) { name = state.title || 'Planner'; try { localStorage.setItem('planner.title', name); } catch (e) {} }
-  else { try { name = localStorage.getItem('planner.title'); } catch (e) {} name = name || 'Planner'; }
+  if (dataLoaded) { name = state.title || DEFAULT_TITLE; try { localStorage.setItem('planner.title', name); } catch (e) {} }
+  else { try { name = localStorage.getItem('planner.title'); } catch (e) {} name = name || DEFAULT_TITLE; }
   const bn = $('.brand .bname'), bi = bn.querySelector('input'); if (!bi || bi.dataset.done) bn.textContent = name;   // don't wipe the box mid-rename
   document.title = name;
   setRange();
@@ -31,20 +32,24 @@ function setRange(first = ui.dayView) {
 }
 
 /* ---------- sidebar resize ---------- */
+// collapsed (ui.sbw = 0), the sidebar and day view's task list keep a slim labeled tab (like the scratch board's)
+const SB_TAB = 30;
 function setSbw(w) {
   ui.sbw = w; if (w) ui.sbwLast = w;
-  $('#app').style.setProperty('--sbw', w + 'px');
+  $('#app').style.setProperty('--sbw', (w || SB_TAB) + 'px');
   $('#app').classList.toggle('sbhidden', !w);
 }
 const rz = $('#resizer');
 rz.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
   e.preventDefault(); rz.setPointerCapture(e.pointerId); document.body.classList.add('resizing');
-  const move = ev => { let w = Math.round(ev.clientX); if (w < 140) w = 0; setSbw(Math.min(w, Math.round(innerWidth * 0.6))); };
+  const move = ev => { let w = Math.round(ev.clientX); if (w < 100) w = 0; setSbw(Math.min(w, Math.round(innerWidth * 0.6))); };
   const up = () => { rz.removeEventListener('pointermove', move); rz.removeEventListener('pointerup', up); document.body.classList.remove('resizing'); saveUI(); };
   rz.addEventListener('pointermove', move); rz.addEventListener('pointerup', up);
 });
-rz.addEventListener('dblclick', () => { setSbw(ui.sbw ? 0 : (ui.sbwLast || 330)); saveUI(); });
+rz.addEventListener('dblclick', () => { setSbw(ui.sbw ? 0 : (ui.sbwLast || 330)); saveUI(); render(); });
+const sbTab = label => `<button class="sc-tab sb-tab" data-act="sb-show" title="Show sidebar (double-click its edge)">${ICON.dright}<span>${label}</span></button>`;
+$('aside').insertAdjacentHTML('afterbegin', sbTab('Projects / Conflicts'));
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
@@ -86,6 +91,11 @@ document.addEventListener('click', e => {
     case 'sc-clear': { const n = clearDoneScratch(); if (n) toast(`Deleted ${plural(n, 'completed task')}. ⌘Z to undo.`); break; }
     case 'sc-hide': toggleScratch(false); break;
     case 'sc-show': toggleScratch(true); break;
+    case 'sb-show': setSbw(Math.max(100, ui.sbwLast || 330)); saveUI(); render(); break;
+    case 'dr-toggle': {   // a "+ N completed" line in the sidebar: show / hide those tasks
+      const ids = a.dataset.has.split(' '), open = ids.some(x => drOpen.has(x));
+      ids.forEach(x => open ? drOpen.delete(x) : drOpen.add(x)); render(); break;
+    }
     case 'unplan': { const f = findTask(id); if (f) mutate(() => { delete f.task.plan; }); break; }
   }
 });
@@ -141,7 +151,13 @@ $('#todayBtn').onclick = navToday;
 $$('.views button').forEach(b => { b.innerHTML = ICON[{ c: 'calendar', d: 'day', '-': 'timeline' }[b.dataset.view]]; b.onclick = () => switchView(b.dataset.view); });
 // day view: how many days side by side
 $('#dvcount').innerHTML = [1, 2, 3, 4, 5].map(n => `<button data-n="${n}"><span>${n}</span><span class="dl">${n > 1 ? ' days' : ' day'}</span></button>`).join('');
-$('#dvcount').onclick = e => { const b = e.target.closest('button'); if (!b || !ui.dayView) return; ui.dayCount = +b.dataset.n; dvAdd = null; saveUI(); renderDay(); };
+$('#dvcount').onclick = e => { const b = e.target.closest('button'); if (b) setDayCount(+b.dataset.n); };
+// (also keys 1–5) a slide in progress lands first
+function setDayCount(n) {
+  if (!ui.dayView || dv || cfDrag || n === ui.dayCount) return;
+  if (dayAnim) dayAnim.finish(); else if (dayStrip) exitStrip(null);
+  ui.dayCount = n; dvAdd = null; saveUI(); renderDay();
+}
 $('#addProject').onclick = addProject;
 $('#archBtn').onclick = showArchive;
 $('#warnUndo').onclick = () => { undo(); hideWarn(); };
@@ -155,7 +171,6 @@ const osDark = matchMedia('(prefers-color-scheme: dark)');
 function applyTheme() {
   document.documentElement.dataset.theme = ui.theme === 'auto' ? (osDark.matches ? 'dark' : 'light') : ui.theme;
   const b = $('#themeBtn'); b.innerHTML = ICON[ui.theme === 'auto' ? 'auto' : ui.theme === 'dark' ? 'moon' : 'sun'];
-  b.title = 'Theme';
 }
 $('#themeBtn').onclick = () => { ui.theme = { auto: 'light', light: 'dark', dark: 'auto' }[ui.theme]; saveUI(); applyTheme(); };
 osDark.addEventListener('change', applyTheme);
@@ -200,6 +215,8 @@ document.addEventListener('keydown', e => {
   else if (!mod && !e.altKey && e.key.toLowerCase() === 's') showSettings();
   else if (admOpen) return;
   else if (!mod && !e.altKey && e.key.toLowerCase() === 'x') toggleScratch();
+  else if (!mod && !e.altKey && e.key.toLowerCase() === 'n' && ui.scw) { e.preventDefault(); scNew(); }   // (no 'n' typed into the box)
+  else if (!mod && !e.altKey && ui.dayView && /^[1-5]$/.test(e.key)) setDayCount(+e.key);
   else if (!mod && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) { e.preventDefault(); navStep(-1); }
   else if (!mod && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) { e.preventDefault(); navStep(1); }
   else if (!mod && e.key.toLowerCase() === 't') navToday();

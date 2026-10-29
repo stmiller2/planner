@@ -1,10 +1,12 @@
 /* ---------- the scratch board: right of the calendar and day view (js/ui/scratch.js) ---------- */
 #scratch{grid-column:3;grid-row:2;position:relative;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
-.sc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:10px 8px 6px 14px}
-.sc-ttl{min-width:0}
-.sc-head h2{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600;white-space:nowrap}
-.sc-sub{font-size:11.5px;color:var(--muted);opacity:.8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sc-btns{display:flex;align-items:center;gap:2px;flex:none;margin-top:-3px}
+/* too narrow for the title's longest word beside the buttons: the buttons move up onto their own line (wrap-reverse) */
+.sc-head{display:flex;flex-wrap:wrap-reverse;align-items:flex-end;justify-content:space-between;gap:2px 8px;padding:10px 8px 6px 14px}
+.sc-ttl{flex:1 1 0;min-width:min-content}
+/* (a narrow board wraps its title and subtitle onto more lines, between words) */
+.sc-head h2{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+.sc-sub{font-size:11.5px;color:var(--muted);opacity:.8;margin-top:2px}
+.sc-btns{display:flex;align-items:center;gap:2px;flex:none;margin:-3px 0 0 auto;align-self:flex-end}
 .sc-list{flex:1;overflow:auto;padding:4px 8px 40px;isolation:isolate}   /* (scrollbar in front: see .items in calendar.css) */
 .sc-row{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:6px;position:relative;cursor:grab;min-height:28px}
 .sc-row:hover{background:var(--hover)}
@@ -18,6 +20,8 @@
 .sc-row.dragging{opacity:.4}
 .sc-list .add{width:100%;margin:2px 0 0}
 .sc-list .add:not(.idle){background:var(--hover);border:1px solid var(--accent)}
+.sc-list .add.idle:hover{background:var(--hover);cursor:text}
+.sc-list .add.idle:hover::placeholder{color:var(--ink)}
 /* collapsed: a slim tab down the right edge */
 .sc-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 0;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase}
 .sc-tab:hover{background:var(--hover);color:var(--ink)}

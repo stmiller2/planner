@@ -79,7 +79,8 @@ function renderDay() {
   if (!box.querySelector('.dv-side')) buildDaySkeleton(box);
   const ds = dvDays();
   setRange();
-  box.querySelector('.dv-side .sb-head h2').textContent = ds.length > 1 ? `Tasks these ${ds.length} days` : 'Tasks this day';
+  const lbl = ds.length > 1 ? `Tasks these ${ds.length} days` : 'Tasks this day';
+  box.querySelector('.dv-side .sb-head h2').textContent = lbl; box.querySelector('.dv-side .sb-tab span').textContent = lbl;
   $$('#dvcount button').forEach(b => b.classList.toggle('on', +b.dataset.n === ui.dayCount));
   renderDayList(box);
   renderDayTimeline(box);
@@ -88,6 +89,7 @@ function renderDay() {
 function buildDaySkeleton(box) {
   box.innerHTML = `
     <section class="dv-side">
+      ${sbTab('Tasks this day')}
       <div class="sb-head"><h2>Tasks this day</h2></div>
       <div class="dv-list"></div>
     </section>
