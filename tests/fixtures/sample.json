@@ -1,0 +1,497 @@
+{
+  "version": 4,
+  "title": "Test planner",
+  "projects": [
+    {
+      "id": "pa",
+      "name": "Alpha",
+      "threads": [
+        {
+          "id": "t1",
+          "name": "Writing",
+          "color": "#d9534f",
+          "tasks": [
+            {
+              "id": "a1",
+              "title": "Outline",
+              "date": "2026-10-26",
+              "done": true,
+              "linkToPrev": null
+            },
+            {
+              "id": "a2",
+              "title": "Draft intro",
+              "date": "2026-10-27",
+              "done": true,
+              "linkToPrev": null,
+              "plan": {
+                "date": "2026-10-27",
+                "start": 540,
+                "dur": 60
+              }
+            },
+            {
+              "id": "a3",
+              "title": "Draft methods",
+              "date": "2026-10-28",
+              "done": false,
+              "linkToPrev": null,
+              "plan": {
+                "date": "2026-10-28",
+                "start": 540,
+                "dur": 90
+              }
+            },
+            {
+              "id": "a4",
+              "title": "Figures",
+              "date": "2026-10-28",
+              "done": false,
+              "linkToPrev": "sameDay",
+              "plan": {
+                "date": "2026-10-28",
+                "start": 660,
+                "dur": 45
+              }
+            },
+            {
+              "id": "a5",
+              "title": "Revise",
+              "date": "2026-10-29",
+              "done": false,
+              "linkToPrev": "nextDay",
+              "plan": {
+                "date": "2026-10-25",
+                "start": 600,
+                "dur": 30
+              }
+            },
+            {
+              "id": "a6",
+              "title": "Send to PI",
+              "date": "2026-11-02",
+              "done": false,
+              "linkToPrev": null
+            },
+            {
+              "id": "a7",
+              "title": "Unscheduled thing",
+              "date": null,
+              "done": false,
+              "linkToPrev": null
+            }
+          ],
+          "threads": [
+            {
+              "id": "s1",
+              "name": "Experiments",
+              "color": null,
+              "tasks": [
+                {
+                  "id": "e1",
+                  "title": "Run assay",
+                  "date": "2026-10-30",
+                  "done": false,
+                  "linkToPrev": null
+                },
+                {
+                  "id": "e2",
+                  "title": "Analyze",
+                  "date": "2026-11-03",
+                  "done": false,
+                  "linkToPrev": null
+                }
+              ],
+              "threads": [
+                {
+                  "id": "s1a",
+                  "name": "Controls",
+                  "color": null,
+                  "tasks": [
+                    {
+                      "id": "c1",
+                      "title": "Prep controls",
+                      "date": "2026-10-29",
+                      "done": false,
+                      "linkToPrev": null
+                    }
+                  ],
+                  "threads": [],
+                  "afterTask": null
+                }
+              ],
+              "afterTask": "a3"
+            },
+            {
+              "id": "s2",
+              "name": "Parallel B",
+              "color": "#8e5bd6",
+              "tasks": [
+                {
+                  "id": "p1",
+                  "title": "Order reagents",
+                  "date": "2026-10-28",
+                  "done": true,
+                  "linkToPrev": null
+                },
+                {
+                  "id": "p2",
+                  "title": "Wait for delivery",
+                  "date": null,
+                  "done": false,
+                  "linkToPrev": null
+                }
+              ],
+              "threads": [],
+              "afterTask": "a3"
+            }
+          ]
+        },
+        {
+          "id": "t2",
+          "name": "Admin",
+          "color": null,
+          "tasks": [
+            {
+              "id": "m1",
+              "title": "Grant report",
+              "date": "2026-11-05",
+              "done": false,
+              "linkToPrev": null,
+              "plan": {
+                "date": "2026-11-05",
+                "start": 600,
+                "dur": 120
+              }
+            },
+            {
+              "id": "m2",
+              "title": "Expense forms",
+              "date": "2026-11-05",
+              "done": false,
+              "linkToPrev": "sameDay",
+              "plan": {
+                "date": "2026-11-05",
+                "start": 630,
+                "dur": 15
+              }
+            },
+            {
+              "id": "m3",
+              "title": "Long task title that should wrap across multiple lines in a chip to test the wrapping behaviour",
+              "date": "2026-11-06",
+              "done": false,
+              "linkToPrev": null
+            },
+            {
+              "id": "m4",
+              "title": "Busy item 4",
+              "date": "2026-11-09",
+              "done": false,
+              "linkToPrev": null,
+              "plan": {
+                "date": "2026-11-09",
+                "start": 600,
+                "dur": 30
+              }
+            },
+            {
+              "id": "m5",
+              "title": "Busy item 5",
+              "date": "2026-11-09",
+              "done": false,
+              "linkToPrev": null,
+              "plan": {
+                "date": "2026-11-09",
+                "start": 630,
+                "dur": 30
+              }
+            },
+            {
+              "id": "m6",
+              "title": "Busy item 6",
+              "date": "2026-11-09",
+              "done": false,
+              "linkToPrev": null
+            },
+            {
+              "id": "m7",
+              "title": "Busy item 7",
+              "date": "2026-11-09",
+              "done": false,
+              "linkToPrev": null
+            },
+            {
+              "id": "m8",
+              "title": "Busy item 8",
+              "date": "2026-11-09",
+              "done": false,
+              "linkToPrev": null
+            },
+            {
+              "id": "m9",
+              "title": "Busy item 9",
+              "date": "2026-11-09",
+              "done": false,
+              "linkToPrev": null
+            },
+            {
+              "id": "m10",
+              "title": "Busy item 10",
+              "date": "2026-11-09",
+              "done": false,
+              "linkToPrev": null
+            },
+            {
+              "id": "m11",
+              "title": "Busy item 11",
+              "date": "2026-11-09",
+              "done": false,
+              "linkToPrev": null
+            }
+          ],
+          "threads": []
+        }
+      ]
+    },
+    {
+      "id": "pb",
+      "name": "Beta",
+      "threads": [
+        {
+          "id": "t3",
+          "name": "Lab",
+          "color": "#1c9bb0",
+          "tasks": [
+            {
+              "id": "l1",
+              "title": "Old done",
+              "date": "2026-10-20",
+              "done": true,
+              "linkToPrev": null
+            },
+            {
+              "id": "l2",
+              "title": "Mid November",
+              "date": "2026-11-12",
+              "done": false,
+              "linkToPrev": null
+            },
+            {
+              "id": "l3",
+              "title": "Later",
+              "date": "2026-11-20",
+              "done": false,
+              "linkToPrev": null
+            },
+            {
+              "id": "l4",
+              "title": "During travel",
+              "date": "2026-11-26",
+              "done": false,
+              "linkToPrev": null
+            }
+          ],
+          "threads": []
+        },
+        {
+          "id": "t4",
+          "name": "Empty thread",
+          "color": null,
+          "tasks": [],
+          "threads": []
+        }
+      ]
+    },
+    {
+      "id": "pc",
+      "name": "Gamma",
+      "threads": []
+    }
+  ],
+  "archive": [
+    {
+      "id": "ar1",
+      "kind": "task",
+      "at": "2026-10-25",
+      "item": {
+        "id": "x1",
+        "title": "Archived task",
+        "date": "2026-10-22",
+        "done": true,
+        "linkToPrev": null
+      },
+      "from": {
+        "pid": "pa",
+        "tid": "t1",
+        "path": [
+          "Alpha",
+          "Writing"
+        ],
+        "prevId": "a1",
+        "nextId": "a2"
+      }
+    },
+    {
+      "id": "ar2",
+      "kind": "thread",
+      "at": "2026-10-24",
+      "item": {
+        "id": "xt",
+        "name": "Old thread",
+        "color": null,
+        "tasks": [
+          {
+            "id": "x2",
+            "title": "Old A",
+            "date": "2026-10-15",
+            "done": true,
+            "linkToPrev": null
+          },
+          {
+            "id": "x3",
+            "title": "Old B",
+            "date": "2026-10-21",
+            "done": true,
+            "linkToPrev": null
+          },
+          {
+            "id": "x4",
+            "title": "Old C",
+            "date": "2026-10-29",
+            "done": false,
+            "linkToPrev": null
+          }
+        ],
+        "threads": [
+          {
+            "id": "xts",
+            "name": "Old sub",
+            "color": null,
+            "tasks": [
+              {
+                "id": "x5",
+                "title": "Old sub task",
+                "date": "2026-10-19",
+                "done": true,
+                "linkToPrev": null
+              }
+            ],
+            "threads": [],
+            "afterTask": "x2"
+          }
+        ]
+      },
+      "from": {
+        "pid": "pb",
+        "parentTid": null,
+        "path": [
+          "Beta"
+        ],
+        "color": "#c98a12",
+        "prevId": "t3",
+        "nextId": "t4"
+      }
+    },
+    {
+      "id": "ar3",
+      "kind": "project",
+      "at": "2026-10-01",
+      "item": {
+        "id": "pz",
+        "name": "Finished project",
+        "threads": [
+          {
+            "id": "zt",
+            "name": "Z thread",
+            "color": "#e0702a",
+            "tasks": [
+              {
+                "id": "z1",
+                "title": "Z one",
+                "date": "2026-09-10",
+                "done": true,
+                "linkToPrev": null
+              },
+              {
+                "id": "z2",
+                "title": "Z two",
+                "date": "2026-09-12",
+                "done": true,
+                "linkToPrev": null
+              },
+              {
+                "id": "z3",
+                "title": "Z undated",
+                "date": null,
+                "done": true,
+                "linkToPrev": null
+              }
+            ],
+            "threads": []
+          }
+        ]
+      },
+      "from": {
+        "index": 2,
+        "path": [],
+        "prevId": "pb",
+        "nextId": "pc"
+      }
+    },
+    {
+      "id": "ar4",
+      "kind": "task",
+      "at": "2026-10-26",
+      "item": {
+        "id": "x6",
+        "title": "Orphan archived",
+        "date": "2026-10-27",
+        "done": true,
+        "linkToPrev": null
+      },
+      "from": {
+        "pid": "gone",
+        "tid": "gonet",
+        "path": [
+          "Gone proj",
+          "Gone thread"
+        ],
+        "prevId": null,
+        "nextId": null
+      }
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "cf1",
+      "title": "Conference",
+      "start": "2026-11-03",
+      "end": "2026-11-05"
+    },
+    {
+      "id": "cf2",
+      "title": "Holiday",
+      "start": "2026-11-04",
+      "end": "2026-11-04"
+    },
+    {
+      "id": "cf3",
+      "title": "Thanksgiving",
+      "start": "2026-11-25",
+      "end": "2026-11-29"
+    },
+    {
+      "id": "cf4",
+      "title": "Old trip",
+      "start": "2026-10-01",
+      "end": "2026-10-03"
+    },
+    {
+      "id": "cf5",
+      "title": "Someday",
+      "start": null,
+      "end": null
+    }
+  ]
+}

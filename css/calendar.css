@@ -1,0 +1,53 @@
+/* calendar */
+main{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+#dow,#grid{display:grid}
+#dow{border-bottom:1px solid var(--line);background:var(--panel);position:relative;z-index:2}
+#dow div{padding:6px 8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;overflow:hidden;white-space:nowrap}
+#grid{flex:1;overflow:auto;min-height:0;will-change:transform}
+#grid.settle{transition:transform .18s ease-out,opacity .18s ease-out}
+.day{border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);padding:4px 5px 8px;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;position:relative}
+.day:nth-child(7n){border-right:0}
+.day.we{background:var(--weekend)}
+.day.more::after{content:'';position:absolute;left:0;right:0;bottom:0;height:22px;pointer-events:none;background:linear-gradient(to bottom,transparent,var(--bg))}
+.day.we.more::after{background:linear-gradient(to bottom,transparent,var(--weekend))}
+.dn{font-size:12px;font-weight:600;padding:1px 2px 4px;display:flex;align-items:center;gap:6px}
+.dn .n{padding:0 6px;border-radius:10px;line-height:19px}
+.day.past .dn{color:var(--muted);font-weight:500}
+.day.today .dn .n{background:var(--today);color:#fff}
+.day.over{background:color-mix(in srgb,var(--accent) 10%,transparent);box-shadow:inset 0 0 0 2px var(--accent)}
+/* isolation: the list is its own stacking context, so macOS overlay scrollbars draw in front of its rows */
+.items{display:flex;flex-direction:column;gap:4px;flex:1 1 auto;min-height:0;overflow-y:auto;padding:3px;margin:-3px;scrollbar-width:thin;isolation:isolate}
+/* --cs: a thread's color as used for chip edge strips, checkboxes, highlight rings and the sidebar's dots / bars.
+   Same as the thread color in light mode; toned down in dark mode so bright colors don't glare. */
+.thread,.chip,.grp,.dv-th,.dv-item,.dv-blk,#dvtip,#tpop{--cs:var(--c)}
+:root[data-theme="dark"] :is(.thread,.chip,.grp,.dv-th,.dv-item,.dv-blk,#dvtip,#tpop){--cs:color-mix(in srgb,var(--c) 62%,#16171a)}
+.chip{display:flex;gap:6px;align-items:flex-start;background:color-mix(in srgb,var(--c) 14%,var(--chip));border-left:3px solid var(--cs);border-radius:5px;padding:4px 6px 4px 5px;cursor:grab}
+.chip input{margin:2px 0 0;flex:none;accent-color:var(--cs)}
+.cb{min-width:0;flex:1;cursor:pointer}
+.tt{font-weight:520;line-height:1.3;overflow-wrap:break-word;hyphens:auto}
+.ts{font-size:10.5px;color:var(--muted);margin-top:1px;display:flex;flex-wrap:wrap;column-gap:5px;min-width:0}
+/* thread name + position: one line, cut off with … if it's too long; "day after #N" moves to its own line when
+   it doesn't fit beside it, and wraps within its own block (so a wrapped "#N" lines up under "day after") */
+.ts .tn{min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ts .nd{color:var(--c);font-weight:600;min-width:0}
+/* next-day link: the dotted curve from the earlier task (showLinkLines in calendar.js) */
+main{position:relative}
+#linkline{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5;overflow:visible;opacity:0;transition:opacity .15s}
+#linkline.on{opacity:1}
+#linkline{color:var(--c)}
+:root[data-theme="dark"] #linkline{color:color-mix(in srgb,var(--c) 70%,#fff)}
+#linkline .ln{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-dasharray:4 5}   /* (round caps: ≈6px dashes, 3px gaps) */
+#linkline .rv{fill:none;stroke:#fff;stroke-width:10}
+#linkline circle{fill:currentColor}
+.chip{transition:box-shadow .2s}
+.chip.linkfrom{box-shadow:0 0 0 2px var(--cs),0 3px 10px rgba(0,0,0,.15)}
+.chip.done{background:color-mix(in srgb,var(--c) 6%,var(--chip));border-left-color:color-mix(in srgb,var(--c) 40%,var(--chip));color:var(--muted)}
+.chip.done input{opacity:.7}
+.chip.done .tt{text-decoration:line-through}
+.chip.hl{box-shadow:0 0 0 2px var(--cs),0 3px 10px rgba(0,0,0,.15)}
+.task.hl{background:color-mix(in srgb,var(--cs) 20%,transparent)}
+.add.ins{margin-left:24px;width:calc(100% - 28px);background:var(--hover);border:1px solid var(--accent)}
+.grp{display:flex;flex-direction:column;gap:0;border-radius:5px}   /* same-day group: chips stacked flush into one bubble */
+/* outline that follows the chips' own rounded shapes (incl. the notches between them) */
+.grp.hl{filter:drop-shadow(2px 0 0 var(--cs)) drop-shadow(-2px 0 0 var(--cs)) drop-shadow(0 2px 0 var(--cs)) drop-shadow(0 -2px 0 var(--cs)) drop-shadow(0 3px 5px rgba(0,0,0,.18))}
+body.dragging .chip, body.dragging .task{cursor:grabbing}

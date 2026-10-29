@@ -1,0 +1,117 @@
+/* ---------- day planning view ---------- */
+.dn .n{cursor:pointer}
+.dn .n:hover{background:var(--hover);box-shadow:0 0 0 1px var(--line)}
+.day.today .dn .n:hover{background:var(--today);filter:brightness(1.1)}
+#dayview{position:absolute;top:50px;left:0;right:var(--scw);bottom:0;display:none;grid-template-columns:var(--sbw) minmax(0,1fr);background:var(--bg);z-index:8}
+#app.dayon #dayview{display:grid}
+#app.dayon #resizer{z-index:9}
+.dv-side{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.dv-side.rm{box-shadow:inset 0 0 0 2px var(--danger)}
+.dv-side .sb-head{padding-bottom:4px}
+.dv-list{overflow:auto;flex:1;padding:0 8px 40px;isolation:isolate}   /* (scrollbar in front: see .items) */
+.dv-th{font-size:11px;font-weight:650;color:var(--muted);margin:12px 4px 5px;display:flex;gap:6px;align-items:center;text-transform:uppercase;letter-spacing:.04em;cursor:default}
+.dv-th .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* thread headings show just the lowest-level name; hovering a moment shows the full path (see #dvtip) */
+.dv-th .dot{width:9px;height:9px;cursor:default}
+.dv-item{display:flex;gap:7px;align-items:flex-start;padding:5px 8px 5px 6px;border-radius:6px;background:color-mix(in srgb,var(--c) 24%,var(--chip));border-left:3px solid var(--cs);margin-bottom:4px;cursor:grab;touch-action:none;user-select:none}
+.dv-item input{margin:2px 0 0;accent-color:var(--cs);flex:none}
+.dv-item .bd{flex:1;min-width:0}
+.dv-item .tt{line-height:1.3;overflow-wrap:break-word}
+.dv-item .tm{font-size:10.5px;color:var(--muted);margin-top:1px}
+.dv-item.done{background:color-mix(in srgb,var(--c) 8%,var(--chip));border-left-color:color-mix(in srgb,var(--c) 40%,var(--chip));color:var(--muted)}
+.dv-item.done .tt{text-decoration:line-through;color:var(--muted)}
+.dv-empty{color:var(--muted);padding:16px 12px;line-height:1.6}
+.dv-empty.small{padding:8px 4px 4px;font-size:12px}
+/* 2- and 3-day views: one section per day, each with a sticky date header */
+.dv-day{padding-bottom:10px}
+.dv-day+.dv-day{border-top:2px solid var(--line);margin-top:30px}
+.dv-dh{position:sticky;top:0;z-index:3;display:flex;align-items:baseline;gap:6px;margin:0 -8px;padding:9px 12px 7px;background:var(--panel);border-bottom:1px solid var(--line2);font-size:12px;color:var(--muted)}
+.dv-dh b{font-size:14px;font-weight:650;color:var(--ink)}
+.dv-day.cur .dv-dh b{color:var(--accent)}
+.dv-dh .cnt{margin-left:auto;font-size:11px}
+.dv-dh+.dv-grp .dv-th{margin-top:10px}
+.dv-list .add.dvadd{margin:0 0 4px 0;width:100%;background:var(--hover);border:1px solid var(--accent)}
+.dv-main{display:flex;flex-direction:column;min-height:0;min-width:0}
+.dvcount button{transition:background-color .22s ease,color .22s ease}
+.dvcount .dl{display:inline-block;max-width:0;opacity:0;overflow:hidden;white-space:pre;vertical-align:bottom;transition:max-width .26s cubic-bezier(.2,.8,.2,1),opacity .2s ease}
+.dvcount button.on .dl{max-width:3.4em;opacity:1}
+.dv-scroll{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;isolation:isolate}
+.dv-grid{position:relative;display:grid;grid-template-columns:58px minmax(0,1fr);margin:12px 18px 12px 0}
+.dv-main{position:relative;overflow:hidden}
+.dv-hours{position:relative;z-index:4;background:var(--bg)}
+.dv-hours div{position:absolute;right:10px;font-size:11px;color:var(--muted);transform:translateY(-50%);white-space:nowrap}
+.dv-col{position:relative;border-left:1px solid var(--line);overflow-x:visible;overflow-y:clip}
+.dv-col.other{background:color-mix(in srgb,var(--ink) 2.5%,transparent)}
+.dv-heads{display:grid;margin-right:18px;padding:6px 0 0;border-bottom:1px solid var(--line2)}
+.dv-heads>div:first-child{position:relative;z-index:2;background:var(--bg);align-self:stretch}
+.dv-conf{display:grid;margin-right:18px;padding:0 0 7px;row-gap:3px;border-bottom:1px solid var(--line2);flex:none}
+.dv-day.solo+.dv-day.solo{margin-top:24px;border-top:0}
+.dv-day.solo{display:flow-root}   /* (1-day slide: keeps the first heading's margin inside, so the day lands where it slid to) */
+.dv-list.gliding .dv-dh{position:static}
+.dv-cfg{grid-column:1;position:relative;z-index:2;background:var(--bg);margin-bottom:-7px}
+.dv-conf.solo .dv-cfg{background:var(--panel);margin-bottom:-8px}
+.dv-conf.solo{margin-right:0;padding:8px 18px 8px 0;background:var(--panel);border-bottom-color:var(--line)}
+.dv-heads.hascf{border-bottom:0}
+.dv-cfb{position:relative;cursor:grab;user-select:none;touch-action:none}
+.dv-cfb span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dv-cfb .h{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize}
+.dv-cfb .h.l{left:0} .dv-cfb .h.r{right:0}
+.dv-cfp{cursor:grab;user-select:none;touch-action:none}
+.dv-cfp .inl,.dv-cfb .inl{color:var(--ink);font-weight:500;padding:0 4px;width:100%}
+.dv-cfb span.editing{flex:none;overflow:visible}
+.dv-cfb .inl{width:calc(var(--colw,180px) - 22px) !important}
+.dv-cfb{height:20px;background:var(--cf);color:var(--cf-ink);font-size:11.5px;font-weight:600;display:flex;align-items:center;padding:0 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 -1px}
+.dv-cfb.s{margin-left:4px;border-top-left-radius:5px;border-bottom-left-radius:5px}
+.dv-cfb.e{margin-right:4px;border-top-right-radius:5px;border-bottom-right-radius:5px}
+.dv-cfp{margin:8px 4px 2px;background:var(--cf);color:var(--cf-ink);border-radius:5px;padding:3px 9px;font-size:11.5px;font-weight:600;overflow-wrap:break-word}
+.dv-heads div{padding:0 8px 6px;font-size:12px;color:var(--muted);border-left:1px solid transparent}
+.dv-heads div b{font-size:14px;color:var(--ink);font-weight:650}
+.dv-heads div.cur b{color:var(--accent)}
+.dv-heads div.today b{background:var(--today);color:#fff;border-radius:10px;padding:0 6px}
+.dv-line{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+.dv-line.half{border-top:1px dashed var(--line2)}
+.dv-blk{position:absolute;box-sizing:border-box;border-radius:6px;background:color-mix(in srgb,var(--c) 24%,var(--chip));border-left:3px solid var(--cs);padding:3px 6px 3px 6px;overflow:hidden;cursor:grab;touch-action:none;user-select:none;box-shadow:0 0 0 1px var(--bg)}
+.dv-blk:hover{box-shadow:0 0 0 1px var(--bg),0 2px 8px rgba(0,0,0,.18)}
+.dv-blk .bi{display:flex;gap:5px;align-items:flex-start}
+.dv-blk input{margin:2px 0 0;accent-color:var(--cs);flex:none}
+.dv-blk .tt{font-weight:550;line-height:1.25;overflow-wrap:break-word;min-width:0}
+.dv-blk .tm{font-size:10.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv-blk .tmi{display:none;font-size:10.5px;color:var(--muted);white-space:nowrap;margin-left:auto;padding-left:4px}
+/* short blocks: one line (title + start time); tiny ones (≈15 min) use smaller type; hovering shows a full label */
+.dv-blk.short{padding-top:1px;padding-bottom:1px}
+.dv-blk.short .bi{align-items:center;height:100%}
+.dv-blk.short .tt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv-blk.short .tmi{display:block}
+.dv-blk.short .tm{display:none}
+.dv-blk.tiny{padding-top:0;padding-bottom:0;font-size:11.5px;line-height:1.1}
+.dv-blk.tiny input{width:11px;height:11px;margin:0}
+.dv-blk.tiny .x{top:0;height:100%;max-height:18px}
+#dvtip{position:fixed;z-index:55;pointer-events:none;display:none;max-width:320px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-left:3px solid var(--cs);border-radius:7px;padding:6px 9px;box-shadow:0 6px 20px rgba(0,0,0,.2);font-size:13px;line-height:1.35}
+#dvtip .tm{font-size:11px;color:var(--muted);margin-top:2px}
+/* click a block / list item in day view: small popover to type exact start and end times */
+#tpop{position:fixed;z-index:56;display:none;width:262px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--cs);border-radius:9px;box-shadow:0 8px 28px rgba(0,0,0,.2);padding:10px 12px 10px 11px}
+#tpop .tp-h{font-weight:600;line-height:1.3;margin-bottom:9px;overflow-wrap:break-word;padding-right:20px}
+#tpop .tp-x{position:absolute;top:6px;right:6px;width:20px;height:20px}
+#tpop .tp-x svg{width:12px;height:12px}
+#tpop .tp-row{display:flex;align-items:flex-end;gap:6px}
+#tpop label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted);flex:1;min-width:0}
+#tpop input{width:100%;border:1px solid var(--line);border-radius:6px;padding:4px 7px;background:var(--panel);font-variant-numeric:tabular-nums;outline:none}
+#tpop input:focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
+#tpop input.bad{border-color:var(--danger)}
+#tpop .tp-dash{padding-bottom:5px;color:var(--muted)}
+#tpop .tp-f{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11.5px;color:var(--muted)}
+#tpop .tp-d.bad{color:var(--danger)}
+#tpop .tp-f .mini{margin-left:auto}
+#tpop .tp-k{font-size:10.5px;color:var(--muted);margin-top:6px}
+.dv-blk.done{background:color-mix(in srgb,var(--c) 8%,var(--chip));border-left-color:color-mix(in srgb,var(--c) 40%,var(--chip));color:var(--muted)}
+.dv-blk.done .tt{text-decoration:line-through}
+.dv-blk .h{position:absolute;left:0;right:0;height:7px;cursor:ns-resize;z-index:2}
+.dv-blk .h.t{top:0} .dv-blk .h.b{bottom:0}
+.dv-blk .x{position:absolute;top:2px;right:2px;width:18px;height:18px;display:none;z-index:3;background:color-mix(in srgb,var(--c) 24%,var(--chip))}
+.dv-blk .x svg{width:12px;height:12px}
+.dv-blk:hover .x{display:grid}
+.dv-now{position:absolute;left:-5px;right:0;border-top:2px solid var(--danger);z-index:3;pointer-events:none}
+.dv-now::before{content:'';position:absolute;left:0;top:-5px;width:8px;height:8px;border-radius:50%;background:var(--danger)}
+.dv-ghost{position:fixed;pointer-events:none;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:.95}
+body.dv-dragging,body.dv-dragging *{cursor:grabbing !important;user-select:none}
+body.dv-resizing,body.dv-resizing *{cursor:ns-resize !important;user-select:none}

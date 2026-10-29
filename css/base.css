@@ -1,0 +1,82 @@
+:root{
+  --bg:#f6f5f2; --panel:#ffffff; --ink:#1d1d1f; --muted:#6e6e74; --line:#e2e0db; --line2:#ebe9e4;
+  --weekend:#f0efea; --chip:#ffffff; --hover:#f1f0ec; --accent:#2f6fed; --today:#2f6fed;
+  --warn-bg:#fff5d9; --warn-line:#ecd48b; --warn-ink:#5e4600; --danger:#c43c3c; --ok:#2e9e6b;
+  color-scheme: light;
+}
+/* dark theme: chosen with the header toggle, or following macOS when the toggle is on Auto (app.js sets data-theme) */
+:root[data-theme="dark"]{
+  --bg:#16171a; --panel:#1e1f22; --ink:#ececee; --muted:#9a9aa2; --line:#2f3034; --line2:#26272b;
+  --weekend:#1a1b1e; --chip:#25262a; --hover:#292a2e; --accent:#5b8cff; --today:#5b8cff;
+  --warn-bg:#3a3019; --warn-line:#5d4c1f; --warn-ink:#f1d690; --danger:#ff7676; --ok:#4cc38a;
+  color-scheme: dark;
+}
+#dropline{position:fixed;height:2px;background:var(--accent);border-radius:2px;pointer-events:none;z-index:30;display:none}
+#dropline::before{content:'';position:absolute;left:-3px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.subs>.thread{padding-bottom:8px}
+body.drag-thread .threads>.thread{padding-bottom:9px}
+/* click-to-insert line: a thin line with a small + just before it (showGuide in dom.js leaves room for the +) */
+#insline{position:fixed;height:1px;background:color-mix(in srgb,var(--accent) 65%,transparent);pointer-events:none;z-index:29;display:none}
+#insline::before{content:'+';position:absolute;left:-17px;top:-5.5px;width:12px;height:12px;border-radius:50%;background:var(--accent);color:#fff;font:600 11px/12px system-ui;text-align:center}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overscroll-behavior:none}   /* no browser pull-to-refresh / bounce / swipe-back */
+body{background:var(--bg);color:var(--ink);font:13px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body.resizing{cursor:col-resize;user-select:none}
+button,select,input{font:inherit;color:inherit}
+#app{--sbw:330px;--scw:30px;position:relative;display:grid;grid-template-columns:var(--sbw) minmax(0,1fr) var(--scw);grid-template-rows:50px minmax(0,1fr);height:100vh}
+
+/* header */
+/* (above day view and the timeline, so the view switcher's hover labels can hang below it) */
+header{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--line);background:var(--panel);min-width:0;position:relative;z-index:20}
+.brand .bname{cursor:default;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 0;min-width:0}
+.brand .inl{font-size:15px;font-weight:700;padding:1px 5px}
+/* the name + view switcher fill the sidebar's width; the switcher and ‹ Today › sit the same distance (16px) either
+   side of the sidebar's edge: brand ends at sbw - 16, then the header's 8px gap + #prev's 24px margin = sbw + 16 */
+.brand{font-weight:700;font-size:15px;width:calc(var(--sbw) - 28px);min-width:150px;letter-spacing:-.01em;flex:none;display:flex;align-items:center;gap:12px}
+#app.sbhidden .brand{width:auto}
+/* view switcher: calendar / day view / timeline */
+.views{margin-left:auto;display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:8px;flex:none;font-weight:400;letter-spacing:0}
+.views .ic{position:relative;width:34px;height:28px;border-radius:6px}
+.views .ic svg{width:18px;height:18px}
+.views .ic.on{color:var(--accent);background:color-mix(in srgb,var(--accent) 15%,transparent)}
+/* hover labels on header buttons (data-tip): name + shortcut, below the button; .tip-r: right-aligned (at the window edge) */
+header [data-tip]{position:relative}
+header [data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 7px);left:50%;transform:translateX(-50%);white-space:nowrap;pointer-events:none;
+  background:var(--ink);color:var(--panel);font-size:11.5px;font-weight:500;letter-spacing:0;padding:3px 7px;border-radius:5px;opacity:0;transition:opacity .1s}
+header [data-tip]:hover::after{opacity:1;transition-delay:.35s}
+header .tip-r::after{left:auto;right:0;transform:none}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--hover)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.on{background:color-mix(in srgb,var(--accent) 14%,var(--panel));border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+#prev{margin-left:24px}
+#range{font-weight:650;font-size:15px;min-width:180px;padding-left:6px;white-space:nowrap}
+/* ‹ Today › and the dates: calendar and day view; 1–5 days: day view only */
+#app.admon .calctl{visibility:hidden}
+#app:not(.dayon) .dvcount,#app.admon .dvcount{display:none}
+/* right end of the header. In day view with "Other to-do" open, it takes that panel's width, so 1–5 days sits the same
+   16px left of the panel's edge as the view switcher sits left of the sidebar's (24px margin + 8px gap, as for #prev) */
+.hright{display:flex;align-items:center;gap:8px;flex:none;justify-content:flex-end}
+#app.dayon.scon:not(.admon) .hright{width:calc(var(--scw) - 28px);min-width:max-content}
+#app.dayon.scon:not(.admon) #dvcount{margin-right:24px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;flex:none}
+.seg button{border:0;background:transparent;padding:4px 9px;cursor:pointer}
+.seg button.on{background:var(--accent);color:#fff}
+select{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:3px 6px}
+.spacer{flex:1}
+.switch{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap;padding:4px 6px;border-radius:7px}
+.switch:hover{background:var(--hover)}
+.switch input{position:absolute;opacity:0;width:0;height:0}
+.switch .track{position:relative;width:30px;height:18px;border-radius:9px;background:var(--line);transition:background .15s;flex:none}
+.switch .track::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+.switch input:checked + .track{background:var(--accent)}
+.switch input:checked + .track::after{transform:translateX(12px)}
+.switch input:checked ~ span:last-child{color:var(--ink)}
+.switch input:focus-visible + .track{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+#status{border:0;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;padding:4px 6px;border-radius:6px;white-space:nowrap}
+#status:hover{background:var(--hover)}
+#status::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--muted)}
+#status.ok::before{background:var(--ok)}
+#status.busy::before{background:#d6a21e}
+#status.err{color:var(--danger)} #status.err::before{background:var(--danger)}

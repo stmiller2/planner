@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- macOS login item for the Planner server. mac/install-server.sh fills in the __PLACEHOLDERS__ and
+     installs the result as ~/Library/LaunchAgents/local.planner.server.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>local.planner.server</string>
+
+  <!-- the Python that runs the server, and the server script in the app's folder (the data folder is remembered by
+       the server itself: ~/.config/planner/data-folder.txt, set by the install script or the app's Settings) -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>__PYTHON__</string>
+    <string>__APP__/serve_planner.py</string>
+  </array>
+
+  <!-- start at login, and restart it if it ever stops -->
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- only errors are written here; normally this file stays empty -->
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/planner-server.log</string>
+</dict>
+</plist>

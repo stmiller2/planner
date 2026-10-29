@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planner</title>
+<script>
+// before the first paint: the planner's own name for the window title, and the theme in effect (see applyTheme in js/ui/app.js)
+try { var t = localStorage.getItem('planner.title'); if (t) document.title = t; } catch (e) {}
+try { var th = JSON.parse(localStorage.getItem('planner.ui') || '{}').theme;
+  document.documentElement.dataset.theme = th === 'light' || th === 'dark' ? th : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; } catch (e) {}
+</script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1e1f22" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/sidebar.css">
+<link rel="stylesheet" href="css/conflicts.css">
+<link rel="stylesheet" href="css/calendar.css">
+<link rel="stylesheet" href="css/dayview.css">
+<link rel="stylesheet" href="css/scratch.css">
+<link rel="stylesheet" href="css/dialogs.css">
+<link rel="stylesheet" href="css/timeline.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand"><span class="bname" data-act="rename-b" data-id="title"></span>
+      <div class="views"><button class="ic" data-view="c" data-tip="Calendar (c)" aria-label="Calendar"></button><button class="ic" data-view="d" data-tip="Day view (d)" aria-label="Day view"></button><button class="ic" data-view="-" data-tip="Timeline (-)" aria-label="Timeline"></button></div>
+    </div>
+    <button class="calctl btn" id="prev">‹</button>
+    <button class="calctl btn" id="todayBtn" data-tip="Jump to today (t)">Today</button>
+    <button class="calctl btn" id="next">›</button>
+    <div class="calctl" id="range"></div>
+    <div class="spacer"></div>
+    <div class="seg dvcount" id="dvcount"></div>
+    <div class="hright">
+    <span id="fb" hidden><button class="btn" id="exportBtn">Export</button> <button class="btn" id="importBtn">Import</button><input type="file" id="importFile" accept=".json,application/json" hidden></span>
+    <button id="status"></button>
+    <button class="ic" id="themeBtn"></button>
+    <button class="ic" id="setBtn" data-tip="Settings (s)" aria-label="Settings"></button>
+    <button class="btn tip-r" id="helpBtn" data-tip="Help (h)" aria-label="Help">?</button>
+    </div>
+  </header>
+  <aside>
+    <div class="sb-head"><h2>Projects</h2><span><button class="mini" id="archBtn"></button><button class="mini" id="addProject">+ Project</button></span></div>
+    <div id="tree"></div>
+  </aside>
+  <main>
+    <div id="dow"></div>
+    <div id="grid"></div>
+  </main>
+  <section id="scratch" class="dv-scratch"></section>
+  <div class="sc-rz" title="Drag to resize · double-click to hide or show"></div>
+  <div id="dayview"></div>
+  <div id="admire"></div>
+  <div id="resizer"></div>
+</div>
+<div id="menu"></div>
+<div id="dropline"></div>
+<div id="insline"></div>
+<div id="dvtip"></div>
+<div id="tpop"></div>
+<div id="admtip"></div>
+<div id="warn"><div class="msg"></div><div class="btns"><button id="warnUndo">Undo</button><button id="warnClose">Dismiss</button></div></div>
+<div id="toast"></div>
+<div id="modal"><div class="card"></div></div>
+
+<script src="js/core/util.js"></script>
+<script src="js/core/parse.js"></script>
+<script src="js/core/prefs.js"></script>
+<script src="js/core/model.js"></script>
+<script src="js/core/ops.js"></script>
+<script src="js/ui/dom.js"></script>
+<script src="js/ui/dragdrop.js"></script>
+<script src="js/ui/archive.js"></script>
+<script src="js/ui/sidebar.js"></script>
+<script src="js/ui/calendar.js"></script>
+<script src="js/ui/conflicts.js"></script>
+<script src="js/ui/dialogs.js"></script>
+<script src="js/ui/timeline-data.js"></script>
+<script src="js/ui/timeline.js"></script>
+<script src="js/ui/dayview.js"></script>
+<script src="js/ui/dayview-edit.js"></script>
+<script src="js/ui/scratch.js"></script>
+<script src="js/ui/app.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

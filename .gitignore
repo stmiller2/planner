@@ -1,0 +1,13 @@
+# Your plan never goes in the repository. The server keeps it in ~/PlannerData by default; these lines cover
+# setups that keep planner.json next to the code.
+planner.json
+backups/
+.planner.json.tmp-*
+
+# your own copy of the macOS login item (mac/install-server.sh writes one to ~/Library/LaunchAgents)
+local.planner.server.plist
+
+.DS_Store
+node_modules/
+__pycache__/
+server-errors.log
