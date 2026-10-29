@@ -185,7 +185,8 @@ function renderDayTimeline(box) {
     }).join('');
     let now = '';
     if (d === today) { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); now = `<div class="dv-now" style="top:${(m - lo) * PPM}px"></div>`; }
-    return `<div class="dv-col ${d !== ui.dayView ? 'other' : ''}" data-date="${d}" data-sh="${sH}" data-eh="${eH}" style="height:${H}px">${lines}${blk}${now}</div>`;
+    const we = [0, 6].includes(parseD(d).getDay());   // Saturday / Sunday: shaded like the calendar's weekends
+    return `<div class="dv-col ${d !== ui.dayView ? 'other' : ''} ${we ? 'we' : ''}" data-date="${d}" data-sh="${sH}" data-eh="${eH}" style="height:${H}px">${lines}${blk}${now}</div>`;
   };
   sc.innerHTML = `<div class="dv-grid" style="grid-template-columns:${tmpl}">
       <div class="dv-hours" style="height:${H}px">${hours}</div>

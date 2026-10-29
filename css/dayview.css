@@ -42,6 +42,8 @@
 .dv-hours div{position:absolute;right:10px;font-size:11px;color:var(--muted);transform:translateY(-50%);white-space:nowrap}
 .dv-col{position:relative;border-left:1px solid var(--line);overflow-x:visible;overflow-y:clip}
 .dv-col.other{background:color-mix(in srgb,var(--ink) 2.5%,transparent)}
+.dv-col.we{background:var(--weekend)}
+.dv-col.other.we{background:color-mix(in srgb,var(--ink) 2.5%,var(--weekend))}
 .dv-heads{display:grid;margin-right:18px;padding:6px 0 0;border-bottom:1px solid var(--line2)}
 .dv-heads>div:first-child{position:relative;z-index:2;background:var(--bg);align-self:stretch}
 .dv-conf{display:grid;margin-right:18px;padding:0 0 7px;row-gap:3px;border-bottom:1px solid var(--line2);flex:none}
