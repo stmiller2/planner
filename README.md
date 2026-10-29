@@ -1,4 +1,4 @@
-### Experiment Planner
+## Experiment Planner
 
 A planner for lab work. **Projects** (e.g. "build library") hold **threads** (e.g. "cloning"), and threads hold ordered
 **tasks** (e.g. "purify GoldenGate reaction"), which can be linked to happen on the same day or the next day. Schedule
@@ -12,7 +12,7 @@ Everything runs on your own computer. Your plan is stored in one file, `planner.
 > promises that it's great. It has automated tests (`tests/`), and your data stays in a
 > plain file you can back up, but use it at your own risk.
 
-#### Install
+### Install
 
 You need Python 3.7 or newer. On a Mac, macOS offers to install it the first time you type `python3` in Terminal. On
 Windows, install it from [python.org](https://www.python.org/downloads/) and tick "Add python.exe to PATH".
@@ -33,11 +33,11 @@ Your plan is saved to `PlannerData/planner.json` in your home folder, with a dai
 You can also open `Planner.html` directly in a browser, but it only saves automatically in Chrome or Edge. In other
 browsers, you'll need to export and import your `planner.json` by hand.
 
-#### Updating
+### Updating
 
 Run `git pull` (or replace the app folder with the new ZIP), then rerun the install script from step 2.
 
-#### Troubleshooting
+### Troubleshooting
 
 - **Page won't load:** rerun the install script. It restarts the server and says whether it's answering. Errors are
   logged in `~/Library/Logs/planner-server.log` (Mac) or `server-errors.log` in your data folder (Windows). As a
@@ -46,14 +46,14 @@ Run `git pull` (or replace the app folder with the new ZIP), then rerun the inst
 - **"planner.json couldn't be read":** the file isn't valid JSON. Fix it, or restore a backup by copying
   `backups/planner-YYYY-MM-DD.json` over `planner.json`.
 
-#### Uninstalling
+### Uninstalling
 
 - **Mac:** `launchctl bootout gui/$(id -u)/local.planner.server` then `rm ~/Library/LaunchAgents/local.planner.server.plist`
 - **Windows:** `windows\install-server.cmd /uninstall`
 
 Neither touches your data folder.
 
-#### Changing the code
+### Changing the code
 
 `ARCHITECTURE.md` is a map of the code and its rules. Take a gander if that's your thing, or give your LLM of choice
 access to the app folder and tell it to read `ARCHITECTURE.md` first for the project structure. If you come up with
