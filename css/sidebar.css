@@ -81,19 +81,23 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 #menu button.cur{font-weight:650}
 #menu .k{width:26px;font-size:10px;font-weight:650;text-align:center;color:var(--muted)}
 /* "Collapse completed tasks": the "+ N completed" line, laid out like a task row (checkbox gap, number column) */
-.drun{display:flex;align-items:center;gap:6px;padding:0 4px 0 6px;min-height:24px;position:relative;border-radius:6px;cursor:pointer;color:var(--muted);font-size:12px;user-select:none}
+.drun{display:flex;align-items:center;gap:6px;padding:0 4px 0 6px;min-height:24px;position:relative;border-radius:6px;cursor:pointer;color:var(--muted);user-select:none}
 .drun:hover{background:var(--hover);color:var(--ink)}
 .drun .drk{visibility:hidden;margin:0;flex:none}   /* (a real checkbox, so the number column lines up in every browser) */
+/* (the smaller text size goes on the label only, so the hidden checkbox renders exactly like the task rows' ones:
+   browsers may size checkboxes by font-size) */
+.drun .drt{font-size:12px}
 .drun .drn{min-width:18px;flex:none;position:relative;align-self:stretch}
-.drun.open{min-height:20px;font-size:11.5px}
+.drun.open{min-height:20px}
+.drun.open .drt{font-size:11.5px}
 /* a linked chain crossing the line: the bar on the left (as .task.g) and the number box sides (same day) or joining
    line (next day), each fading toward the line's middle; carried straight through above an opened run */
 .drun.lu::before,.drun.ld::before{content:'';position:absolute;left:-9px;top:0;bottom:0;width:3px;background:var(--cs);pointer-events:none}
 .drun .drn::before,.drun .drn::after{content:'';position:absolute;left:0;right:0;height:50%;pointer-events:none;--lk:1.5px solid color-mix(in srgb,var(--cs) 65%,transparent)}
 .drun .drn::before{top:0}
 .drun .drn::after{bottom:0}
-.drun.us .drn::before,.drun.ds .drn::after{border-left:var(--lk);border-right:var(--lk)}
-.drun.un .drn::before,.drun.dn .drn::after{left:calc(50% - .75px);right:auto;border-left:var(--lk)}
+.drun.u-s .drn::before,.drun.d-s .drn::after{border-left:var(--lk);border-right:var(--lk)}
+.drun.u-n .drn::before,.drun.d-n .drn::after{left:calc(50% - .75px);right:auto;border-left:var(--lk)}
 .drun:not(.open).lu::before{-webkit-mask-image:linear-gradient(#000,transparent 50%);mask-image:linear-gradient(#000,transparent 50%)}
 .drun:not(.open).ld::before{-webkit-mask-image:linear-gradient(transparent 50%,#000);mask-image:linear-gradient(transparent 50%,#000)}
 .drun:not(.open).lu.ld::before{-webkit-mask-image:linear-gradient(#000,transparent 40%,transparent 60%,#000);mask-image:linear-gradient(#000,transparent 40%,transparent 60%,#000)}

@@ -104,12 +104,13 @@ function renderThread(p, t, isSub) {
 }
 // "+ N completed" (or, opened, "− N completed" above those tasks). A linked chain crossing into the run carries its
 // bar and number box into the line, fading out (top half: link from the task above; bottom half: link to the task
-// below); above an opened run the line sits inside that link, so it carries straight through.
+// below); above an opened run the line sits inside that link, so it carries straight through. (Classes u-s / u-n /
+// d-s / d-n: plain "dn" would pick up the calendar's day-number style, .dn in calendar.css.)
 function doneRunLine(t, ks, open) {
   const a = t.tasks.indexOf(ks[0]), b = t.tasks.indexOf(ks[ks.length - 1]), nx = t.tasks[b + 1];
   const up = a > 0 ? ks[0].linkToPrev : null, dn = open ? up : nx && nx.linkToPrev;
   const k = { sameDay: 's', nextDay: 'n' };
-  const cls = ['drun', open && 'open', up && 'lu', dn && 'ld', up && 'u' + k[up], dn && 'd' + k[dn]].filter(Boolean).join(' ');
+  const cls = ['drun', open && 'open', up && 'lu', dn && 'ld', up && 'u-' + k[up], dn && 'd-' + k[dn]].filter(Boolean).join(' ');
   return `<div class="${cls}" data-act="dr-toggle" data-has="${ks.map(x => x.id).join(' ')}" title="${open ? 'Hide' : 'Show'} these completed tasks">
     <input type="checkbox" class="drk" tabindex="-1" aria-hidden="true" disabled><span class="drn"></span><span class="drt">${open ? '−' : '+'} ${ks.length} completed</span></div>`;
 }

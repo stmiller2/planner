@@ -4,7 +4,9 @@
      def      default value
      ok(v)    whether a stored value is acceptable (otherwise the default is used)
      key      name in localStorage, when it differs
-     setting  true = part of the Settings window ("Restore defaults" resets it) */
+     setting  true = part of the Settings window ("Restore defaults" resets it)
+     was      (optional) the value for a browser that already has saved settings from before this preference existed,
+              when that differs from the default for a new install (so adding a preference doesn't change anyone's setup) */
 const DAY_HOURS = [4, 6, 8, 10, 12, 16, 24];   // choices for how many hours the day view fits in the window
 const isBool = v => typeof v === 'boolean', isNum = v => typeof v === 'number', oneOf = (...xs) => v => xs.includes(v);
 const UI_PREFS = {
@@ -25,9 +27,10 @@ const UI_PREFS = {
   sbw:           { def: 330, ok: isNum },                                     // sidebar width (0 = hidden)
   sbwLast:       { def: 330, ok: isNum },
   dayCount:      { def: 1, ok: oneOf(1, 2, 3, 4, 5) },                         // days shown side by side in day view
+  scratchOn:     { def: false, was: true, ok: isBool, setting: true },         // false: no scratch board at all (Settings)
   scratchCal:    { def: false, ok: isBool, setting: true },                    // scratch board open when you go to the calendar
   scratchDay:    { def: true, ok: isBool, setting: true },                     // … and when you go to day view
-  scratchRemember: { def: false, ok: isBool, setting: true },                 // true: it stays open / closed as you left it (the two above are ignored)
+  scratchRemember: { def: true, ok: isBool, setting: true },                   // true: it stays open / closed as you left it (the two above are ignored)
   scratchOpen:   { def: false, ok: isBool },                                   // whether it was open last (used when remembering)
   scwLast:       { def: 280, ok: isNum },                                      // scratch board width (while open)
   admPlanned:    { def: false, ok: isBool },                                   // timeline: show future tasks
@@ -39,8 +42,8 @@ const prefDefault = k => typeof UI_PREFS[k].def === 'function' ? UI_PREFS[k].def
 function loadUI() {
   let u = {};
   try { u = JSON.parse(localStorage.getItem('planner.ui') || '{}'); } catch (e) {}
-  const out = {};
-  for (const [k, p] of Object.entries(UI_PREFS)) { const v = u[p.key || k]; out[k] = p.ok(v) ? v : prefDefault(k); }
+  const out = {}, fresh = !Object.keys(u).length;   // (fresh: nothing saved yet, a new install)
+  for (const [k, p] of Object.entries(UI_PREFS)) { const v = u[p.key || k]; out[k] = p.ok(v) ? v : !fresh && 'was' in p ? p.was : prefDefault(k); }
   // dayView: the date open in day view (null = calendar); scw: the scratch board's width now (0 = closed; it opens or
   // closes per view as set in Settings, or stays as last left: see scratchForView)
   return { ...out, dayView: null, scw: (out.scratchRemember ? out.scratchOpen : out.scratchCal) ? out.scwLast : 0 };

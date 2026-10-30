@@ -45,8 +45,8 @@
 .card.framed .mbody{overflow:auto;min-height:0;flex:1 1 auto;padding:14px 24px 22px}
 .mx{width:28px;height:28px}
 .mx svg{width:16px;height:16px}
-.set h4{margin:22px -24px 2px;padding:7px 24px;background:var(--hover);border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;position:sticky;top:-14px;z-index:1}
-.set h4:first-child{margin-top:-14px;border-top:0}   /* (flush under the title bar; sections' headers stick there as you scroll) */
+.set h4,.help h4{margin:22px -24px 2px;padding:7px 24px;background:var(--hover);border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;position:sticky;top:-14px;z-index:1}
+.set h4:first-child,.help .mbody>h4:first-child{margin-top:-14px;border-top:0}   /* (flush under the title bar; sections' headers stick there as you scroll) */
 .set .srow{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;padding:11px 0;border-top:1px solid var(--line2)}
 .set h4+.srow{border-top:0}
 .set .sl{flex:1;min-width:0}
@@ -69,10 +69,9 @@
 .keys .kd{white-space:nowrap}
 kbd{font:inherit;font-size:11.5px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;background:var(--hover);white-space:nowrap}
 /* Help window */
-.help h4{margin:20px 0 5px;font-size:13.5px;font-weight:650;color:var(--ink)}
-.help h4:first-child{margin-top:4px}
+/* (section headers: the same sticky bands as Settings, above) */
+.help h4{margin-bottom:10px}
 .help p{margin-bottom:8px}
-.help .hkeys{margin-top:20px;padding-top:8px;border-top:1px solid var(--line2)}   /* keyboard shortcuts, set off from the rest */
 .help .hkeys .keys{margin-top:4px}
 .help .hui{display:inline-block;font-size:11.5px;font-weight:500;line-height:1.4;padding:0 6px;border:1px solid var(--line);border-radius:5px;background:var(--hover);white-space:nowrap}
 .help .hic{display:inline-grid;place-items:center;width:18px;height:18px;vertical-align:-4px;border:1px solid var(--line);border-radius:5px;background:var(--hover);color:var(--muted)}
@@ -84,6 +83,10 @@ kbd{font:inherit;font-size:11.5px;border:1px solid var(--line);border-bottom-wid
 .set .sline .switch{padding:2px 0}
 .set .ssub.off{opacity:.45}
 .set .ssub.off .switch{cursor:default;pointer-events:none}
+/* scratch board turned off: its other settings dimmed and inactive */
+.set .sgrp{transition:opacity .15s}
+.set .sgrp.off{opacity:.45}
+.set .sgrp.off .switch{cursor:default;pointer-events:none}
 .set .dfrow{display:flex;gap:8px;margin-top:8px}
 .set .dfin{flex:1;min-width:0;border:1px solid var(--line);border-radius:7px;padding:4px 8px;background:var(--panel);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;outline:none}
 .set .dfin:focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}

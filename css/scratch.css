@@ -22,6 +22,8 @@
 .sc-list .add:not(.idle){background:var(--hover);border:1px solid var(--accent)}
 .sc-list .add.idle:hover{background:var(--hover);cursor:text}
 .sc-list .add.idle:hover::placeholder{color:var(--ink)}
+/* turned off in Settings (ui.scratchOn): gone, and #app's third column is 0 wide */
+#app.scoff #scratch,#app.scoff .sc-rz{display:none}
 /* collapsed: a slim tab down the right edge */
 .sc-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 0;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase}
 .sc-tab:hover{background:var(--hover);color:var(--ink)}

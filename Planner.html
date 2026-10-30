@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Experiment Planner</title>
+<title>Experiment planner</title>
 <script>
 // before the first paint: the planner's own name for the window title, and the theme in effect (see applyTheme in js/ui/app.js)
 try { var t = localStorage.getItem('planner.title'); if (t) document.title = t; } catch (e) {}
@@ -27,7 +27,7 @@ try { var th = JSON.parse(localStorage.getItem('planner.ui') || '{}').theme;
 <div id="app">
   <header>
     <div class="brand"><span class="bname" data-act="rename-b" data-id="title"></span>
-      <div class="views"><button class="ic" data-view="c" data-tip="Calendar (c or w)" aria-label="Calendar"></button><button class="ic" data-view="d" data-tip="Day view (d)" aria-label="Day view"></button><button class="ic" data-view="-" data-tip="Timeline (-)" aria-label="Timeline"></button></div>
+      <div class="views"><button class="ic" data-view="c" data-tip="Calendar (c)" aria-label="Calendar"></button><button class="ic" data-view="d" data-tip="Day view (d)" aria-label="Day view"></button><button class="ic" data-view="-" data-tip="Timeline (-)" aria-label="Timeline"></button></div>
     </div>
     <button class="calctl btn" id="prev">‹</button>
     <button class="calctl btn" id="todayBtn" data-tip="Jump to today (t)">Today</button>

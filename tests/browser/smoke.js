@@ -185,7 +185,26 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       await page.keyboard.press('h'); assert.ok(!(await page.isVisible('#modal')), 'H in Help closes it');
       await page.keyboard.press('c');
     });
-    await check('scratch board: closed in calendar view, open in day view (by default); X opens / closes it', async () => {
+    await check('collapsed completed tasks: the "+ N completed" line\'s number column lines up with the task rows\'', async () => {
+      const x = await page.evaluate(() => {
+        const t = state.projects[0].threads[0], k = t.tasks, keep = JSON.stringify(k), cd = ui.collapseDone;
+        k[0].done = k[1].done = true; k[1].linkToPrev = k[2].linkToPrev = 'nextDay'; k[2].done = false; ui.collapseDone = true; render();
+        const dr = $('#tree .drun'), out = [dr.className, dr.querySelector('.drn').getBoundingClientRect().left, $(`.task[data-id="${k[2].id}"] .num`).getBoundingClientRect().left];
+        t.tasks = JSON.parse(keep); ui.collapseDone = cd; render();
+        return out;
+      });
+      assert.ok(/\bd-n\b/.test(x[0]), x[0]); assert.strictEqual(x[1], x[2]);
+    });
+    await check('scratch board: off for a new install (remember open / closed on, if turned on)', async () => {
+      assert.deepStrictEqual(await page.evaluate(() => [ui.scratchOn, ui.scratchRemember, ui.scratchCal, ui.scratchDay]), [false, true, false, true]);
+      assert.ok(!(await page.isVisible('#scratch')));
+      await page.keyboard.press('x'); assert.ok(!(await page.isVisible('#scratch')), 'X does nothing while off');
+      // on, and per view, for the checks below
+      await page.keyboard.press('s'); await page.click('#modal input[data-set="scratchOn"] + .track');
+      await page.click('#modal input[data-set="scratchRemember"] + .track'); await page.click('#sClose');
+      assert.ok(await page.isVisible('#scratch .sc-tab'));
+    });
+    await check('scratch board (per view): closed in calendar view, open in day view; X opens / closes it', async () => {
       const open = () => page.isVisible('#scratch .sc-head');
       assert.ok(!(await open()) && await page.isVisible('#scratch .sc-tab'), 'closed in calendar view');
       const g0 = (await page.locator('main').boundingBox()).width;
@@ -210,6 +229,19 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.strictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('planner.ui')).scratchOpen), true);
       await page.keyboard.press('s'); await page.click('#modal input[data-set="scratchRemember"] + .track'); await page.click('#sClose');
       assert.ok(!(await open()), 'back to per view: closed in the calendar');
+    });
+    await check('scratch board turned off in Settings: no panel or tab, X does nothing, the calendar takes the room', async () => {
+      const g0 = (await page.locator('main').boundingBox()).width;
+      await page.keyboard.press('s'); await page.click('#modal input[data-set="scratchOn"] + .track');
+      assert.ok(await page.evaluate(() => $('#modal .sgrp').classList.contains('off') && $('#modal input[data-set="scratchRemember"]').disabled));
+      await page.click('#sClose');
+      assert.ok(!(await page.isVisible('#scratch')) && !(await page.isVisible('.sc-rz')));
+      assert.ok((await page.locator('main').boundingBox()).width > g0, 'no collapsed tab column');
+      await page.keyboard.press('x'); assert.ok(!(await page.isVisible('#scratch')));
+      await page.keyboard.press('d'); assert.ok(!(await page.isVisible('#scratch')), 'not in day view either');
+      await page.keyboard.press('s'); await page.click('#modal input[data-set="scratchOn"] + .track'); await page.click('#sClose');
+      assert.ok(await page.isVisible('#scratch .sc-head'), 'back on: open in day view, as set');
+      await page.keyboard.press('c'); assert.ok(await page.isVisible('#scratch .sc-tab'));
     });
     await check('day view: scratch board (add, insert, tick, rename, clear done, delete, collapse)', async () => {
       await page.keyboard.press('d');

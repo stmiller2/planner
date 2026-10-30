@@ -19,7 +19,7 @@ function showHelp() {
   <h4>Conflicts</h4>
   <p>Add holidays or travel with ${ui_('+ Conflict')} in the <b>Conflicts</b> section of the sidebar. Tasks can still be scheduled over conflicts but will display a warning, which can be turned off in Settings.</p>
   <h4>Scratch board</h4>
-  <p>One-off tasks that don’t deserve their own project or scheduling (e.g., “clean tubes”) can be added to the scratch board, on the right of the calendar and day view. These tasks can’t be scheduled; they stay on the board until you delete them. Add them with ${ui_('+ Add task')} (or click between two tasks to add one there), check them off as you go, and remove all finished ones at once with the <span class="hic">${ICON.clearDone}</span> button at the top. Press <kbd>x</kbd> to open or close the board, or drag its edge to resize it. By default it’s open in day view and closed in calendar view; in Settings you can change that, or have it remember how you left it.</p>
+  <p>One-off tasks that don’t deserve their own project or scheduling (e.g., “clean tubes”) can be added to the scratch board, on the right of the calendar and day view. These tasks can’t be scheduled; they stay on the board until you delete them. Add them with ${ui_('+ Add task')} (or click between two tasks to add one there), check them off as you go, and remove all finished ones at once with the <span class="hic">${ICON.clearDone}</span> button at the top. Press <kbd>x</kbd> to open or close the board, or drag its edge to resize it. The board is off until you turn it on in Settings; it then stays open or closed the way you left it, or can open and close by itself for calendar and day view.</p>
   <h4>Archive</h4>
   <p>To remove a task, thread, or project from the sidebar without deleting it, it can be archived with the archive icon <span class="hic">${ICON.archive}</span>. Archived tasks still appear in the timeline and calendar.</p>
   <h4>Your data</h4>
@@ -36,13 +36,13 @@ function shortcutsHTML() {
     ['<kbd>⌥ Option</kbd> + drop', 'Move only the task you dragged, unlinking from other tasks if applicable'],
     ['<kbd>←</kbd> / <kbd>→</kbd> or <kbd>↑</kbd> / <kbd>↓</kbd>', 'Previous / next week (previous / next day in day view)'],
     ['<kbd>T</kbd>', 'Jump to today'],
-    ['<kbd>C</kbd> (or <kbd>W</kbd>) / <kbd>D</kbd> / <kbd>-</kbd>', 'Switch to the calendar / day view / timeline'],
+    ['<kbd>C</kbd> / <kbd>D</kbd> / <kbd>-</kbd>', 'Switch to the calendar / day view / timeline'],
     ['<kbd>⌘Z</kbd>', 'Undo'],
     ['<kbd>⇧⌘Z</kbd> or <kbd>⌘Y</kbd>', 'Redo'],
     ['<kbd>S</kbd> or <kbd>⌃⇧,</kbd>', 'Open Settings'],
     ['<kbd>H</kbd>', 'Open Help'],
     ['<kbd>1</kbd> – <kbd>5</kbd>', 'Show that many weeks (days in day view)'],
-    ['<kbd>X</kbd>', 'Open / close the scratch board'],
+    ['<kbd>X</kbd>', 'Open / close the scratch board (if it’s turned on)'],
     ['<kbd>N</kbd>', 'New task on the scratch board (while it’s open)'],
     ['<kbd>Esc</kbd>', 'Close day view, a menu, or a window'],
     ['<kbd>Enter</kbd> / <kbd>Esc</kbd>', 'In a new-task box: add the task / stop adding'],
@@ -77,7 +77,7 @@ function applySetting(key, v) {
   else if (key === 'snap' || key === 'dayHours') ui[key] = +v;
   else ui[key] = v;
   // the scratch board in the view you're in follows at once (scratchForView does nothing while remembering)
-  if (key === null || key === 'scratchRemember' || (key === 'scratchDay') === !!ui.dayView && /^scratch(Cal|Day)$/.test(key)) scratchForView();
+  if (key === null || key === 'scratchOn' || key === 'scratchRemember' || (key === 'scratchDay') === !!ui.dayView && /^scratch(Cal|Day)$/.test(key)) scratchForView();
   if (!warnings().length) hideWarn();
   saveUI(); render(); renderSettings();
 }
@@ -109,13 +109,16 @@ function renderSettings() {
     ${row('Time steps', 'Blocks snap to this grid when you place, move or resize them.', seg('snap', [[5, '5'], [10, '10'], [15, '15'], [30, '30 min']]))}
     ${row('Time format', 'Hours and block times.', seg('clock', [['12', '12-hour (2pm)'], ['24', '24-hour (14:00)']]))}
     <h4>Scratch board</h4>
-    ${row('Remember open / closed', 'Keep the scratch board open or closed the way you left it, in every view and the next time you open the planner.', sw('scratchRemember'))}
-    <div class="ssub ${ui.scratchRemember ? 'off' : ''}">
+    ${row('Enable scratch board', 'A panel on the right of the calendar and day view for quick one-off tasks that don’t belong to a project and don’t need a date.', sw('scratchOn'))}
+    <div class="sgrp ${ui.scratchOn ? '' : 'off'}">
+    ${row('Remember open / closed', 'Keep the scratch board open or closed the way you left it, in every view and the next time you open the planner.', sw('scratchRemember', !ui.scratchOn))}
+    <div class="ssub ${ui.scratchOn && ui.scratchRemember ? 'off' : ''}">
       <div class="sh">${ui.scratchRemember ? 'Not used while remembering. Otherwise, open' : 'Open'} the scratch board when you go to:</div>
-      <div class="sline"><span>Calendar view</span>${sw('scratchCal', ui.scratchRemember)}</div>
-      <div class="sline"><span>Day view</span>${sw('scratchDay', ui.scratchRemember)}</div>
+      <div class="sline"><span>Calendar view</span>${sw('scratchCal', !ui.scratchOn || ui.scratchRemember)}</div>
+      <div class="sline"><span>Day view</span>${sw('scratchDay', !ui.scratchOn || ui.scratchRemember)}</div>
     </div>
     <p class="sub snote">Either way, you can always open or close it by clicking its » / tab or pressing <kbd>X</kbd>.</p>
+    </div>
     <h4>Warnings</h4>
     ${row('Confirm before deleting', 'Ask before deleting a project or thread that still has tasks.', sw('confirmDelete'))}
     ${row('Out-of-order warning', 'Show a warning when a change puts a task before an earlier task in its thread.', sw('orderWarn'))}

@@ -12,7 +12,7 @@ function render() {
 }
 
 let dataLoaded = false;
-const DEFAULT_TITLE = 'Experiment Planner';   // the planner's name until it's renamed (state.title)
+const DEFAULT_TITLE = 'Experiment planner';   // the planner's name until it's renamed (state.title)
 function renderHeader() {
   let name;
   if (dataLoaded) { name = state.title || DEFAULT_TITLE; try { localStorage.setItem('planner.title', name); } catch (e) {} }
@@ -225,19 +225,18 @@ document.addEventListener('keydown', e => {
     // in Help or Settings, a letter shortcut closes the window and then does its thing (H in Help / S in Settings just
     // close it). Other windows, and the arrow keys (they scroll the window), are left alone.
     const kind = $('#modal').dataset.kind, k = e.key.toLowerCase();
-    if (!kind || mod || e.altKey || !['c', 'w', 'd', '-', 't', 'h', 's', 'x'].includes(k)) return;
+    if (!kind || mod || e.altKey || !['c', 'd', '-', 't', 'h', 's', 'x'].includes(k)) return;
     hideModal();
     if (k === kind[0]) return;   // 'h'elp / 's'ettings
   }
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
   else if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
   else if (!mod && !e.altKey && ['c', 'd', '-'].includes(e.key.toLowerCase())) switchView(e.key.toLowerCase());
-  else if (!mod && !e.altKey && e.key.toLowerCase() === 'w') switchView('c');   // (W for weeks: the calendar too)
   else if (!mod && !e.altKey && e.key.toLowerCase() === 'h') { closeMenu(); showHelp(); }
   else if (!mod && !e.altKey && e.key.toLowerCase() === 's') showSettings();
   else if (admOpen) return;
   else if (!mod && !e.altKey && e.key.toLowerCase() === 'x') toggleScratch();
-  else if (!mod && !e.altKey && e.key.toLowerCase() === 'n' && ui.scw) { e.preventDefault(); scNew(); }   // (no 'n' typed into the box)
+  else if (!mod && !e.altKey && e.key.toLowerCase() === 'n' && ui.scratchOn && ui.scw) { e.preventDefault(); scNew(); }   // (no 'n' typed into the box)
   else if (!mod && !e.altKey && /^[1-5]$/.test(e.key)) ui.dayView ? setDayCount(+e.key) : setWeekCount(+e.key);
   else if (!mod && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) { e.preventDefault(); navStep(-1); }
   else if (!mod && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) { e.preventDefault(); navStep(1); }

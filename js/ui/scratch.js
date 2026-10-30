@@ -6,7 +6,7 @@
    Rows can be ticked off, renamed (double-click), deleted and dragged to reorder; "Clear done" deletes the ticked
    ones. The panel resizes from its left edge and collapses to a slim tab (drag it narrow, double-click the edge, the
    » button, or X); its width is ui.scw (0 = collapsed), shown through --scw on #app (#app's third grid column; day
-   view stops short of it; the header lines up with it). */
+   view stops short of it; the header lines up with it). Settings can turn the board off altogether (ui.scratchOn). */
 const SC_MIN = 100, SC_TAB = 30;   // narrower than SC_MIN while dragging = collapse; the collapsed tab's width
 let scAdd = null;      // open new-task box while typing: { beforeId } (null = at the end)
 let scFocus = false;   // put the cursor in that box after the next draw
@@ -15,12 +15,15 @@ const scratch = () => state.scratch || [];
 
 function setScw(w) {
   ui.scw = w; ui.scratchOpen = !!w; if (w) ui.scwLast = w;
-  $('#app').style.setProperty('--scw', (w || SC_TAB) + 'px');
-  $('#app').classList.toggle('scon', !!w);
+  const on = ui.scratchOn;   // (turned off in Settings: no panel, no tab, no third column; ui.scw is kept for turning it back on)
+  $('#app').style.setProperty('--scw', on ? (w || SC_TAB) + 'px' : '0px');
+  $('#app').classList.toggle('scon', on && !!w);
+  $('#app').classList.toggle('scoff', !on);
 }
 function renderScratch() {
   const el = scEl;
   setScw(ui.scw);
+  if (!ui.scratchOn) { el.innerHTML = ''; scAdd = null; return; }
   const list = scratch(), nDone = list.filter(s => s.done).length, nOpen = list.length - nDone;
   if (!ui.scw) {
     el.innerHTML = `<button class="sc-tab" data-act="sc-show" title="Show scratch board (x)">${ICON.dleft}<span>Scratch board</span>${nOpen ? `<b>${nOpen}</b>` : ''}</button>`;
@@ -156,7 +159,7 @@ scRz.addEventListener('pointerdown', e => {
 });
 scRz.addEventListener('dblclick', () => toggleScratch());
 // open / close the board (X, the » button, the collapsed tab); it stays that way until you switch views
-function toggleScratch(open = !ui.scw) { setScw(open ? Math.max(SC_MIN, ui.scwLast || 280) : 0); saveUI(); render(); }
+function toggleScratch(open = !ui.scw) { if (!ui.scratchOn) return; setScw(open ? Math.max(SC_MIN, ui.scwLast || 280) : 0); saveUI(); render(); }
 // going to the calendar or day view: open or close the board as Settings says for that view (no redraw: the caller does)
 function scratchForView() {
   if (ui.scratchRemember) return;   // (Settings: "Remember open / closed")
