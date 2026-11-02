@@ -203,7 +203,7 @@ function renderAdmire() {
       const folded = admCollapsed.has(p.key);
       const hasKids = new Set(p.lanes.map(L => L.parentKey).filter(Boolean));
       // lanes with something in this row (loose lanes have no row: their dots ride on their host's, see admireData)
-      const vis = folded ? [] : p.lanes.filter(L => !L.loose && L.vs && !(L.ve < r0 || L.vs > rEnd) && !inFolded(L));
+      let vis = folded ? [] : p.lanes.filter(L => !L.loose && L.vs && !(L.ve < r0 || L.vs > rEnd) && !inFolded(L));
       const hosted = k => p.lanes.filter(x => x.loose && x.host === k);
       // each lane's dots in this row (a folded lane carries everything under it), and where its name could go
       const G = new Map();
@@ -213,33 +213,42 @@ function renderAdmire() {
         const cells = new Map();   // day -> { done, plan }
         parts.forEach(x => x.own.forEach((o, d) => { if (d < r0 || d > rEnd) return; const c = cells.get(d) || { done: 0, plan: 0 }; c.done += o.done.length; c.plan += o.plan.length; cells.set(d, c); }));
         const half = d => { const c = cells.get(d); return c ? dotSize(c.done + c.plan) / 2 : 0; };
-        const ext = clipX(L.vs, L.ve), estW = Math.min(220, L.name.length * 5.4 + 10);
-        const rEdge = ext[3] ? tw : Math.max(ext[1], xc(ix(L.ve)) + half(L.ve)), lEdge = ext[2] ? 0 : Math.min(ext[0], xc(ix(L.vs)) - half(L.vs));
+        // its core: its own line (or, with none in this row, its first dot), named beside it; any other dots (the
+        // unordered threads it hosts) only take up their own spot, so other lanes and projects can fill around them
+        const days = [...cells.keys()].sort(), line = L.s && L.s <= rEnd && L.e >= r0;
+        if (!line && !days.length) return;   // (what it hosts lies before and after this row)
+        const cs = line ? L.s : days[0], ce = line ? L.e : days[0];
+        const dotP = days.filter(d => d < cs || d > ce).map(d => [xc(ix(d)) - half(d) - 3, xc(ix(d)) + half(d) + 3]);
+        const ext = clipX(cs, ce), estW = Math.min(220, L.name.length * 5.4 + 10);
+        const rEdge = ext[3] ? tw : Math.max(ext[1], xc(ix(ce)) + half(ce)), lEdge = ext[2] ? 0 : Math.min(ext[0], xc(ix(cs)) - half(cs));
         const xr = rEdge + 7, xl = lEdge - 7, room = ext[2] ? lEdge : lEdge - 14;   // 14: the bend of its connector
         // name options, best first: [side, x, the stretch of the row this lane then takes up]
         const opts = [];
         if (!ext[3] && tw - xr >= estW) opts.push(['r', xr, [room, xr + estW + 6]]);
         if (!ext[2] && xl >= estW) opts.push(['l', xl, [xl - estW - 6, rEdge + 6]]);
         opts.push(['t', ext[0] + 4, [room, Math.max(rEdge, ext[0] + 4 + estW) + 6]]);
-        G.set(L.key, { lf, parts, cells, ext, opts });
+        const clear = o => o[0] === 't' || dotP.every(([a, b]) => o[2][1] <= a || o[2][0] >= b);   // a name never sits on its own dots
+        G.set(L.key, { lf, parts, cells, ext, opts: opts.filter(clear), dotP });
       });
+      vis = vis.filter(L => G.has(L.key));
       // rows: a sub-thread shares a row with earlier lanes of the same branch (below its parent) when it fits; a
       // thread joining the ribbon shares one with other such threads
       const rows = [], rowOf = new Map(), tagOf = new Map(), top = new Set();
       const free = (row, [a0, a1]) => row.occ.every(([b0, b1]) => a1 <= b0 || a0 >= b1);
+      const fits = (row, g, o) => o[0] !== 't' && free(row, o[2]) && g.dotP.every(dp => free(row, dp));
       vis.forEach(L => {
         const g = G.get(L.key), pr = L.parentKey && rowOf.has(L.parentKey) ? rowOf.get(L.parentKey) : null;
         let at = null;
         if (pr !== null) for (let k = pr + 1; k < rows.length && !at; k++) {
           if (!rows[k].lanes.every(x => laneUnder(x, L.parentKey, D.lanes, false))) continue;
-          const o = g.opts.find(o => o[0] !== 't' && free(rows[k], o[2])); if (o) at = [k, o];   // sharing a row: its name must fit beside it
+          const o = g.opts.find(o => fits(rows[k], g, o)); if (o) at = [k, o];   // sharing a row: its name must fit beside it
         }
         else { top.add(L.key); for (let k = 0; k < rows.length && !at; k++) {
           if (!rows[k].lanes.every(x => top.has(x.key))) continue;
-          const o = g.opts.find(o => o[0] !== 't' && free(rows[k], o[2])); if (o) at = [k, o];
+          const o = g.opts.find(o => fits(rows[k], g, o)); if (o) at = [k, o];
         } }
         if (!at) { rows.push({ lanes: [], occ: [] }); at = [rows.length - 1, g.opts[0]]; }
-        rows[at[0]].lanes.push(L); rows[at[0]].occ.push(at[1][2]); rowOf.set(L.key, at[0]); tagOf.set(L.key, at[1]);
+        rows[at[0]].lanes.push(L); rows[at[0]].occ.push(at[1][2], ...g.dotP); rowOf.set(L.key, at[0]); tagOf.set(L.key, at[1]);
       });
       const yOf = new Map([[null, ADM_PROJ / 2]]);
       vis.forEach(L => yOf.set(L.key, ADM_PROJ + rowOf.get(L.key) * ADM_LANE + ADM_LANE / 2));
@@ -273,17 +282,18 @@ function renderAdmire() {
       const fullL = p.s ? xc(diffDays(p.s, r0)) - pad : 0, fullW = p.s ? diffDays(p.e, p.s) * DW + 2 * pad : 0;
       const rib = !p.s ? '' : bars(p, '', x => `--rib:${p.rib};--rbs:${fullW.toFixed(1)}px;--rbp:${(fullL - x[0]).toFixed(1)}px;`, x => dl(x[0] / DW, .1, .5), false, squareBL.has(null));
       let pdots = '';
+      const hd = new Map();   // the ribbon row's dots: day -> how many
       if (folded) p.days.forEach((cnt, d) => {
         if (d < r0 || d > rEnd) return;
         const parts = p.lanes.filter(L => L.own.has(d)), tot = cnt.done + cnt.plan;
-        pdots += dotHTML(`proj|${p.key}|${d}`, parts[0].color, cnt.done, cnt.plan, ix(d), pieOf(parts, d, tot));
+        pdots += dotHTML(`proj|${p.key}|${d}`, parts[0].color, cnt.done, cnt.plan, ix(d), pieOf(parts, d, tot)); hd.set(d, tot);
       });
       else {   // the loose lanes it hosts (unordered threads with no ordered thread above them)
         const own = hosted(null), days = new Set(own.flatMap(L => [...L.own.keys()]));
         days.forEach(d => {
           if (d < r0 || d > rEnd) return;
           const parts = own.filter(L => L.own.has(d)), c = parts.reduce((a, L) => a + L.own.get(d).done.length, 0), q = parts.reduce((a, L) => a + L.own.get(d).plan.length, 0);
-          pdots += dotHTML(`set|${parts.map(L => L.key).join(',')}|${d}`, parts[0].color, c, q, ix(d), pieOf(parts, d, c + q));
+          pdots += dotHTML(`set|${parts.map(L => L.key).join(',')}|${d}`, parts[0].color, c, q, ix(d), pieOf(parts, d, c + q)); hd.set(d, c + q);
         });
       }
       let lanesH = '', links = '';
@@ -306,16 +316,21 @@ function renderAdmire() {
         lanesH += `<div class="adm-trk adm-row1" style="--tw:${tw}px">${trk}</div>`;
       });
       const h = ADM_PROJ + rows.length * ADM_LANE;
-      // the project's name beside what its row shows (ribbon and hosted dots; folded: all its dots): after it if
-      // there's room, else before, else just above. With no ribbon in this row: before, if there's room
-      const rb = clipX(p.s, p.e), pe = (folded ? clipX(p.as, p.ae) : clipX(p.vs, p.ve)) || clipX(p.as, p.ae), pw = Math.min(260, p.name.length * 6.4 + 10);
+      // the project's name beside its ribbon (with none in this row: its first dot there): after it if there's room,
+      // else before, else just above; never on one of the row's other dots. Those only take up their own spot.
+      const hdays = [...hd.keys()].sort(), rb = clipX(p.s, p.e), hs = rb ? p.s : hdays[0], he = rb ? p.e : hdays[0];
+      const pe = (hs && clipX(hs, he)) || clipX(p.as, p.ae), pw = Math.min(260, p.name.length * 6.4 + 10);
+      const hdot = d => [xc(ix(d)) - dotSize(hd.get(d)) / 2 - 3, xc(ix(d)) + dotSize(hd.get(d)) / 2 + 3];
+      const hdotP = hdays.filter(d => !hs || d < hs || d > he).map(hdot);
       const pr_ = (pe[3] ? tw : pe[1]) + 8, pl_ = (pe[2] ? 0 : pe[0]) - 8;
-      const [ps_, px_] = !rb && !pe[2] && pl_ >= pw ? ['l', pl_ + 4]
-        : !pe[3] && tw - pr_ >= pw ? ['r', pr_] : !pe[2] && pl_ >= pw ? ['l', pl_] : ['t', pe[0] + 4];
+      const popts = (rb ? [] : [['l', pl_ + 4, [pl_ + 4 - pw, pe[1]], !pe[2] && pl_ + 4 >= pw]]).concat([
+        ['r', pr_, [pe[0], pr_ + pw], !pe[3] && tw - pr_ >= pw], ['l', pl_, [pl_ - pw, pe[1]], !pe[2] && pl_ >= pw]]);
+      const [ps_, px_, pocc] = popts.find(o => o[3] && hdotP.every(([a, b]) => o[2][1] <= a || o[2][0] >= b))
+        || ['t', pe[0] + 4, [pe[0], Math.max(pe[1], pe[0] + 4 + pw)]];
       const ptag = `<span class="adm-tag pjt" data-side="${ps_}" style="left:${px_.toFixed(1)}px;--d:${dl(pe[0] / DW, .5, .5)}s">${esc(p.name)}</span>`;
       // what this block takes up, for packing below: [x0, x1, y0, y1] pieces for its name + ribbon row, each lane's
       // stretch (with its name) in its row, and each pipe down from a parent
-      const pieces = [[...(ps_ === 'r' ? [pe[0], px_ + pw] : ps_ === 'l' ? [px_ - pw, pe[1]] : [pe[0], Math.max(pe[1], pe[0] + 4 + pw)]), 0, ADM_PROJ]];
+      const pieces = [[...pocc, 0, ADM_PROJ], ...hdotP.map(([a, b]) => [a, b, 0, ADM_PROJ])];
       rows.forEach((rw, k) => rw.occ.forEach(([a, b]) => pieces.push([a, b, ADM_PROJ + k * ADM_LANE, ADM_PROJ + (k + 1) * ADM_LANE])));
       joins.forEach(j => pieces.push([j.xv - 3, j.xv + 3, j.y0, j.y1]));
       blks.push({ h, pieces, html: y => `<div class="adm-blk" style="top:${y}px;height:${h}px">
