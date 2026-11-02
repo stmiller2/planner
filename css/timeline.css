@@ -128,6 +128,10 @@ body.adm-rs-y,body.adm-rs-y *{cursor:ns-resize !important;user-select:none}
 .adm-tag.cft[data-side="t"]{top:-3px;transform:none;font-size:9.5px}
 .adm-tag.pjt{color:var(--ink);font-weight:700;font-size:11px;opacity:1;max-width:260px;pointer-events:auto}
 .adm-tag.pjt[data-side="t"]{top:-1px;font-size:10px}
+/* an unordered project's thread names, on its row of loose dots */
+.adm-tag.ltg{pointer-events:auto;transition:color .12s}
+.adm-tag.ltg.planonly{opacity:.55}
+.adm-tag.ltg:is(.hl,.hl2){color:var(--ink);opacity:1;font-weight:620}
 /* the timeline packs sub-threads side by side in rows; the list beside it keeps one line per thread */
 .adm-list{display:flex;flex-direction:column}
 .adm-li{height:auto;min-height:20px;align-items:flex-start;padding-top:2px;padding-bottom:2px;line-height:16px}

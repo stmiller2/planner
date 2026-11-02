@@ -1,10 +1,12 @@
 ## Experiment planner
 
-Vibe-coded experiment planner I use to help schedule lab work. Code is all AI-generated javascript that I haven’t read and can’t vouch for, put here for version control or if anyone else wants to use it feel free! “Help” section in the app explains how to use it.
+Vibe-coded experiment planner I use to help schedule lab work. Code is all AI-generated javascript that I haven’t read and can’t vouch for, put here for version control or if anyone else wants to use it feel free.
+
+“Help” section in the app explains how to use it.
 
 ### Install
 
-It runs off a local server on your computer bound to <http://localhost:47823/>. You just need Python 3.7 or newer to run this server.
+It runs off a local server on your computer bound to <http://localhost:47823/>. You need Python 3.7 or newer to run the server.
 To install:
    ```
    git clone https://github.com/stmiller2/planner Planner

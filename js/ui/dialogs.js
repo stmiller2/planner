@@ -36,7 +36,7 @@ function shortcutsHTML() {
     ['<kbd>⌥ Option</kbd> + drop', 'Move only the task you dragged, unlinking from other tasks if applicable'],
     ['<kbd>←</kbd> / <kbd>→</kbd> or <kbd>↑</kbd> / <kbd>↓</kbd>', 'Previous / next week (previous / next day in day view)'],
     ['<kbd>T</kbd>', 'Jump to today'],
-    ['<kbd>C</kbd> / <kbd>D</kbd> / <kbd>-</kbd>', 'Switch to the calendar / day view / timeline'],
+    ['<kbd>C</kbd> / <kbd>D</kbd> / <kbd>-</kbd>', 'Switch to the calendar / day view / timeline (<kbd>-</kbd> again: back)'],
     ['<kbd>⌘Z</kbd>', 'Undo'],
     ['<kbd>⇧⌘Z</kbd> or <kbd>⌘Y</kbd>', 'Redo'],
     ['<kbd>S</kbd> or <kbd>⌃⇧,</kbd>', 'Open Settings'],

@@ -327,10 +327,32 @@ function renderAdmire() {
         ['r', pr_, [pe[0], pr_ + pw], !pe[3] && tw - pr_ >= pw], ['l', pl_, [pl_ - pw, pe[1]], !pe[2] && pl_ >= pw]]);
       const [ps_, px_, pocc] = popts.find(o => o[3] && hdotP.every(([a, b]) => o[2][1] <= a || o[2][0] >= b))
         || ['t', pe[0] + 4, [pe[0], Math.max(pe[1], pe[0] + 4 + pw)]];
-      const ptag = `<span class="adm-tag pjt" data-side="${ps_}" style="left:${px_.toFixed(1)}px;--d:${dl(pe[0] / DW, .5, .5)}s">${esc(p.name)}</span>`;
+      let ptag = `<span class="adm-tag pjt" data-side="${ps_}" style="left:${px_.toFixed(1)}px;--d:${dl(pe[0] / DW, .5, .5)}s">${esc(p.name)}</span>`;
       // what this block takes up, for packing below: [x0, x1, y0, y1] pieces for its name + ribbon row, each lane's
       // stretch (with its name) in its row, and each pipe down from a parent
       const pieces = [[...pocc, 0, ADM_PROJ], ...hdotP.map(([a, b]) => [a, b, 0, ADM_PROJ])];
+      if (!p.s && !folded) {
+        // an unordered project (no ribbon, just a row of loose dots): its threads are named instead of the project
+        // (the list beside says whose they are), each once per row, beside its first dot there: after it, else
+        // before it, else after its last; never on a dot or another name. Failing all that, just above its first dot.
+        if (!hdays.length) return;   // (nothing of it in this row)
+        const allDots = hdays.map(hdot), occ = [], topOcc = [], clr = ([a, b], xs) => xs.every(([c, d]) => b <= c || a >= d);
+        ptag = ''; pieces.length = 0;
+        hosted(null).map(L => ({ L, ds: [...L.own.keys()].filter(d => d >= r0 && d <= rEnd).sort() })).filter(x => x.ds.length)
+          .sort((a, b) => a.ds[0] < b.ds[0] ? -1 : a.ds[0] > b.ds[0] ? 1 : 0)
+          .forEach(({ L, ds }) => {
+            const w = Math.min(220, L.name.length * 5.4 + 10), f = hdot(ds[0]), l = hdot(ds[ds.length - 1]);
+            let o = [['r', f[1], [f[1], f[1] + w]], ['l', f[0], [f[0] - w, f[0]]], ['r', l[1], [l[1], l[1] + w]]]
+              .find(o => o[2][0] >= 0 && o[2][1] <= tw && clr(o[2], allDots) && clr(o[2], occ));
+            if (o) occ.push(o[2]);
+            else {
+              const t = [f, l].map(q => ['t', q[0] + 3, [q[0] + 3, Math.min(tw, q[0] + 3 + w)]]);
+              o = t.find(o => clr(o[2], topOcc)) || t[0]; topOcc.push(o[2]);
+            }
+            ptag += `<span class="adm-tag ltg ${L.n ? '' : 'planonly'}" data-lk="${esc(L.key)}" data-pk="${esc(p.key)}" data-side="${o[0]}" style="left:${o[1].toFixed(1)}px;--c:${L.color};--d:${dl(f[0] / DW, .5, .5)}s">${esc(L.name)}</span>`;
+          });
+        [...occ, ...topOcc, ...allDots].forEach(([a, b]) => pieces.push([a, b, 0, ADM_PROJ]));
+      }
       rows.forEach((rw, k) => rw.occ.forEach(([a, b]) => pieces.push([a, b, ADM_PROJ + k * ADM_LANE, ADM_PROJ + (k + 1) * ADM_LANE])));
       joins.forEach(j => pieces.push([j.xv - 3, j.xv + 3, j.y0, j.y1]));
       blks.push({ h, pieces, html: y => `<div class="adm-blk" style="top:${y}px;height:${h}px">

@@ -29,9 +29,9 @@ try { var th = JSON.parse(localStorage.getItem('planner.ui') || '{}').theme;
     <div class="brand"><span class="bname" data-act="rename-b" data-id="title"></span>
       <div class="views"><button class="ic" data-view="c" data-tip="Calendar (c)" aria-label="Calendar"></button><button class="ic" data-view="d" data-tip="Day view (d)" aria-label="Day view"></button><button class="ic" data-view="-" data-tip="Timeline (-)" aria-label="Timeline"></button></div>
     </div>
-    <button class="calctl btn" id="prev">‹</button>
+    <button class="calctl btn" id="prev" data-tip="Previous (←)" aria-label="Previous">‹</button>
     <button class="calctl btn" id="todayBtn" data-tip="Jump to today (t)">Today</button>
-    <button class="calctl btn" id="next">›</button>
+    <button class="calctl btn" id="next" data-tip="Next (→)" aria-label="Next">›</button>
     <div class="calctl" id="range"></div>
     <div class="spacer"></div>
     <div class="seg dvcount" id="dvcount"></div><div class="seg dvcount" id="wkcount"></div>

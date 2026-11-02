@@ -203,9 +203,9 @@ applyTheme();
 $('#status').onclick = () => showStorageInfo();   // (storage.js loads after this file)
 document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });   // keep 'Today'/'Mon' labels current
 // C / D / - : switch to the calendar, day view or timeline. Day view opens on today, or on the first day shown
-// when the calendar is on other weeks.
-function switchView(k) {
-  if (k === '-') { if (!admOpen) openAdmire(); return; }
+// when the calendar is on other weeks. toggle (the - key): in the timeline, - goes back to the view it covered.
+function switchView(k, toggle) {
+  if (k === '-') { if (!admOpen) openAdmire(); else if (toggle) closeAdmire(); return; }
   if (admOpen) closeAdmire();
   if (k === 'c' && ui.dayView) closeDay();
   else if (k === 'd' && !ui.dayView) {
@@ -235,7 +235,7 @@ document.addEventListener('keydown', e => {
   }
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
   else if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
-  else if (!mod && !e.altKey && ['c', 'd', '-'].includes(e.key.toLowerCase())) switchView(e.key.toLowerCase());
+  else if (!mod && !e.altKey && ['c', 'd', '-'].includes(e.key.toLowerCase())) switchView(e.key.toLowerCase(), true);
   else if (!mod && !e.altKey && e.key.toLowerCase() === 'h') { closeMenu(); showHelp(); }
   else if (!mod && !e.altKey && e.key.toLowerCase() === 's') showSettings();
   else if (admOpen) return;
