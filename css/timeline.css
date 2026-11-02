@@ -51,7 +51,11 @@ body.adm-rs-y,body.adm-rs-y *{cursor:ns-resize !important;user-select:none}
 .adm-lab .cnt{margin-left:auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;flex:none;padding-left:6px}
 .adm-lab .sw{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 22%,transparent)}
 /* lanes */
-.adm-blk{position:relative;margin-top:4px}
+/* project blocks are packed: placed absolutely (top set in timeline.js), so one block's empty stretch must not catch
+   the mouse over another's dots and bars */
+.adm-blks{position:relative;margin-top:4px}
+.adm-blk{position:absolute;left:0;right:0;pointer-events:none}
+.adm-blk .adm-dot{pointer-events:auto}
 .adm-lane{height:24px}
 .adm-lane.pj{height:32px}
 .adm-lane .tw,.adm-li .tw{width:10px;font-size:8px;color:var(--muted);flex:none;margin-right:-2px}

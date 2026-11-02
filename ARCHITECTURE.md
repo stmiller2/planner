@@ -72,7 +72,8 @@ js/ui/  (views; each draws its part of the page and handles its own events)
                         threads are `loose` lanes: no row of their own, their dots ride on L.host's row (nearest
                         ordered thread above; null = the project's ribbon row) without stretching its line (vs..ve =
                         what a row shows). No ordered work = no ribbon (p.s null; p.as..p.ae = all it shows)
-  timeline.js           Timeline drawing (renderAdmire), hover lists, folding, resizing
+  timeline.js           Timeline drawing (renderAdmire), hover lists, folding, resizing; each week-row packs its
+                        project blocks (pieces: name + ribbon row, lane stretches, pipes) into the highest free spot
   dayview.js            day view: list + hour timeline (renderDay), adding tasks to a day, day swiping
   dayview-edit.js       day view editing: time popover, dragging / resizing blocks, conflict drag, tooltips
   scratch.js            the scratch board, #app's third column beside the calendar and day view: scratch tasks

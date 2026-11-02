@@ -197,7 +197,7 @@ function renderAdmire() {
       const sz = dotSize(c + q), cls = [c ? '' : 'plan', pie ? 'pie' : ''].join(' ');
       return `<div class="adm-dot ${cls}" data-tip="${tip}" style="--c:${color};--tc:${inkOn(color)};${pie ? `--pie:${pie};` : ''}left:${xc(i)}px;--s:${sz.toFixed(1)}px;--d:${dl(i, .4, .9)}s">${c + q > 1 && sz >= 15 ? `<span>${c + q}</span>` : ''}</div>`;
     };
-    let blocks = '';
+    const blks = [];   // each project's block in this row: { h, x0, x1 (the stretch it takes up), html(y) }
     D.projs.forEach(p => {
       if (p.ae < r0 || p.as > rEnd) return;
       const folded = admCollapsed.has(p.key);
@@ -223,8 +223,9 @@ function renderAdmire() {
         opts.push(['t', ext[0] + 4, [room, Math.max(rEdge, ext[0] + 4 + estW) + 6]]);
         G.set(L.key, { lf, parts, cells, ext, opts });
       });
-      // rows: a sub-thread shares a row with earlier lanes of the same branch (below its parent) when it fits
-      const rows = [], rowOf = new Map(), tagOf = new Map();
+      // rows: a sub-thread shares a row with earlier lanes of the same branch (below its parent) when it fits; a
+      // thread joining the ribbon shares one with other such threads
+      const rows = [], rowOf = new Map(), tagOf = new Map(), top = new Set();
       const free = (row, [a0, a1]) => row.occ.every(([b0, b1]) => a1 <= b0 || a0 >= b1);
       vis.forEach(L => {
         const g = G.get(L.key), pr = L.parentKey && rowOf.has(L.parentKey) ? rowOf.get(L.parentKey) : null;
@@ -233,6 +234,10 @@ function renderAdmire() {
           if (!rows[k].lanes.every(x => laneUnder(x, L.parentKey, D.lanes, false))) continue;
           const o = g.opts.find(o => o[0] !== 't' && free(rows[k], o[2])); if (o) at = [k, o];   // sharing a row: its name must fit beside it
         }
+        else { top.add(L.key); for (let k = 0; k < rows.length && !at; k++) {
+          if (!rows[k].lanes.every(x => top.has(x.key))) continue;
+          const o = g.opts.find(o => o[0] !== 't' && free(rows[k], o[2])); if (o) at = [k, o];
+        } }
         if (!at) { rows.push({ lanes: [], occ: [] }); at = [rows.length - 1, g.opts[0]]; }
         rows[at[0]].lanes.push(L); rows[at[0]].occ.push(at[1][2]); rowOf.set(L.key, at[0]); tagOf.set(L.key, at[1]);
       });
@@ -259,7 +264,7 @@ function renderAdmire() {
           const id = `admj${r}_${L.key.replace(/[^\w-]/g, '')}`;
           const grad = (gid, hl) => `<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="${xv.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}">
               <stop offset="0" stop-color="${barAt(pL, xv, !par, hl)}"/><stop offset="1" stop-color="${barAt(L, a[0] + .5, false, hl)}"/></linearGradient>`;
-          return { side, par, svg: grad(id, false) + grad(id + 'h', true) +
+          return { side, par, xv, y0, y1: yC, svg: grad(id, false) + grad(id + 'h', true) +
             `<path pathLength="1" data-lk="${esc(L.key)}" data-pk="${esc(p.key)}" stroke="url(#${id})" stroke-width="1.5" style="--d:${dl(ix(L.s), .2, .5)}s;--sh:url(#${id}h)" d="${d}"/>` };
       };
       const joins = new Map(), squareBL = new Set();   // parents (null = ribbon) a join drops straight down from: square that corner
@@ -308,12 +313,29 @@ function renderAdmire() {
       const [ps_, px_] = !rb && !pe[2] && pl_ >= pw ? ['l', pl_ + 4]
         : !pe[3] && tw - pr_ >= pw ? ['r', pr_] : !pe[2] && pl_ >= pw ? ['l', pl_] : ['t', pe[0] + 4];
       const ptag = `<span class="adm-tag pjt" data-side="${ps_}" style="left:${px_.toFixed(1)}px;--d:${dl(pe[0] / DW, .5, .5)}s">${esc(p.name)}</span>`;
-      blocks += `<div class="adm-blk" style="height:${h}px">
+      // what this block takes up, for packing below: [x0, x1, y0, y1] pieces for its name + ribbon row, each lane's
+      // stretch (with its name) in its row, and each pipe down from a parent
+      const pieces = [[...(ps_ === 'r' ? [pe[0], px_ + pw] : ps_ === 'l' ? [px_ - pw, pe[1]] : [pe[0], Math.max(pe[1], pe[0] + 4 + pw)]), 0, ADM_PROJ]];
+      rows.forEach((rw, k) => rw.occ.forEach(([a, b]) => pieces.push([a, b, ADM_PROJ + k * ADM_LANE, ADM_PROJ + (k + 1) * ADM_LANE])));
+      joins.forEach(j => pieces.push([j.xv - 3, j.xv + 3, j.y0, j.y1]));
+      blks.push({ h, pieces, html: y => `<div class="adm-blk" style="top:${y}px;height:${h}px">
         <svg class="adm-links" width="${tw}" height="${h}" style="--tw:${tw}px">${links}</svg>
         <div class="adm-g adm-lane pj ${p.n ? '' : 'planonly'} ${rb ? '' : 'norib'}" data-lk="${esc(p.key)}" data-pk="${esc(p.key)}" style="--c:${p.color}"><div></div>
           <div class="adm-trk" style="--tw:${tw}px">${rib}${pdots}${ptag}</div></div>
-        ${lanesH}</div>`;
+        ${lanesH}</div>` });
     });
+    // projects share the row's height: each goes in at the highest spot where none of its pieces touch those of a
+    // project placed before it (in the order above: ribbons by start date, then projects without one). So projects
+    // that don't overlap in time sit side by side, and a later one can tuck in beside an earlier one's lower lanes.
+    const BX = 20, BY = 6, placed = [];
+    blks.forEach(b => {
+      const hits = y => placed.some(q => q.pieces.some(([qa, qb, qc, qd]) => b.pieces.some(([a, c, t, u]) =>
+        a < qb + BX && qa < c + BX && y + t < q.y + qd + BY && q.y + qc < y + u + BY)));
+      const ys = [0]; placed.forEach(q => q.pieces.forEach(qp => b.pieces.forEach(bp => { const y = q.y + qp[3] + BY - bp[2]; if (y > 0) ys.push(y); })));
+      b.y = ys.sort((a, c) => a - c).find(y => !hits(y));
+      placed.push(b);
+    });
+    const blocks = `<div class="adm-blks" style="height:${Math.max(0, ...placed.map(q => q.y + q.h))}px">${placed.map(b => b.html(b.y)).join('')}</div>`;
     rowsHTML.push(`<section class="adm-row" style="--tw:${tw}px;--ct:34px">
       <div class="adm-cols">${cols}</div>
       <div class="adm-g adm-axis"><div></div><div class="adm-trk" style="--tw:${tw}px">${axis}</div></div>
