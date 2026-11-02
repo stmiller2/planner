@@ -4,24 +4,24 @@ function showHelp() {
   const ui_ = l => `<span class="hui">${l}</span>`;   // a button's label, as it appears in the app
   const body = framedModal('How it works', `
   <h4>Projects, (sub)threads, and tasks</h4>
-  <p><b>Tasks</b> (e.g., “purify GoldenGate reaction”) are organized into <b>threads</b> (e.g., “cloning”), which are organized into <b>projects</b> (e.g., “build library”). To get started, create a project with ${ui_('+ Project')} and make a thread with ${ui_('+ thread')}. You can then add tasks to your thread, or create subthreads to any depth with ${ui_('+ sub')}.</p>
+  <p><b>Tasks</b> (e.g., “purify GoldenGate reaction”) are organized into <b>threads</b> (e.g., “cloning”), which are organized into <b>projects</b> (e.g., “build library”). To get started, create a project with ${ui_('+ Project')} and make a thread with ${ui_('+ thread')}. You can then add tasks to your thread, or create subthreads to any depth from the thread’s settings menu <span class="hic">${ICON.gear}</span>.</p>
   <p>Tasks, threads, projects, and the planner itself can be renamed by double-clicking the title in calendar or day view.</p>
   <h4>Scheduling</h4>
   <p>To schedule a task, drag it onto the calendar, or click the date box and type e.g. “fri”, “11/26”, “+3”. Tasks can also be scheduled relative to one another: click the link icon <span class="hic">${ICON.link}</span> to link two tasks to the <b>same day</b> (e.g., “do transformation” and “plate cells”) or <b>next day</b> (e.g., “start overnights” and “miniprep plasmids”).</p>
-  <p>Tasks are expected to be ordered based on their number in the sidebar. If scheduled out of order, a warning will display. This can be turned off in Settings.</p>
+  <p>Tasks are expected to be ordered based on their number in the sidebar. If scheduled out of order, a warning will display. This can be turned off in Settings, or for a thread or whole project whose tasks have no set order (e.g., “mentoring”) by switching off <b>Ordered tasks</b> in its settings menu <span class="hic">${ICON.gear}</span>.</p>
   <h4>Rescheduling</h4>
   <p>When rescheduling tasks, linked tasks move too, unless holding <kbd>⌥ Option</kbd> while dropping the task (this breaks links and moves only the dragged task).</p>
-  <p>By default, all tasks within a thread get shifted relative to each other when rescheduling. This can be turned off in Settings, or bypassed by holding <kbd>⌥ Option</kbd>.</p>
+  <p>By default, all tasks within a thread get shifted relative to each other when rescheduling. This can be turned off in Settings, or bypassed by holding <kbd>⌥ Option</kbd>. Tasks in unordered threads never shift.</p>
   <h4>Day view</h4>
   <p>To plan the timing of tasks within a single day, enter day view with the view switcher, pressing <kbd>d</kbd>, or by clicking the date number from calendar view. Drag tasks onto the timeline, then drag or click blocks to set their times. Swipe sideways or use the arrow keys to move between days.</p>
   <h4>Timeline</h4>
-  <p>Press <kbd>-</kbd> or use the view switcher to enter timeline view, where you can view everything you’ve finished over time. No functionality here, it just looks nice.</p>
+  <p>Press <kbd>-</kbd> or use the view switcher to enter timeline view, where you can view everything you’ve finished over time. Unordered threads and projects show as loose dots, without lines. No functionality here, it just looks nice.</p>
   <h4>Conflicts</h4>
   <p>Add holidays or travel with ${ui_('+ Conflict')} in the <b>Conflicts</b> section of the sidebar. Tasks can still be scheduled over conflicts but will display a warning, which can be turned off in Settings.</p>
   <h4>Scratch board</h4>
   <p>One-off tasks that don’t deserve their own project or scheduling (e.g., “clean tubes”) can be added to the scratch board, on the right of the calendar and day view. These tasks can’t be scheduled; they stay on the board until you delete them. Add them with ${ui_('+ Add task')} (or click between two tasks to add one there), check them off as you go, and remove all finished ones at once with the <span class="hic">${ICON.clearDone}</span> button at the top. Press <kbd>x</kbd> to open or close the board, or drag its edge to resize it. The board is off until you turn it on in Settings; it then stays open or closed the way you left it, or can open and close by itself for calendar and day view.</p>
   <h4>Archive</h4>
-  <p>To remove a task, thread, or project from the sidebar without deleting it, it can be archived with the archive icon <span class="hic">${ICON.archive}</span>. Archived tasks still appear in the timeline and calendar.</p>
+  <p>To remove a task, thread, or project from the sidebar without deleting it, it can be archived with the archive icon <span class="hic">${ICON.archive}</span> (for threads and projects, in the settings menu <span class="hic">${ICON.gear}</span>). Archived tasks still appear in the timeline and calendar.</p>
   <h4>Your data</h4>
   <p>Your plan is saved to ${dataWhereHTML()}${MODE === 'fallback' ? '' : ' as you go, with a dated copy each day in <code>backups/</code> next to it (last 14 days)'}. You can change where in Settings, under <b>Data file</b>.</p>
   <div class="hkeys"><h4>Keyboard shortcuts</h4><div class="keys">${shortcutsHTML()}</div></div>
@@ -96,7 +96,7 @@ function renderSettings() {
     ${strip('Shift off', { 0: [1], 2: ['3 !', 'bad'], 3: [2, 'mv'] }, !ui.shiftLater)}</div>`;
   body.innerHTML = `
     <h4>Scheduling</h4>
-    ${row('Shift later tasks', `<p>When you drag a scheduled task to a different day, every scheduled task <i>after</i> it in the same thread moves by the same number of days, so the rest of the thread keeps its spacing. That includes later sub-threads and everything in them.</p>
+    ${row('Shift later tasks', `<p>When you drag a scheduled task to a different day, every scheduled task <i>after</i> it in the same thread (unless the thread is unordered) moves by the same number of days, so the rest of the thread keeps its spacing. That includes later sub-threads and everything in them.</p>
       <p>Fully completed chains never move. Hold <b>⌥ Option</b> while dropping to just move that task.</p>
       <div>Dragging task 2 from Tue to Thu (+2 days):</div>${example}`, sw('shiftLater'))}
     <h4>Calendar view</h4>
@@ -121,7 +121,7 @@ function renderSettings() {
     </div>
     <h4>Warnings</h4>
     ${row('Confirm before deleting', 'Ask before deleting a project or thread that still has tasks.', sw('confirmDelete'))}
-    ${row('Out-of-order warning', 'Show a warning when a change puts a task before an earlier task in its thread.', sw('orderWarn'))}
+    ${row('Out-of-order warning', 'Show a warning when a change puts a task before an earlier task in its thread (ordered threads only).', sw('orderWarn'))}
     ${row('Conflict warning', 'Show a warning when an uncompleted task lands on the same day as a Conflict.', sw('conflictWarn'))}
     <h4>Data file</h4>
     ${dataFileRows(row)}

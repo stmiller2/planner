@@ -54,7 +54,7 @@ $('aside').insertAdjacentHTML('afterbegin', sbTab('Projects / Conflicts'));
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  if (!e.target.closest('#menu') && !e.target.closest('[data-act="linkmenu"]')) closeMenu();
+  if (!e.target.closest('#menu') && !e.target.closest('[data-act="linkmenu"], [data-act="tmenu"], [data-act="pmenu"]')) closeMenu();
   if (e.target.closest('.inl')) return;            // clicks inside a rename box just move the cursor
   const a = e.target.closest('[data-act]'); if (!a) return;
   const act = a.dataset.act;
@@ -71,13 +71,15 @@ document.addEventListener('click', e => {
       else editDateIn(a, { value: c.end !== c.start ? c.end : null, allowEmpty: true, emptyText: 'one day', min: c.start, placeholder: 'End', commit: v => setConflictDates(id, c.start, v || c.start) });
       break;
     }
-    case 'del-p': delProject(id); break;
-    case 'arch-p': archiveProject(id); break;
+    case 'pmenu': openProjectMenu(id, a); break;
+    case 'del-p': closeMenu(); delProject(id); break;
+    case 'arch-p': closeMenu(); archiveProject(id); break;
     case 'p-up': moveProject(id, -1); break;
     case 'p-down': moveProject(id, 1); break;
-    case 'del-t': delThread(id); break;
-    case 'arch-t': archiveThread(id); break;
-    case 'add-sub': addSubThread(id); break;
+    case 'tmenu': openThreadMenu(id, a); break;
+    case 'del-t': closeMenu(); delThread(id); break;
+    case 'arch-t': closeMenu(); archiveThread(id); break;
+    case 'add-sub': closeMenu(); addSubThread(id); break;
     case 'add-task': inserting = null; addOpen = id; focusAdd = id; ui.collapsed[id] = false; saveUI(); render(); break;
     case 'color-reset': { const f = findThread(id); if (f) mutate(() => f.t.color = null); break; }
     case 'linkmenu': openLinkMenu(id, a); break;
@@ -104,6 +106,8 @@ document.addEventListener('change', e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   if (a.dataset.act === 'done') { const f = findTask(a.dataset.id); if (f) mutate(() => f.task.done = a.checked); }
   else if (a.dataset.act === 'sc-done') setScratchDone(a.dataset.id, a.checked);
+  else if (a.dataset.act === 't-order') setThreadOrdered(a.dataset.id, a.checked);
+  else if (a.dataset.act === 'p-order') setProjectOrdered(a.dataset.id, a.checked);
   else if (a.dataset.act === 'color') { const f = findThread(a.dataset.id); if (f) mutate(() => f.t.color = a.value); }
 });
 document.addEventListener('input', e => {

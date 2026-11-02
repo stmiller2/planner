@@ -173,9 +173,9 @@ function chip({ p, t, path }, i) {
   const nd = prev || next ? `<span class="nd">linked to ${prev && next ? 'prior and later tasks' : prev ? 'a prior task' : 'a later task'}</span>` : '';
   const links = (prev ? [prev.id] : []).concat(next ? [next.id] : []).join(' ');
   return `<div class="chip ${k.done ? 'done' : ''}" draggable="true" data-id="${k.id}" data-thread="${t.id}" ${links ? `data-links="${links}"` : ''} style="--c:${esc(colorOf(t))}"
-      title="${esc([p.name, ...path].join(' › '))} #${i + 1}">
+      title="${esc([p.name, ...path].join(' › '))}${isLoose(p, t) ? '' : ` #${i + 1}`}">
     <input type="checkbox" data-act="done" data-id="${k.id}" ${k.done ? 'checked' : ''}>
-    <div class="cb" data-act="reveal" data-id="${k.id}"><div class="tt">${esc(k.title)}</div><div class="ts"><span class="tn">${esc(t.name)} · ${i + 1}/${t.tasks.length}</span>${nd}</div></div>
+    <div class="cb" data-act="reveal" data-id="${k.id}"><div class="tt">${esc(k.title)}</div><div class="ts"><span class="tn">${esc(t.name)}${isLoose(p, t) ? '' : ` · ${i + 1}/${t.tasks.length}`}</span>${nd}</div></div>
     <button class="ic cx" data-act="unsched" data-id="${k.id}" title="Unschedule" draggable="false">${ICON.x}</button>
   </div>`;
 }

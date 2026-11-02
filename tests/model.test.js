@@ -112,3 +112,28 @@ test('loading scratch tasks: kept in order, bad entries dropped; files without t
   assert.strictEqual(s[0].id, 's1'); assert.ok(s[1].id);
   assert.deepStrictEqual(JSON.parse(JSON.stringify(load({ projects: [] }).state.scratch)), []);
 });
+
+test('unordered threads: no order warnings among their tasks; the flag loads, saves and toggles', () => {
+  const P = load(plan([{ ...TH('t', [T('a', '2026-11-05'), T('b', '2026-11-02')]), unordered: true }, { ...TH('u', [T('x', '2026-11-05'), T('y', '2026-11-02')]), unordered: 'yes' }]));
+  assert.strictEqual(P.findThread('t').t.unordered, true);
+  assert.ok(!('unordered' in P.findThread('u').t));   // anything but true is dropped
+  assert.deepStrictEqual(j(P.violations().map(w => w.task.id)), ['y']);
+  P.setThreadOrdered('t', true);
+  assert.ok(!('unordered' in P.findThread('t').t));
+  assert.deepStrictEqual(j(P.violations().map(w => w.task.id).sort()), ['b', 'y']);
+  P.setThreadOrdered('u', false);
+  assert.deepStrictEqual(j(P.violations().map(w => w.task.id)), ['b']);
+});
+
+test('an unordered project makes every thread in it unordered, whatever their own switch says', () => {
+  const P = load({ version: 4, projects: [{ id: 'p', name: 'P', unordered: true, threads: [TH('t', [T('a', '2026-11-05'), T('b', '2026-11-02')])] },
+    { id: 'q', name: 'Q', unordered: 1, threads: [TH('u', [T('x', '2026-11-05'), T('y', '2026-11-02')])] }] });
+  assert.strictEqual(P.state.projects[0].unordered, true);
+  assert.ok(!('unordered' in P.state.projects[1]));   // anything but true is dropped
+  assert.deepStrictEqual(j(P.violations().map(w => w.task.id)), ['y']);
+  P.setProjectOrdered('p', true);
+  assert.deepStrictEqual(j(P.violations().map(w => w.task.id).sort()), ['b', 'y']);
+  P.setProjectOrdered('q', false);
+  P.moveTask('b', '2026-11-08');
+  assert.deepStrictEqual(j(P.violations().map(w => w.task.id)), []);
+});

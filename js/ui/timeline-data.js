@@ -4,6 +4,10 @@
 /* A timeline of finished work.
    Every finished task (live and archived) sits on its calendar day. One lane per thread (sub-threads branch off
    their parent), one ribbon per project, and a stacked wave of daily totals on top (one layer per thread).
+   Unordered threads (isLoose: no progression) are "loose" lanes: no line and no row of their own. Their dots ride
+   on their host's row: the nearest ordered thread above them (L.host), or the project's ribbon row (host null),
+   without stretching that line. A project with no ordered work (or set unordered as a whole) has no ribbon and
+   is a single row of dots; those come after the projects that have one.
    Optionally, tasks still on the calendar show too, a little transparent. Rows wrap a whole number of weeks to
    fit the window. Read-only: nothing here changes the plan. */
 const ADM_PROJ = 32, ADM_LANE = 24, ADM_PULSE = 66, ADM_TIP_DELAY = 1000;
@@ -23,7 +27,7 @@ function pieOf(parts, d, tot) {
 function admireData(range, withPlan) {
   const projs = new Map(), lanes = new Map(), all = [];
   let undated = 0;
-  const proj = (key, name, arch) => { if (!projs.has(key)) projs.set(key, { key, name, arch, lanes: [] }); return projs.get(key); };
+  const proj = (key, name, arch, loose = false) => { if (!projs.has(key)) projs.set(key, { key, name, arch, loose, lanes: [] }); return projs.get(key); };
   const addTask = (L, k, arch) => {
     const d = isoDate(k.date);
     if (k.done) { if (d) all.push({ d, k, L, plan: false }); else undated++; }
@@ -31,17 +35,17 @@ function admireData(range, withPlan) {
   };
   // a thread and everything under it, as lanes in display order
   const sub = (P, t, depth, parentKey, path, cmap, arch) => {
-    const L = { key: t.id, name: t.name, path, depth, parentKey, color: cmap.get(t.id) || PALETTE[0], pkey: P.key, arch, own: new Map(), n: 0, np: 0 };
+    const L = { key: t.id, name: t.name, path, depth, parentKey, color: cmap.get(t.id) || PALETTE[0], pkey: P.key, arch, loose: !!(t.unordered || P.loose), own: new Map(), n: 0, np: 0 };
     lanes.set(t.id, L);
     const out = [L];
     (t.tasks || []).forEach(k => addTask(L, k, arch));
     (t.threads || []).forEach(c => out.push(...sub(P, c, depth + 1, t.id, path.concat(c.name), cmap, arch)));
     return out;
   };
-  state.projects.forEach(p => { const P = proj(p.id, p.name, false); p.threads.forEach(t => P.lanes.push(...sub(P, t, 0, null, [t.name], colors, false))); });
+  state.projects.forEach(p => { const P = proj(p.id, p.name, false, !!p.unordered); p.threads.forEach(t => P.lanes.push(...sub(P, t, 0, null, [t.name], colors, false))); });
   const arch = (state.archive || []).slice().reverse();   // oldest first
   arch.filter(e => e.kind === 'project').forEach(e => {
-    const P = proj(e.item.id, e.item.name, true), cm = colorTree(e.item.threads, null, new Map());
+    const P = proj(e.item.id, e.item.name, true, !!e.item.unordered), cm = colorTree(e.item.threads, null, new Map());
     (e.item.threads || []).forEach(t => P.lanes.push(...sub(P, t, 0, null, [t.name], cm, true)));
   });
   arch.filter(e => e.kind === 'thread').forEach(e => {
@@ -56,7 +60,7 @@ function admireData(range, withPlan) {
     const fr = e.from || {}; let L = fr.tid && lanes.get(fr.tid);
     if (!L) {
       const path = (fr.path || ['Project', 'Thread']).slice(1), P = proj(fr.pid || 'p:' + (fr.path || ['Project'])[0], (fr.path || ['Project'])[0], true);
-      L = { key: fr.tid || 'o:' + e.id, name: path[path.length - 1] || 'Thread', path, depth: 0, parentKey: null, color: PALETTE[P.lanes.length % PALETTE.length], pkey: P.key, arch: true, own: new Map(), n: 0, np: 0 };
+      L = { key: fr.tid || 'o:' + e.id, name: path[path.length - 1] || 'Thread', path, depth: 0, parentKey: null, color: PALETTE[P.lanes.length % PALETTE.length], pkey: P.key, arch: true, loose: P.loose, own: new Map(), n: 0, np: 0 };
       lanes.set(L.key, L); P.lanes.push(L);
     }
     addTask(L, e.item, true);
@@ -88,26 +92,46 @@ function admireData(range, withPlan) {
     });
     for (let i = p.lanes.length - 1; i >= 0; i--) {   // children come after their parent in each list
       const L = p.lanes[i], par = L.parentKey && lanes.get(L.parentKey);
-      if (!par || !L.s || par.pkey !== p.key) continue;
-      par.s = lo(par.s, L.s); par.e = hi(par.e, L.e); par.ds = lo(par.ds, L.ds); par.de = hi(par.de, L.de);
-      par.sub += L.sub; par.subp += L.subp;
+      if (!par || par.pkey !== p.key) continue;
+      par.sub += L.sub; par.subp += L.subp;            // counts: everything underneath
+      // spans: an ordered lane's line runs under its nearest ordered ancestor's (a loose lane has no line)
+      if (L.loose || !L.s) continue;
+      let A = par; while (A && A.loose) A = A.parentKey && lanes.get(A.parentKey);
+      if (!A || A.pkey !== p.key) continue;
+      A.s = lo(A.s, L.s); A.e = hi(A.e, L.e); A.ds = lo(A.ds, L.ds); A.de = hi(A.de, L.de);
     }
-    p.lanes = p.lanes.filter(L => L.s);
+    p.lanes = p.lanes.filter(L => L.s || L.sub || L.subp);   // (a lane with nothing of its own still lists what's under it)
     p.n = p.lanes.reduce((a, L) => a + L.n, 0); p.np = p.lanes.reduce((a, L) => a + L.np, 0);
-    p.s = p.e = p.ds = p.de = null;
-    p.lanes.forEach(L => { p.s = lo(p.s, L.s); p.e = hi(p.e, L.e); p.ds = lo(p.ds, L.ds); p.de = hi(p.de, L.de); });
+    // s..e / ds..de: the ribbon (ordered lanes only; none = no ribbon); as..ae: everything the project shows
+    p.s = p.e = p.ds = p.de = p.as = p.ae = null;
+    p.lanes.forEach(L => {
+      if (!L.s) return;
+      p.as = lo(p.as, L.s); p.ae = hi(p.ae, L.e); if (L.loose) return;
+      p.s = lo(p.s, L.s); p.e = hi(p.e, L.e); p.ds = lo(p.ds, L.ds); p.de = hi(p.de, L.de);
+    });
+    // vs..ve: what a row shows (its line plus the loose dots it hosts); loose lanes find their host
+    p.lanes.forEach(L => { L.vs = L.loose ? null : L.s; L.ve = L.loose ? null : L.e; });
+    p.vs = p.s; p.ve = p.e;
+    p.lanes.forEach(L => {
+      if (!L.loose) return;
+      let H = L.parentKey && lanes.get(L.parentKey); while (H && H.loose) H = H.parentKey && lanes.get(H.parentKey);
+      if (H && H.pkey !== p.key) H = null;
+      L.host = H ? H.key : null;
+      if (L.s) { const o = H || p; o.vs = lo(o.vs, L.s); o.ve = hi(o.ve, L.e); }
+    });
     p.color = (p.lanes.find(L => L.depth === 0) || p.lanes[0] || {}).color;
     p.days = new Map();
     p.lanes.forEach(L => L.own.forEach((o, d) => { const c = p.days.get(d) || { done: 0, plan: 0 }; c.done += o.done.length; c.plan += o.plan.length; p.days.set(d, c); }));
     // ribbon colors: each lane's color at the middle of its span
     const span = Math.max(1, diffDays(p.e || R0, p.s || R0));
-    const stops = p.lanes.filter(L => L.n || L.np).map(L => [L.color, (diffDays(L.s, p.s) + diffDays(L.e, p.s)) / 2 / span]).sort((a, b) => a[1] - b[1]);
+    const stops = p.lanes.filter(L => (L.n || L.np) && !L.loose).map(L => [L.color, (diffDays(L.s, p.s) + diffDays(L.e, p.s)) / 2 / span]).sort((a, b) => a[1] - b[1]);
     const pick = stops.length > 7 ? stops.filter((x, i) => i % Math.ceil(stops.length / 7) === 0) : stops;
     if (pick.length > 1) pick.forEach((x, i) => x[1] = .5 * x[1] + .5 * i / (pick.length - 1));   // keep stops apart: always a blend
     p.ribStops = pick.length > 1 ? pick : [[p.color, 0], [shade(p.color || PALETTE[0], 2), 1]];
     p.rib = pick.length > 1 ? `linear-gradient(90deg,${pick.map(([c, f]) => `${c} ${(f * 100).toFixed(1)}%`).join(',')})` : `linear-gradient(90deg,${p.color},${shade(p.color || PALETTE[0], 2)})`;
   });
-  const projList = P.filter(p => p.n || p.np).sort((a, b) => a.s < b.s ? -1 : a.s > b.s ? 1 : 0);
+  // projects with a ribbon by where it starts, then the ones without, by their first task
+  const projList = P.filter(p => p.n || p.np).sort((a, b) => (!a.s - !b.s) || ((a.s || a.as) < (b.s || b.as) ? -1 : (a.s || a.as) > (b.s || b.as) ? 1 : 0));
   const laneList = projList.flatMap(p => p.lanes);
   const maxCell = laneList.reduce((m, L) => { L.own.forEach(o => m = Math.max(m, o.done.length)); return m; }, 0);
   const total = inR.filter(x => !x.plan).length;

@@ -49,6 +49,7 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 .task input[type=checkbox]{margin:0;accent-color:var(--cs);flex:none}
 .task .num{font-size:11px;color:var(--muted);min-width:18px;flex:none;font-variant-numeric:tabular-nums;position:relative;align-self:stretch;margin:-3px 0;padding:0 2px;display:flex;align-items:center;justify-content:center}
 /* linked chains: a box around each same-day group's numbers; next-day steps get their own box joined by a line */
+.task .num.nn,.drun .drn.nn{min-width:10px}   /* unordered thread: no number; just room for a linked chain's box */
 .task .num.nb::before{content:'';position:absolute;inset:0;border-left:1.5px solid color-mix(in srgb,var(--cs) 65%,transparent);border-right:1.5px solid color-mix(in srgb,var(--cs) 65%,transparent);pointer-events:none}
 .task .num.nbs::before{top:4px;border-top:1.5px solid color-mix(in srgb,var(--cs) 65%,transparent);border-radius:5px 5px 0 0}
 .task .num.nbe::before{bottom:4px;border-bottom:1.5px solid color-mix(in srgb,var(--cs) 65%,transparent);border-radius:0 0 5px 5px}
@@ -80,6 +81,13 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 #menu button:hover{background:var(--hover)}
 #menu button.cur{font-weight:650}
 #menu .k{width:26px;font-size:10px;font-weight:650;text-align:center;color:var(--muted)}
+#menu .k svg{width:13px;height:13px;vertical-align:-2px}
+/* the thread menu: its "Ordered tasks" switch sits in a row like the buttons, the track in the icon column */
+#menu .mtog{display:flex;gap:8px;padding:6px 9px 6px 7px;border-radius:6px;font-size:inherit}
+#menu .mtog .track{transform:scale(.85)}
+#menu .mtog.dis{opacity:.5;cursor:default}
+#menu .mtog.dis:hover{background:transparent}
+#menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
 /* "Collapse completed tasks": the "+ N completed" line, laid out like a task row (checkbox gap, number column) */
 .drun{display:flex;align-items:center;gap:6px;padding:0 4px 0 6px;min-height:24px;position:relative;border-radius:6px;cursor:pointer;color:var(--muted);user-select:none}
 .drun:hover{background:var(--hover);color:var(--ink)}

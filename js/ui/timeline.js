@@ -58,10 +58,13 @@ function renderAdmire() {
   const tl = $('.adm-tl', el), cs = getComputedStyle(tl);
   const W = tl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const LW = Math.round(ui.admSide ? clamp(ui.admSide, 120, Math.max(160, W * .5)) : clamp(W * .19, 150, 240)), GAP = 16, avail = Math.max(140, W - LW - GAP);
-  const N = diffDays(D.R1, D.R0) + 1, weeksTotal = N / 7, MIN_DW = 26, MAX_DW = 92;
-  const wpr = Math.max(1, Math.min(weeksTotal, Math.floor(avail / (7 * MIN_DW))));
-  const nRows = Math.ceil(weeksTotal / wpr), dpr = wpr * 7;
-  const DW = Math.min(MAX_DW, avail / dpr);
+  const N = diffDays(D.R1, D.R0) + 1, weeksTotal = N / 7, MIN_DW = 16, MAX_DW = 92;
+  // one row while days can stay at least MIN_DW wide; past that, as few rows as that allows, with the weeks shared
+  // out evenly (12 weeks in 2 rows = 6 + 6, not 10 + 2; 25 in 4 = 7 + 6 + 6 + 6)
+  const nRows = Math.ceil(weeksTotal / Math.max(1, Math.floor(avail / (7 * MIN_DW))));
+  const wpr = Math.ceil(weeksTotal / nRows), rowWeeks = r => Math.floor(weeksTotal / nRows) + (r < weeksTotal % nRows ? 1 : 0);
+  const rowStart = r => { let w = 0; for (let q = 0; q < r; q++) w += rowWeeks(q); return w * 7; };
+  const DW = Math.min(MAX_DW, avail / (wpr * 7));
   tl.style.setProperty('--side', LW + 'px'); tl.style.setProperty('--gap', GAP + 'px');
   const dotSize = n => Math.min(n > 1 ? 18 : 10, DW - 3);
   const panelHex = getComputedStyle(el).getPropertyValue('--panel').trim() || '#ffffff';   // one size for a single task, one for a day with several
@@ -75,7 +78,7 @@ function renderAdmire() {
   const layerDefs = [...allLanes.filter(L => L.n).map(L => [L, 'done']), ...allLanes.filter(L => L.np).map(L => [L, 'plan'])];
   const rowsHTML = [];
   for (let r = 0; r < nRows; r++) {
-    const r0 = addDays(D.R0, r * dpr), n = Math.min(dpr, N - r * dpr), rEnd = addDays(r0, n - 1), tw = n * DW;
+    const r0 = addDays(D.R0, rowStart(r)), n = rowWeeks(r) * 7, rEnd = addDays(r0, n - 1), tw = n * DW;
     const ix = d => diffDays(d, r0), xc = i => (i + .5) * DW;
     const rowDelay = anim ? Math.min(r, 3) * 0.22 : 0;
     const dl = (i, base, spread) => anim ? (base + rowDelay + (i / Math.max(1, n)) * spread).toFixed(2) : 0;
@@ -196,20 +199,22 @@ function renderAdmire() {
     };
     let blocks = '';
     D.projs.forEach(p => {
-      if (p.e < r0 || p.s > rEnd) return;
+      if (p.ae < r0 || p.as > rEnd) return;
       const folded = admCollapsed.has(p.key);
       const hasKids = new Set(p.lanes.map(L => L.parentKey).filter(Boolean));
-      const vis = folded ? [] : p.lanes.filter(L => !(L.e < r0 || L.s > rEnd) && !inFolded(L));
+      // lanes with something in this row (loose lanes have no row: their dots ride on their host's, see admireData)
+      const vis = folded ? [] : p.lanes.filter(L => !L.loose && L.vs && !(L.ve < r0 || L.vs > rEnd) && !inFolded(L));
+      const hosted = k => p.lanes.filter(x => x.loose && x.host === k);
       // each lane's dots in this row (a folded lane carries everything under it), and where its name could go
       const G = new Map();
       vis.forEach(L => {
         const lf = hasKids.has(L.key) && admCollapsed.has(L.key);
-        const parts = lf ? p.lanes.filter(x => laneUnder(x, L.key, D.lanes)) : [L];
+        const parts = lf ? p.lanes.filter(x => laneUnder(x, L.key, D.lanes)) : [L, ...hosted(L.key)];
         const cells = new Map();   // day -> { done, plan }
         parts.forEach(x => x.own.forEach((o, d) => { if (d < r0 || d > rEnd) return; const c = cells.get(d) || { done: 0, plan: 0 }; c.done += o.done.length; c.plan += o.plan.length; cells.set(d, c); }));
         const half = d => { const c = cells.get(d); return c ? dotSize(c.done + c.plan) / 2 : 0; };
-        const ext = clipX(L.s, L.e), estW = Math.min(220, L.name.length * 5.4 + 10);
-        const rEdge = ext[3] ? tw : Math.max(ext[1], xc(ix(L.e)) + half(L.e)), lEdge = ext[2] ? 0 : Math.min(ext[0], xc(ix(L.s)) - half(L.s));
+        const ext = clipX(L.vs, L.ve), estW = Math.min(220, L.name.length * 5.4 + 10);
+        const rEdge = ext[3] ? tw : Math.max(ext[1], xc(ix(L.ve)) + half(L.ve)), lEdge = ext[2] ? 0 : Math.min(ext[0], xc(ix(L.vs)) - half(L.vs));
         const xr = rEdge + 7, xl = lEdge - 7, room = ext[2] ? lEdge : lEdge - 14;   // 14: the bend of its connector
         // name options, best first: [side, x, the stretch of the row this lane then takes up]
         const opts = [];
@@ -235,8 +240,10 @@ function renderAdmire() {
       vis.forEach(L => yOf.set(L.key, ADM_PROJ + rowOf.get(L.key) * ADM_LANE + ADM_LANE / 2));
       // how each lane joins its parent (or the ribbon): a pipe as thick as its bar, from the parent's underside into its left end
       const joinOf = L => {
-          const a = clipX(L.s, L.e); if (!a || a[2]) return null;   // starts in an earlier row: nothing to join here
-          const par = L.parentKey && vis.find(x => x.key === L.parentKey) ? L.parentKey : null;
+          const a = clipX(L.s, L.e); if (!a || a[2]) return null;   // starts in an earlier row (or no line of its own): nothing to join
+          // joins its nearest ordered ancestor if that's drawn here, else the ribbon (if there is one)
+          let anc = null; for (const x of laneUp(L, D.lanes, false)) if (!x.loose) { anc = x; break; }
+          const par = anc && vis.includes(anc) ? anc.key : null;
           const pL = par ? D.lanes.get(par) : p, pc = clipX(pL.s, pL.e); if (!pc) return null;
           // a thin line from the flat underside of the parent's bar (clear of its rounded end) to this bar's left tip
           const ch = (L.depth ? ADM_BAR.sub : ADM_BAR.top) / 2, ph = par ? (pL.depth ? ADM_BAR.sub : ADM_BAR.top) / 2 : ADM_BAR.rib / 2;
@@ -258,14 +265,22 @@ function renderAdmire() {
       const joins = new Map(), squareBL = new Set();   // parents (null = ribbon) a join drops straight down from: square that corner
       vis.forEach(L => { const j = joinOf(L); if (j) joins.set(L.key, j); });
       // ribbon: one gradient across the project's whole span, so it carries on across rows
-      const fullL = xc(diffDays(p.s, r0)) - pad, fullW = diffDays(p.e, p.s) * DW + 2 * pad;
-      const rib = bars(p, '', x => `--rib:${p.rib};--rbs:${fullW.toFixed(1)}px;--rbp:${(fullL - x[0]).toFixed(1)}px;`, x => dl(x[0] / DW, .1, .5), false, squareBL.has(null));
+      const fullL = p.s ? xc(diffDays(p.s, r0)) - pad : 0, fullW = p.s ? diffDays(p.e, p.s) * DW + 2 * pad : 0;
+      const rib = !p.s ? '' : bars(p, '', x => `--rib:${p.rib};--rbs:${fullW.toFixed(1)}px;--rbp:${(fullL - x[0]).toFixed(1)}px;`, x => dl(x[0] / DW, .1, .5), false, squareBL.has(null));
       let pdots = '';
       if (folded) p.days.forEach((cnt, d) => {
         if (d < r0 || d > rEnd) return;
         const parts = p.lanes.filter(L => L.own.has(d)), tot = cnt.done + cnt.plan;
         pdots += dotHTML(`proj|${p.key}|${d}`, parts[0].color, cnt.done, cnt.plan, ix(d), pieOf(parts, d, tot));
       });
+      else {   // the loose lanes it hosts (unordered threads with no ordered thread above them)
+        const own = hosted(null), days = new Set(own.flatMap(L => [...L.own.keys()]));
+        days.forEach(d => {
+          if (d < r0 || d > rEnd) return;
+          const parts = own.filter(L => L.own.has(d)), c = parts.reduce((a, L) => a + L.own.get(d).done.length, 0), q = parts.reduce((a, L) => a + L.own.get(d).plan.length, 0);
+          pdots += dotHTML(`set|${parts.map(L => L.key).join(',')}|${d}`, parts[0].color, c, q, ix(d), pieOf(parts, d, c + q));
+        });
+      }
       let lanesH = '', links = '';
       // the timeline: packed rows
       rows.forEach(row => {
@@ -275,24 +290,27 @@ function renderAdmire() {
           let dots = '';
           cells.forEach((c, d) => {
             const ps = parts.filter(x => x.own.has(d)), tot = c.done + c.plan;
-            dots += dotHTML(`${lf ? 'fold' : 'lane'}|${L.key}|${d}`, ps[0].color, c.done, c.plan, ix(d), pieOf(ps, d, tot));
+            dots += dotHTML(lf ? `fold|${L.key}|${d}` : `set|${ps.map(x => x.key).join(',')}|${d}`, ps[0].color, c.done, c.plan, ix(d), pieOf(ps, d, tot));
           });
           // its name, quietly, beside its line
           dots += `<span class="adm-tag" data-side="${side}" style="left:${tx.toFixed(1)}px;--d:${dl(ext[0] / DW, .6, .6)}s">${esc(L.name)}</span>`;
-          trk += `<div class="adm-sl ${L.sub ? '' : 'planonly'} ${kids ? 'par' : ''}" data-lk="${esc(L.key)}" data-pk="${esc(p.key)}" style="--c:${L.color}">${bars(L, L.depth ? 'sub' : '', () => '', x => dl(x[0] / DW, .15, .55), false, false)}${dots}</div>`;
+          const line = bars(L, L.depth ? 'sub' : '', () => '', x => dl(x[0] / DW, .15, .55), false, false);
+          trk += `<div class="adm-sl ${L.sub ? '' : 'planonly'} ${kids ? 'par' : ''}" data-lk="${esc(L.key)}" data-pk="${esc(p.key)}" style="--c:${L.color}">${line}${dots}</div>`;
           const jn = joins.get(L.key); if (jn) links += jn.svg;
         });
         lanesH += `<div class="adm-trk adm-row1" style="--tw:${tw}px">${trk}</div>`;
       });
       const h = ADM_PROJ + rows.length * ADM_LANE;
-      // the project's name beside its ribbon: after it if there's room, else before, else just above
-      const pe = clipX(p.s, p.e), pw = Math.min(260, p.name.length * 6.4 + 10);
+      // the project's name beside what its row shows (ribbon and hosted dots; folded: all its dots): after it if
+      // there's room, else before, else just above. With no ribbon in this row: before, if there's room
+      const rb = clipX(p.s, p.e), pe = (folded ? clipX(p.as, p.ae) : clipX(p.vs, p.ve)) || clipX(p.as, p.ae), pw = Math.min(260, p.name.length * 6.4 + 10);
       const pr_ = (pe[3] ? tw : pe[1]) + 8, pl_ = (pe[2] ? 0 : pe[0]) - 8;
-      const [ps_, px_] = !pe[3] && tw - pr_ >= pw ? ['r', pr_] : !pe[2] && pl_ >= pw ? ['l', pl_] : ['t', pe[0] + 4];
+      const [ps_, px_] = !rb && !pe[2] && pl_ >= pw ? ['l', pl_ + 4]
+        : !pe[3] && tw - pr_ >= pw ? ['r', pr_] : !pe[2] && pl_ >= pw ? ['l', pl_] : ['t', pe[0] + 4];
       const ptag = `<span class="adm-tag pjt" data-side="${ps_}" style="left:${px_.toFixed(1)}px;--d:${dl(pe[0] / DW, .5, .5)}s">${esc(p.name)}</span>`;
       blocks += `<div class="adm-blk" style="height:${h}px">
         <svg class="adm-links" width="${tw}" height="${h}" style="--tw:${tw}px">${links}</svg>
-        <div class="adm-g adm-lane pj ${p.n ? '' : 'planonly'}" data-lk="${esc(p.key)}" data-pk="${esc(p.key)}" style="--c:${p.color}"><div></div>
+        <div class="adm-g adm-lane pj ${p.n ? '' : 'planonly'} ${rb ? '' : 'norib'}" data-lk="${esc(p.key)}" data-pk="${esc(p.key)}" style="--c:${p.color}"><div></div>
           <div class="adm-trk" style="--tw:${tw}px">${rib}${pdots}${ptag}</div></div>
         ${lanesH}</div>`;
     });
@@ -329,6 +347,7 @@ function admTipHTML(spec) {
   const grpOf = (L, withProj) => { const o = L.own.get(day) || { done: [], plan: [] };
     return { name: L.name, up: (withProj ? [(D.projs.find(p => p.key === L.pkey) || {}).name] : []).concat(L.path.slice(0, -1)).join(' › '), color: L.color, done: o.done, plan: o.plan }; };
   if (kind === 'lane') { day = b; const L = D.lanes.get(a); if (L) groups = [grpOf(L, true)]; }
+  else if (kind === 'set') { day = b; groups = a.split(',').map(k => D.lanes.get(k)).filter(L => L && L.own.has(day)).map(L => grpOf(L, true)); }   // a lane with the loose dots it hosts
   else if (kind === 'proj') { day = b; const p = D.projs.find(x => x.key === a); if (p) groups = p.lanes.filter(L => L.own.has(day)).map(L => grpOf(L, false)); }
   else if (kind === 'fold') { day = b; const R = D.lanes.get(a), p = R && D.projs.find(x => x.key === R.pkey);
     if (p) groups = p.lanes.filter(L => laneUnder(L, a, D.lanes) && L.own.has(day)).map(L => grpOf(L, true)); }

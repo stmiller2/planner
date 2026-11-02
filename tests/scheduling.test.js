@@ -84,3 +84,17 @@ test('each move is one undo step', () => {
   P.redo();
   assert.deepStrictEqual(dates(P, 'a1', 'b1'), { a1: '2026-11-04', b1: '2026-11-07' });
 });
+
+test('an unordered thread: moving a task shifts nothing else, even with "Shift later tasks" on', () => {
+  const P = load(plan([{ ...TH('t', [T('a', '2026-11-02'), T('b', '2026-11-05'), T('c', '2026-11-06', { link: 'nextDay' })]), unordered: true }]));
+  P.moveTask('a', '2026-11-04');
+  assert.deepStrictEqual(dates(P, 'a', 'b', 'c'), { a: '2026-11-04', b: '2026-11-05', c: '2026-11-06' });
+  P.moveTask('b', '2026-11-09');   // links still hold
+  assert.deepStrictEqual(dates(P, 'b', 'c'), { b: '2026-11-09', c: '2026-11-10' });
+});
+
+test('an unordered project: moving a task shifts nothing else', () => {
+  const P = load({ version: 4, projects: [{ id: 'p', name: 'P', unordered: true, threads: [TH('t', [T('a', '2026-11-02'), T('b', '2026-11-05')])] }] });
+  P.moveTask('a', '2026-11-04');
+  assert.deepStrictEqual(dates(P, 'a', 'b'), { a: '2026-11-04', b: '2026-11-05' });
+});

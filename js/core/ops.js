@@ -18,7 +18,7 @@ function applyMove(t, i, newDate, split) {
   if (newDate === null) { for (let k = s; k <= e; k++) ts[k].date = null; return; }
   const off = offsets(t, s, e), base = addDays(newDate, -off[i - s]);
   for (let k = s; k <= e; k++) ts[k].date = addDays(base, off[k - s]);
-  if (old === null || !ui.shiftLater) return;
+  if (old === null || !ui.shiftLater || isLoose((findThread(t.id) || {}).p, t)) return;
   const delta = diffDays(newDate, old);
   // shift everything that comes later in this thread: later task chains and later sub-threads (whole subtrees)
   const L = layout(t), from = L.findIndex(x => x.obj === ts[e]);
@@ -34,6 +34,16 @@ function moveTask(id, newDate, split = false) {
   const f = findTask(id); if (!f) return;
   if (newDate === f.task.date) return;
   mutate(() => applyMove(f.t, f.i, newDate, split));
+}
+// a thread's "Ordered tasks" switch (off = unordered: no order warnings, moving a task doesn't shift the others)
+function setThreadOrdered(id, on) {
+  const f = findThread(id); if (!f) return;
+  mutate(() => { if (on) delete f.t.unordered; else f.t.unordered = true; });
+}
+// the same for a whole project (every thread in it, whatever its own switch says)
+function setProjectOrdered(id, on) {
+  const p = state.projects.find(x => x.id === id); if (!p) return;
+  mutate(() => { if (on) delete p.unordered; else p.unordered = true; });
 }
 function setLink(id, type) {
   const f = findTask(id); if (!f || f.i === 0) return;

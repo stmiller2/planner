@@ -35,8 +35,7 @@ function renderTree() {
           <button class="mini" data-act="add-thread" data-id="${p.id}">+ thread</button>
           ${pi > 0 ? `<button class="ic" data-act="p-up" data-id="${p.id}" title="Move up">${ICON.up}</button>` : ''}
           ${pi < state.projects.length - 1 ? `<button class="ic" data-act="p-down" data-id="${p.id}" title="Move down">${ICON.down}</button>` : ''}
-          <button class="ic" data-act="arch-p" data-id="${p.id}" title="Archive">${ICON.archive}</button>
-          <button class="ic" data-act="del-p" data-id="${p.id}" title="Delete">${ICON.trash}</button>
+          <button class="ic" data-act="pmenu" data-id="${p.id}" title="Project settings">${ICON.gear}</button>
         </span>
       </div>
       ${pc ? '' : `<div class="threads">${p.threads.map(t => renderThread(p, t, false)).join('') || `<div class="empty small">No threads yet — hover the project and click <b>+ thread</b>.</div>`}</div>`}
@@ -72,10 +71,10 @@ function renderThread(p, t, isSub) {
       const end = runs.get(i);
       if (end) {   // the run's line; clicked open, its tasks follow as usual
         const ks = L.slice(i, end).map(x => x.obj), open = ks.some(k => drOpen.has(k.id));
-        body += doneRunLine(t, ks, open);
+        body += doneRunLine(t, ks, open, isLoose(p, t));
         if (!open) { if (insAt > i && insAt < end) body += insBox(); i = end; continue; }
       }
-      if (L[i].kind === 'task') { const k = L[i].obj; body += renderTaskRow(t, k, t.tasks.indexOf(k)); i++; }
+      if (L[i].kind === 'task') { const k = L[i].obj; body += renderTaskRow(t, k, t.tasks.indexOf(k), isLoose(p, t)); i++; }
       else {                       // consecutive sub-threads = one parallel block
         let blk = ''; do { blk += renderThread(p, L[i].obj, true); i++; } while (i < L.length && L[i].kind === 'sub' && i !== insAt);
         body += `<div class="subs">${blk}</div>`;
@@ -93,10 +92,8 @@ function renderThread(p, t, isSub) {
       ${uns ? `<span class="meta">${uns} unsched.</span>` : ''}
       <span class="acts">
         <button class="mini" data-act="add-task" data-id="${t.id}">+ task</button>
-        <button class="mini" data-act="add-sub" data-id="${t.id}">+ sub</button>
         ${isSub && t.color ? `<button class="mini" data-act="color-reset" data-id="${t.id}">auto color</button>` : ''}
-        <button class="ic" data-act="arch-t" data-id="${t.id}" title="Archive">${ICON.archive}</button>
-        <button class="ic" data-act="del-t" data-id="${t.id}" title="Delete">${ICON.trash}</button>
+        <button class="ic" data-act="tmenu" data-id="${t.id}" title="Thread settings">${ICON.gear}</button>
       </span>
     </div>
     ${tc ? '' : `<div class="tasks">${body}</div>`}
@@ -106,26 +103,27 @@ function renderThread(p, t, isSub) {
 // bar and number box into the line, fading out (top half: link from the task above; bottom half: link to the task
 // below); above an opened run the line sits inside that link, so it carries straight through. (Classes u-s / u-n /
 // d-s / d-n: plain "dn" would pick up the calendar's day-number style, .dn in calendar.css.)
-function doneRunLine(t, ks, open) {
+function doneRunLine(t, ks, open, loose) {
   const a = t.tasks.indexOf(ks[0]), b = t.tasks.indexOf(ks[ks.length - 1]), nx = t.tasks[b + 1];
   const up = a > 0 ? ks[0].linkToPrev : null, dn = open ? up : nx && nx.linkToPrev;
   const k = { sameDay: 's', nextDay: 'n' };
   const cls = ['drun', open && 'open', up && 'lu', dn && 'ld', up && 'u-' + k[up], dn && 'd-' + k[dn]].filter(Boolean).join(' ');
   return `<div class="${cls}" data-act="dr-toggle" data-has="${ks.map(x => x.id).join(' ')}" title="${open ? 'Hide' : 'Show'} these completed tasks">
-    <input type="checkbox" class="drk" tabindex="-1" aria-hidden="true" disabled><span class="drn"></span><span class="drt">${open ? '−' : '+'} ${ks.length} completed</span></div>`;
+    <input type="checkbox" class="drk" tabindex="-1" aria-hidden="true" disabled><span class="drn${loose ? ' nn' : ''}"></span><span class="drt">${open ? '−' : '+'} ${ks.length} completed</span></div>`;
 }
-function renderTaskRow(t, k, i) {
+// loose: an unordered thread (isLoose): no number (a linked chain keeps its box)
+function renderTaskRow(t, k, i, loose) {
   const nx = t.tasks[i + 1];
   const starts = !k.linkToPrev && nx && nx.linkToPrev;
   const ends = k.linkToPrev && !(nx && nx.linkToPrev);
   const cls = ['task', k.done && 'done', (k.linkToPrev || starts) && 'g', starts && 'gs', ends && 'ge'].filter(Boolean).join(' ');
   // number boxes for linked chains: a box opens at a chain start or a next-day step, and runs through same-day links
   const inChain = k.linkToPrev || (nx && nx.linkToPrev);
-  const numCls = ['num', inChain && 'nb', inChain && k.linkToPrev !== 'sameDay' && 'nbs', inChain && !(nx && nx.linkToPrev === 'sameDay') && 'nbe',
+  const numCls = ['num', loose && 'nn', inChain && 'nb', inChain && k.linkToPrev !== 'sameDay' && 'nbs', inChain && !(nx && nx.linkToPrev === 'sameDay') && 'nbe',
     k.linkToPrev === 'nextDay' && 'cin', nx && nx.linkToPrev === 'nextDay' && 'cout'].filter(Boolean).join(' ');
   return `<div class="${cls}" draggable="true" data-id="${k.id}">
     <input type="checkbox" data-act="done" data-id="${k.id}" ${k.done ? 'checked' : ''}>
-    <span class="${numCls}">${i + 1}</span>
+    <span class="${numCls}">${loose ? '' : i + 1}</span>
     <span class="title" data-act="rename-k" data-id="${k.id}">${esc(k.title)}</span>
     <span class="rt">
       <span class="acts">
@@ -141,12 +139,32 @@ function renderTaskRow(t, k, i) {
 /* ---------- link menu ---------- */
 function openLinkMenu(id, btn) {
   const f = findTask(id); if (!f) return;
-  const cur = f.task.linkToPrev, n = f.i;
+  const cur = f.task.linkToPrev, n = isLoose(f.p, f.t) ? 'the task above' : '#' + f.i;
   const opt = (v, k, label) => `<button data-act="setlink" data-v="${v}" data-id="${id}" class="${(cur || '') === v ? 'cur' : ''}"><span class="k">${k}</span>${label}</button>`;
-  menu.innerHTML = ['nextDay', 'sameDay'].map(v => opt(v, LINKS[v].badge, `${LINKS[v].label} #${n}`)).join('') + opt('', '—', 'Not linked');
+  menu.innerHTML = ['nextDay', 'sameDay'].map(v => opt(v, LINKS[v].badge, `${LINKS[v].label} ${n}`)).join('') + opt('', '—', 'Not linked');
+  placeMenu(btn);
+}
+// a thread's / project's settings menu (its gear button): (+ subthread,) "Ordered tasks" switch, archive, delete.
+// In an unordered project, a thread's switch shows off and can't be changed.
+const orderSwitch = (act, id, on, off) => `<label class="switch mtog ${off ? 'dis' : ''}" ${off ? 'title="The whole project is unordered"' : ''}><input type="checkbox" data-act="${act}" data-id="${id}" ${on ? 'checked' : ''} ${off ? 'disabled' : ''}><span class="track"></span><span>Ordered tasks</span></label>`;
+const menuBtn = (act, id, icon, label) => `<button data-act="${act}" data-id="${id}"><span class="k">${icon}</span>${label}</button>`;
+function openThreadMenu(id, btn) {
+  const f = findThread(id); if (!f) return;
+  menu.innerHTML = menuBtn('add-sub', id, ICON.plus, 'Subthread') + orderSwitch('t-order', id, !isLoose(f.p, f.t), !!f.p.unordered)
+    + '<hr>' + menuBtn('arch-t', id, ICON.archive, 'Archive') + menuBtn('del-t', id, ICON.trash, 'Delete');
+  placeMenu(btn);
+}
+function openProjectMenu(id, btn) {
+  const p = state.projects.find(x => x.id === id); if (!p) return;
+  menu.innerHTML = orderSwitch('p-order', id, !p.unordered, false)
+    + '<hr>' + menuBtn('arch-p', id, ICON.archive, 'Archive') + menuBtn('del-p', id, ICON.trash, 'Delete');
+  placeMenu(btn);
+}
+// show the menu below btn (above it if there's no room), kept inside the window
+function placeMenu(btn) {
   const r = btn.getBoundingClientRect();
   menu.style.display = 'block';
-  menu.style.left = Math.min(r.left, innerWidth - menu.offsetWidth - 8) + 'px';
+  menu.style.left = Math.max(8, Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + 'px';
   menu.style.top = (r.bottom + menu.offsetHeight + 6 > innerHeight ? r.top - menu.offsetHeight - 4 : r.bottom + 4) + 'px';
 }
 function cancelInsert() { if (!inserting && !addOpen) return; inserting = null; addOpen = null; render(); }

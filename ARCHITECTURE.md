@@ -63,11 +63,15 @@ js/ui/  (views; each draws its part of the page and handles its own events)
                         warning bar, toast, modals, guide lines, tween(), wheelSteps() scroll gestures
   dragdrop.js           HTML5 drag state (`drag`) shared by sidebar and calendar; Option-drop
   archive.js            the Archive window
-  sidebar.js            the sidebar tree, link menu, new-task boxes, click-to-insert, sidebar drag & drop
+  sidebar.js            the sidebar tree, link menu, thread / project gear menus (+ subthread, ordered, archive, delete),
+                        new-task boxes, click-to-insert, sidebar drag & drop
   calendar.js           the calendar: renderCal, row heights (fitRows), week scrolling, dropping on days
   conflicts.js          conflicts in the sidebar (+ form), dragging conflict bars, conflict hover
   dialogs.js            Help and Settings windows
-  timeline-data.js      Timeline data: admireData() (lanes, spans, per-day counts), cached per change
+  timeline-data.js      Timeline data: admireData() (lanes, spans, per-day counts), cached per change; unordered
+                        threads are `loose` lanes: no row of their own, their dots ride on L.host's row (nearest
+                        ordered thread above; null = the project's ribbon row) without stretching its line (vs..ve =
+                        what a row shows). No ordered work = no ribbon (p.s null; p.as..p.ae = all it shows)
   timeline.js           Timeline drawing (renderAdmire), hover lists, folding, resizing
   dayview.js            day view: list + hour timeline (renderDay), adding tasks to a day, day swiping
   dayview-edit.js       day view editing: time popover, dragging / resizing blocks, conflict drag, tooltips
@@ -86,10 +90,13 @@ js/main.js              start()
 
 ```
 state = { version: 4, title?, projects: [project], archive: [entry], conflicts: [conflict], scratch: [scratch] }
-project  = { id, name, threads: [thread] }
-thread   = { id, name, color, tasks: [task], threads: [sub-thread], afterTask }
+project  = { id, name, threads: [thread], unordered? }   unordered: true = every thread in it is unordered
+thread   = { id, name, color, tasks: [task], threads: [sub-thread], afterTask, unordered? }
              color: '#rrggbb' for top-level threads; null on a sub-thread = a shade of its parent's color
              afterTask: on sub-threads, the id of the parent's task it comes after (null = before all tasks)
+             unordered: true = its tasks have no set order. isLoose(p, t) (core/model.js) = thread or its project
+             unordered: no order warnings, no shifting later tasks, no numbers in the sidebar / on chips, and loose
+             dots (no line) on the Timeline. Set with "Ordered tasks" in the thread's / project's gear menu
 task     = { id, title, date: 'YYYY-MM-DD' | null, done, linkToPrev: null | 'sameDay' | 'nextDay', plan? }
              linkToPrev ties a task to the one before it; a run of linked tasks is a "chain" and moves together
              plan = { date, start, dur } (minutes from midnight): its slot in day view, valid only while

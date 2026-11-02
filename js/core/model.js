@@ -1,7 +1,7 @@
 'use strict';
 /* The planner's data and its rules (no DOM).
-   state = { version, title?, projects: [{ id, name, threads }], archive: [...], conflicts: [...], scratch: [...] }
-     thread = { id, name, color (null = shade of its parent's), tasks: [...], threads: [sub-threads], afterTask }
+   state = { version, title?, projects: [{ id, name, threads, unordered? }], archive: [...], conflicts: [...], scratch: [...] }
+     thread = { id, name, color (null = shade of its parent's), tasks: [...], threads: [sub-threads], afterTask, unordered? }
      task   = { id, title, date (YYYY-MM-DD or null), done, linkToPrev (null | 'sameDay' | 'nextDay'), plan? }
      scratch = day view's "Other to-do": [{ id, title, done }], small to-dos outside every project (no dates)
    Every change goes through mutate(), which normalizes, records undo, re-renders, saves and raises warnings. */
@@ -39,6 +39,7 @@ const colorOf = t => colors.get(t.id) || t.color || PALETTE[0];
 function migThread(t, top, counter) {
   const T = { ...t, id: t.id || uid(), name: String(t.name ?? 'Thread'),
     color: /^#[0-9a-f]{6}$/i.test(t.color || '') ? t.color : (top ? PALETTE[counter.n % PALETTE.length] : null), tasks: [], threads: [] };
+  if (T.unordered !== true) delete T.unordered;   // unordered: its tasks have no order (see isLoose)
   if (top) counter.n++;
   for (const k of (Array.isArray(t.tasks) ? t.tasks : [])) {
     const link = k.linkToPrev in LINKS ? k.linkToPrev : (k.sameDayAsPrev ? 'sameDay' : null);
@@ -63,6 +64,7 @@ function migrate(d) {
   for (const p of (d && Array.isArray(d.projects) ? d.projects : [])) {
     const P = { ...p, id: p.id || uid(), name: String(p.name ?? 'Project'), threads: [] };
     delete P.color;
+    if (P.unordered !== true) delete P.unordered;   // a whole project unordered: every thread in it (see isLoose)
     for (const t of (Array.isArray(p.threads) ? p.threads : [])) P.threads.push(migThread(t, true, counter));
     s.projects.push(P);
   }
@@ -99,6 +101,10 @@ const index = memo(() => {
   return { threads, byThread, byTask, byDate };
 });
 const allThreads = () => index().threads;
+// a thread whose tasks have no set order: set on the thread itself or on its whole project (p). Its tasks give no
+// order warnings, moving one doesn't shift the others, the sidebar doesn't number them, and the Timeline shows
+// them as loose dots instead of a line.
+const isLoose = (p, t) => !!(t.unordered || (p && p.unordered));
 function findTask(id) { const f = index().byTask.get(id); return f ? { ...f[0], i: f[1], task: f[0].t.tasks[f[1]] } : null; }
 function findThread(id) { return index().byThread.get(id) || null; }
 // the tasks dated d, as { ...thread entry, k (task), i (its number - 1) }, in sidebar order
@@ -181,7 +187,7 @@ function violations() {
     while (i < L.length) {
       if (L[i].kind === 'task') {
         const k = L[i].obj;
-        if (k.date) {
+        if (k.date && !isLoose(p, t)) {   // (an unordered thread's own tasks are neither checked nor checked against)
           if (cur && k.date < cur.d) out.push({ key: k.id + '>' + cur.task.id, p, path, task: k, i: t.tasks.indexOf(k), prev: cur.task, prevPath: cur.path });
           if (!cur || k.date > cur.d) cur = { d: k.date, task: k, path };
         }
