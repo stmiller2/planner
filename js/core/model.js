@@ -44,6 +44,7 @@ function migThread(t, top, counter) {
   for (const k of (Array.isArray(t.tasks) ? t.tasks : [])) {
     const link = k.linkToPrev in LINKS ? k.linkToPrev : (k.sameDayAsPrev ? 'sameDay' : null);
     const K = { ...k, id: k.id || uid(), title: String(k.title ?? ''), date: /^\d{4}-\d{2}-\d{2}$/.test(k.date) ? k.date : null, done: !!k.done, linkToPrev: link };
+    if (typeof K.notes !== 'string' || !K.notes.trim()) delete K.notes;   // notes: free text (see setTaskNotes)
     delete K.sameDayAsPrev; delete K.doneOn;   // doneOn: briefly recorded by an earlier version, no longer used
     T.tasks.push(K);
   }

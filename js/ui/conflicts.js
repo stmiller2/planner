@@ -84,7 +84,7 @@ function cfDragStart(e, id, mode, dayAt, redraw, d0) {
   return true;
 }
 grid.addEventListener('pointerdown', e => {
-  const b = e.target.closest('.cfb'); if (!b || e.button !== 0 || e.target.closest('.inl')) return;
+  const b = e.target.closest('.cfb'); if (!b || e.button !== 0 || e.ctrlKey || e.target.closest('.inl')) return;
   cfDragStart(e, b.dataset.cid, e.target.closest('.h.l') ? 'l' : e.target.closest('.h.r') ? 'r' : 'move', calDayAt, () => renderCal());
 });
 document.addEventListener('pointermove', e => {
@@ -104,6 +104,13 @@ document.addEventListener('pointerup', () => {
   const a = c.start, b = c.end; c.start = d.s0; c.end = d.e0; touch();   // put it back, then make the change as one undoable step
   if (d.moved && (a !== d.s0 || b !== d.e0)) mutate(() => { c.start = a; c.end = b; }); else if (d.moved) d.redraw();
 });
+// a right-click (context menu) mid-drag: its release may never arrive, so put the conflict back
+document.addEventListener('contextmenu', () => {
+  if (!cfDrag) return;
+  const d = cfDrag, c = confs().find(x => x.id === d.id); cfDrag = null;
+  document.body.classList.remove('cf-moving', 'cf-sizing');
+  if (c && d.moved) { c.start = d.s0; c.end = d.e0; touch(); d.redraw(); }
+}, true);
 // hovering a conflict on the calendar or in the sidebar picks it out in both
 let cfLit = false;   // some conflict is picked out (so the common case, nothing to undo, costs nothing)
 document.addEventListener('mouseover', e => {

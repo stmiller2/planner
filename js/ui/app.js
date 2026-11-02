@@ -54,7 +54,7 @@ $('aside').insertAdjacentHTML('afterbegin', sbTab('Projects / Conflicts'));
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  if (!e.target.closest('#menu') && !e.target.closest('[data-act="linkmenu"], [data-act="tmenu"], [data-act="pmenu"]')) closeMenu();
+  if (!e.target.closest('#menu') && !e.target.closest('[data-act="linkmenu"], [data-act="tmenu"], [data-act="pmenu"], [data-act="kmenu"]')) closeMenu();
   if (e.target.closest('.inl')) return;            // clicks inside a rename box just move the cursor
   const a = e.target.closest('[data-act]'); if (!a) return;
   const act = a.dataset.act;
@@ -85,8 +85,10 @@ document.addEventListener('click', e => {
     case 'linkmenu': openLinkMenu(id, a); break;
     case 'setlink': closeMenu(); setLink(id, a.dataset.v); break;
     case 'unsched': moveTask(id, null); break;
-    case 'del-k': delTask(id); break;
-    case 'arch-k': archiveTask(id); break;
+    case 'kmenu': openTaskMenu(id, a); break;
+    case 'k-notes': closeMenu(); editNotes(id); break;
+    case 'del-k': closeMenu(); delTask(id); quickAct('del'); break;
+    case 'arch-k': closeMenu(); archiveTask(id); quickAct('arch'); break;
     case 'date': { const f = findTask(id); if (f) editDateIn(a, { value: f.task.date, allowEmpty: true, emptyText: 'no date (unscheduled)', commit: v => moveTask(id, v), clear: f.task.date ? () => moveTask(id, null) : null }); break; }
     case 'reveal': clearTimeout(revealTimer); if (e.detail === 1) revealTimer = setTimeout(() => reveal(id), 250); break;
     case 'openday': openDay(a.dataset.date); break;
@@ -102,6 +104,25 @@ document.addEventListener('click', e => {
     case 'unplan': { const f = findTask(id); if (f) mutate(() => { delete f.task.plan; }); break; }
   }
 });
+// right-clicking a task (sidebar row, calendar chip, day-view list item or block) opens its menu at the pointer
+// (rename boxes keep the browser's own menu, for copy / paste)
+// A Mac Ctrl-click opens it on the press and then, on release, sends an ordinary click: that click is eaten (else it
+// would close the menu and do the task's left-click action). ctxEat lasts until the next press.
+const TASK_EL = '#tree .task[data-id], #grid .chip[data-id], #dayview .dv-item[data-id], #dayview .dv-blk[data-id]';
+let ctxEat = false;
+document.addEventListener('contextmenu', e => {
+  closeMenu();
+  const el = e.target.closest && e.target.closest(TASK_EL); if (!el || e.target.closest('.inl')) return;
+  e.preventDefault(); closeTimePop(true); hideTip(); hideNotesTip();
+  openTaskMenu(el.dataset.id, null, { x: e.clientX, y: e.clientY });
+  ctxEat = true;
+});
+document.addEventListener('pointerdown', () => { ctxEat = false; }, true);
+['click', 'dblclick'].forEach(ev => document.addEventListener(ev, e => {
+  if (!ctxEat) return;
+  if (ev === 'click') ctxEat = false;
+  e.stopPropagation(); e.preventDefault();
+}, true));
 document.addEventListener('change', e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   if (a.dataset.act === 'done') { const f = findTask(a.dataset.id); if (f) mutate(() => f.task.done = a.checked); }
@@ -218,7 +239,7 @@ document.addEventListener('keydown', e => {
   // ⌘, / Ctrl+, / Ctrl+Shift+, (e.code: Shift turns the key into '<')
   if (mod && e.code === 'Comma') { e.preventDefault(); if (!modalOpen) showSettings(); return; }
   if (e.key === 'Escape') {
-    closeMenu();
+    if (menu.style.display === 'block') { closeMenu(); return; }   // just the menu (not day view / the timeline under it)
     if (tpop) { closeTimePop(false); return; }
     if (admOpen && !modalOpen) { closeAdmire(); return; }
     if (modalOpen) { if ($('#modal').dataset.dismiss) hideModal(); }

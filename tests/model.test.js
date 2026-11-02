@@ -137,3 +137,10 @@ test('an unordered project makes every thread in it unordered, whatever their ow
   P.moveTask('b', '2026-11-08');
   assert.deepStrictEqual(j(P.violations().map(w => w.task.id)), []);
 });
+
+test('loading keeps task notes, and drops empty or non-text ones', () => {
+  const P = load(plan([TH('t', [{ ...T('a'), notes: 'keep me' }, { ...T('b'), notes: '  ' }, { ...T('c'), notes: 42 }])]));
+  assert.strictEqual(P.findTask('a').task.notes, 'keep me');
+  assert.ok(!('notes' in P.findTask('b').task));
+  assert.ok(!('notes' in P.findTask('c').task));
+});

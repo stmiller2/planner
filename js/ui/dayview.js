@@ -119,7 +119,7 @@ function renderDayList(box, only, cur = ui.dayView) {
       if (dvAdd && dvAdd.beforeId === it.k.id) sec += addBox(it.t.id);
       sec += `<div class="dv-item ${p ? 'placed' : ''} ${it.k.done ? 'done' : ''}" data-id="${it.k.id}" style="--c:${esc(colorOf(it.t))}">
         <input type="checkbox" data-act="done" data-id="${it.k.id}" ${it.k.done ? 'checked' : ''}>
-        <div class="bd"><div class="tt">${esc(it.k.title)}</div>${p ? `<div class="tm">${fmtSpan(p.start, p.dur)}</div>` : ''}</div></div>`;
+        <div class="bd"><div class="tt">${esc(it.k.title)}${noteMark(it.k)}</div>${p ? `<div class="tm">${fmtSpan(p.start, p.dur)}</div>` : ''}</div></div>`;
       if (dvAdd && dvAdd.afterId === it.k.id) sec += addBox(it.t.id);
     });
     if (lastT) sec += '</div>';
@@ -178,7 +178,7 @@ function renderDayTimeline(box) {
       return `<div class="dv-blk ${k.done ? 'done' : ''} ${short ? 'short' : ''} ${tiny ? 'tiny' : ''}" data-id="${k.id}"
           style="--c:${esc(colorOf(b.it.t))};top:${top}px;height:${h}px;left:calc(${b.col} * 100% / ${b.ncol} + 3px);width:calc(100% / ${b.ncol} - 6px)">
         <div class="h t"></div>
-        <div class="bi"><input type="checkbox" data-act="done" data-id="${k.id}" ${k.done ? 'checked' : ''}><span class="tt">${esc(k.title)}</span><span class="tmi">${fmtTime(b.start)}</span></div>
+        <div class="bi"><input type="checkbox" data-act="done" data-id="${k.id}" ${k.done ? 'checked' : ''}><span class="tt">${esc(k.title)}</span>${noteMark(k)}<span class="tmi">${fmtTime(b.start)}</span></div>
         <div class="tm">${fmtSpan(b.start, b.dur)} · ${esc(b.it.t.name)}</div>
         <button class="ic x" data-act="unplan" data-id="${k.id}" title="Unschedule">${ICON.x}</button>
         <div class="h b"></div></div>`;

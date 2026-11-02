@@ -96,3 +96,19 @@ kbd{font:inherit;font-size:11.5px;border:1px solid var(--line);border-bottom-wid
 .set .dfmsg.bad{color:var(--danger)}
 .set .dfmsg .row{margin-top:8px}
 code.path{word-break:break-all}
+
+/* task notes: the small mark after a task's title, the window to write them, and the note that shows after resting
+   on a task a moment (ui/notes.js) */
+.nti{display:inline-block;margin-left:5px;color:var(--muted);line-height:0;vertical-align:-1px}
+.nti svg{width:11px;height:11px}
+.card .nt-h{display:flex;gap:8px;align-items:baseline;min-width:0}
+.card .nt-h span{font-weight:450;font-size:13.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.nt-ta{display:block;width:100%;box-sizing:border-box;min-height:150px;resize:vertical;font:inherit;line-height:1.45;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;outline:none}
+.nt-ta:focus{border-color:var(--accent)}
+.card .nt-row{align-items:center}
+.card .nt-row .sub{margin:0 0 0 auto;color:var(--muted);font-size:11.5px}
+#ntip{position:fixed;z-index:55;pointer-events:none;display:none;width:max-content;max-width:340px;max-height:min(50vh,380px);overflow:hidden;background:var(--panel);color:var(--ink);
+  border:1px solid var(--line);border-left:3px solid var(--cs);border-radius:7px;padding:6px 10px 7px 9px;box-shadow:0 6px 20px rgba(0,0,0,.2);font-size:13px;line-height:1.4}
+#ntip .nt-t{font-weight:600;font-size:12px;margin-bottom:3px;overflow-wrap:break-word}
+#ntip .tm{font-size:11px;color:var(--muted);margin:-2px 0 4px}
+#ntip .nt-b{white-space:pre-wrap;overflow-wrap:break-word}

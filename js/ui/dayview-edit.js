@@ -47,7 +47,7 @@ let tipTimer = null, tipFor = null;
 function hideTip() { clearTimeout(tipTimer); tipTimer = null; tipFor = null; dvtip.style.display = 'none'; }
 $('#dayview').addEventListener('mouseover', e => {
   const b = e.target.closest('.dv-blk.short, .dv-th');
-  if (!b || dv) return hideTip();
+  if (!b || dv || (b.dataset.id && (findTask(b.dataset.id) || { task: {} }).task.notes)) return hideTip();   // (notes: see notes.js)
   if (b === tipFor) return;
   hideTip(); tipFor = b;
   tipTimer = setTimeout(() => {
@@ -181,6 +181,10 @@ document.addEventListener('click', e => {
   if (tpSwallow) { tpSwallow = false; tpSwallowedAt = Date.now(); e.stopPropagation(); e.preventDefault(); }
   else if (e.detail === 1) tpSwallowedAt = 0;
 }, true);
+document.addEventListener('contextmenu', e => {
+  dvCancel();
+  if (tpSwallow) { tpSwallow = false; e.preventDefault(); e.stopPropagation(); }   // it closed the time box: no menu
+}, true);
 document.addEventListener('dblclick', e => {
   // the closing click was the first half of a double-click: ignore the double-click too
   if (tpSwallowedAt && Date.now() - tpSwallowedAt < 600) { tpSwallowedAt = 0; e.stopPropagation(); e.preventDefault(); return; }
@@ -202,7 +206,7 @@ const dvListDayAt = (x, y) => {   // a day's section in the list, or a day colum
   return el ? el.dataset.date : null;
 };
 $('#dayview').addEventListener('pointerdown', e => {
-  if (e.button !== 0 || e.target.closest('.inl')) return;
+  if (e.button !== 0 || e.ctrlKey || e.target.closest('.inl')) return;   // (Ctrl-click on a Mac = right-click)
   const b = e.target.closest('.dv-cfb'), t = e.target.closest('.dv-cfp');
   if (b) cfDragStart(e, b.dataset.cid, e.target.closest('.h.l') ? 'l' : e.target.closest('.h.r') ? 'r' : 'move', (x) => dvDayAt(x), () => renderDay());
   else if (t) cfDragStart(e, t.dataset.cid, 'move', dvListDayAt, () => renderDay(), t.dataset.day);
@@ -211,7 +215,8 @@ $('#dayview').addEventListener('pointerdown', e => {
 // block edge (resize), block -> list (remove)
 let dv = null, dvGhost = null;
 $('#dayview').addEventListener('pointerdown', e => {
-  if (e.button !== 0) return;
+  if (dv) dvCancel();   // (a drag whose release never arrived)
+  if (e.button !== 0 || e.ctrlKey) return;
   const seam = dvSeam(e);
   if (seam) { e.preventDefault(); hideInsline(); dvNoClick = Date.now(); dvAdd = seam.before ? { tid: seam.tid, beforeId: seam.id, day: seam.day } : { tid: seam.tid, afterId: seam.id, day: seam.day }; renderDay(); return; }
   if (e.target.closest('input, button, select')) return;
@@ -227,6 +232,8 @@ $('#dayview').addEventListener('pointerdown', e => {
   window.addEventListener('pointermove', dvMove);
   window.addEventListener('pointerup', dvUp, { once: true });
 });
+function dvCancel() { if (dv) dvUp(null, true); }
+window.addEventListener('pointercancel', dvCancel);
 // the day column a drag is aimed at: the one under the pointer (x given), otherwise the task's own day.
 // Dropping a task in another visible day's column moves it to that day.
 function dvCol(x) {
@@ -341,15 +348,18 @@ function dvAutoScroll() {
   dvAuto = requestAnimationFrame(dvAutoScroll);           // set first, so dvMove below doesn't start a second loop
   dvMove(e);
 }
-function dvUp(e) {
+// cancel: the drag ends without changing anything (a right-click / context menu, or the pointer was lost)
+function dvUp(e, cancel) {
   if (dvAuto) { cancelAnimationFrame(dvAuto); dvAuto = null; } dvLastE = null;
-  window.removeEventListener('pointermove', dvMove);
+  window.removeEventListener('pointermove', dvMove); window.removeEventListener('pointerup', dvUp);
   const d = dv; dv = null;
   document.body.classList.remove('dv-dragging', 'dv-resizing');
   if (dvGhost) { dvGhost.remove(); dvGhost = null; }
   const side = $('#dayview .dv-side'); if (side) side.classList.remove('rm');
   dropline.style.display = 'none';
+  if (d && d.el) d.el.style.opacity = '';   // (dimmed while its ghost was out; a drop that changes nothing doesn't redraw)
   if (!d || !d.started) return;
+  if (cancel) return render();
   dvNoClick = Date.now();   // the click that follows a drag isn't a click on the block
   dvtip.style.display = 'none';
   const f = findTask(d.id); if (!f) return render();

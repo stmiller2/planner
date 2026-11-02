@@ -84,6 +84,8 @@
 .dv-blk.short .bi{align-items:center;height:100%}
 .dv-blk.short .tt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dv-blk.short .tmi{display:block}
+.dv-blk .bi .nti{flex:none;margin:3px 0 0 -1px}   /* notes mark (ui/notes.js): beside the title, never cut off with it */
+.dv-blk.short .bi .nti{margin-top:0}
 .dv-blk.short .tm{display:none}
 .dv-blk.tiny{padding-top:0;padding-bottom:0;font-size:11.5px;line-height:1.1}
 .dv-blk.tiny input{width:11px;height:11px;margin:0}

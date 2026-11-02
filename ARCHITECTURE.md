@@ -46,7 +46,7 @@ css/  (one file per area, loaded in this order; later files can override earlier
   calendar.css          calendar grid, days, chips, same-day groups, highlight
   dayview.css           day view: list, timeline, blocks, conflict strip, tooltip, time popover
   scratch.css           the scratch board (right of the calendar / day view), its collapsed tab and resize edge
-  dialogs.css           warning bar, toast, modal windows, Settings, Archive window
+  dialogs.css           warning bar, toast, modal windows, Settings, Archive window; task notes (mark, window, hover note)
   timeline.css          Timeline view ("admire") and its hover list
 
 js/core/  (no DOM: the data and its rules; loaded by the unit tests too)
@@ -63,8 +63,10 @@ js/ui/  (views; each draws its part of the page and handles its own events)
                         warning bar, toast, modals, guide lines, tween(), wheelSteps() scroll gestures
   dragdrop.js           HTML5 drag state (`drag`) shared by sidebar and calendar; Option-drop
   archive.js            the Archive window
-  sidebar.js            the sidebar tree, link menu, thread / project gear menus (+ subthread, ordered, archive, delete),
-                        new-task boxes, click-to-insert, sidebar drag & drop
+  sidebar.js            the sidebar tree, link menu, task menu (notes, archive, delete; from the task's gear in the
+                        sidebar, or right-clicking a task anywhere: the contextmenu handler in app.js; quickAct keeps the last-used
+                        archive / delete button on every task's hover buttons for 2 s), thread / project gear menus
+                        (+ subthread, ordered, archive, delete), new-task boxes, click-to-insert, sidebar drag & drop
   calendar.js           the calendar: renderCal, row heights (fitRows), week scrolling, dropping on days
   conflicts.js          conflicts in the sidebar (+ form), dragging conflict bars, conflict hover
   dialogs.js            Help and Settings windows
@@ -77,6 +79,8 @@ js/ui/  (views; each draws its part of the page and handles its own events)
                         each unordered dot off its host's line) into the highest free spot
   dayview.js            day view: list + hour timeline (renderDay), adding tasks to a day, day swiping
   dayview-edit.js       day view editing: time popover, dragging / resizing blocks, conflict drag, tooltips
+  notes.js              task notes: noteMark (the mark after a title), editNotes (the window, from the task's gear
+                        menu), and the note shown after resting on a task for 1 s (sidebar, calendar, day view)
   scratch.js            the scratch board, #app's third column beside the calendar and day view: scratch tasks
                         (add / insert / tick / rename / reorder / clear done), resizing, opening / closing it (X;
                         per-view defaults in Settings: scratchCal / scratchDay, or scratchRemember + scratchOpen;
@@ -99,10 +103,11 @@ thread   = { id, name, color, tasks: [task], threads: [sub-thread], afterTask, u
              unordered: true = its tasks have no set order. isLoose(p, t) (core/model.js) = thread or its project
              unordered: no order warnings, no shifting later tasks, no numbers in the sidebar / on chips, and loose
              dots (no line) on the Timeline. Set with "Ordered tasks" in the thread's / project's gear menu
-task     = { id, title, date: 'YYYY-MM-DD' | null, done, linkToPrev: null | 'sameDay' | 'nextDay', plan? }
+task     = { id, title, date: 'YYYY-MM-DD' | null, done, linkToPrev: null | 'sameDay' | 'nextDay', plan?, notes? }
              linkToPrev ties a task to the one before it; a run of linked tasks is a "chain" and moves together
              plan = { date, start, dur } (minutes from midnight): its slot in day view, valid only while
              plan.date === date (see planOf)
+             notes: free text (non-empty when present); set with setTaskNotes (core/ops.js)
 entry    = { id, kind: 'task' | 'thread' | 'project', at (date archived), item (the thing itself), from (where it was) }
 conflict = { id, title, start, end }   (end inclusive; start null = no date yet)
 scratch  = { id, title, done }          the scratch board: one-off to-dos outside every project; no dates
@@ -142,6 +147,7 @@ If you ever change `state` in place outside `mutate()` (only conflict dragging d
 | dragging / resizing in day view, the time popover | ui/dayview-edit.js |
 | the scratch board | ui/scratch.js + css/scratch.css; its edits are `addScratch` … `moveScratch` (core/ops.js) |
 | the Timeline view | `admireData` (ui/timeline-data.js), `renderAdmire`, `admTipHTML` (ui/timeline.js) + css/timeline.css |
+| task notes: writing them, the hover note | ui/notes.js; `setTaskNotes` (core/ops.js); the task gear menu `openTaskMenu` (ui/sidebar.js) |
 | a setting | `UI_PREFS` (core/prefs.js), `renderSettings` / `applySetting` (ui/dialogs.js) |
 | the header: view switcher, ‹ Today ›, the dates in view, 1–5 weeks / days | markup in Planner.html; `renderHeader`, `setRange`, `navStep` / `navToday` (ui/app.js) + css/base.css |
 | keyboard shortcuts | the keydown handler at the end of ui/app.js, `switchView` for C / D / - (and list them in `shortcutsHTML` in ui/dialogs.js, shown at the end of Help) |
@@ -196,6 +202,8 @@ any .js / .css file inside js/ and css/.
 - Order of event listeners matters where several handle the same event on `document` (capture-phase listeners in
   dom.js, conflicts.js and dayview-edit.js deliberately run before the click dispatcher). Keep script order.
 - Text from the data is put into HTML with `esc()`; keep doing that for anything a user typed.
+- Day view drags are pointer events (not HTML5 drag): a right-click / Ctrl-click never starts one, and a drag whose
+  release never arrives (a context menu took it) is called off by `dvCancel` (ui/dayview-edit.js) on the next press.
 - Scrolling lists (`#tree`, calendar `.items`, `.dv-list`, `.dv-scroll`) have `isolation: isolate`, so macOS overlay
   scrollbars draw in front of their rows. Give any new scrolling list the same.
 - A non-passive `wheel` listener makes the browser wait for JavaScript before scrolling what's under it. Only the

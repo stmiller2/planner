@@ -124,12 +124,13 @@ function renderTaskRow(t, k, i, loose) {
   return `<div class="${cls}" draggable="true" data-id="${k.id}">
     <input type="checkbox" data-act="done" data-id="${k.id}" ${k.done ? 'checked' : ''}>
     <span class="${numCls}">${loose ? '' : i + 1}</span>
-    <span class="title" data-act="rename-k" data-id="${k.id}">${esc(k.title)}</span>
+    <span class="title" data-act="rename-k" data-id="${k.id}">${esc(k.title)}${noteMark(k)}</span>
     <span class="rt">
       <span class="acts">
         ${i > 0 ? `<button class="ic" data-act="linkmenu" title="Link to previous task">${ICON.link}</button>` : ''}
-        <button class="ic" data-act="arch-k" title="Archive">${ICON.archive}</button>
-        <button class="ic" data-act="del-k" title="Delete">${ICON.trash}</button>
+        <button class="ic" data-act="kmenu" title="Task settings">${ICON.gear}</button>
+        <button class="ic qk qk-arch" data-act="arch-k" title="Archive">${ICON.archive}</button>
+        <button class="ic qk qk-del" data-act="del-k" title="Delete">${ICON.trash}</button>
       </span>
       ${k.done ? '' : `<button class="date ${k.date ? '' : 'none'}" data-act="date" ${k.date ? `title="${fmtLong(k.date)}"` : ''}>${k.date ? fmtRelative(k.date) : 'no date'}</button>`}
     </span>
@@ -143,6 +144,22 @@ function openLinkMenu(id, btn) {
   const opt = (v, k, label) => `<button data-act="setlink" data-v="${v}" data-id="${id}" class="${(cur || '') === v ? 'cur' : ''}"><span class="k">${k}</span>${label}</button>`;
   menu.innerHTML = ['nextDay', 'sameDay'].map(v => opt(v, LINKS[v].badge, `${LINKS[v].label} ${n}`)).join('') + opt('', '—', 'Not linked');
   placeMenu(btn);
+}
+// a task's settings menu: notes, archive, delete. From its gear button in the sidebar (btn), or right-clicking the
+// task anywhere (sidebar row, calendar chip, day-view item or block: at = the pointer; see app.js)
+function openTaskMenu(id, btn, at) {
+  const f = findTask(id); if (!f) return;
+  menu.innerHTML = menuBtn('k-notes', id, ICON.notes, f.task.notes ? 'Edit notes' : 'Add notes')
+    + '<hr>' + menuBtn('arch-k', id, ICON.archive, 'Archive') + menuBtn('del-k', id, ICON.trash, 'Delete');
+  placeMenu(btn, at);
+}
+// After a task is deleted or archived (from its gear menu, or with this button), that one button joins every task's
+// hover buttons for 2 s, restarting with each use, so a run of tasks can go without opening the menu for each one.
+// (#tree[data-quick] shows it: see css/sidebar.css; nothing is redrawn when it goes.)
+let quickTimer = null;
+function quickAct(kind) {
+  const t = $('#tree'); t.dataset.quick = kind; clearTimeout(quickTimer);
+  quickTimer = setTimeout(() => { delete t.dataset.quick; }, 2000);
 }
 // a thread's / project's settings menu (its gear button): (+ subthread,) "Ordered tasks" switch, archive, delete.
 // In an unordered project, a thread's switch shows off and can't be changed.
@@ -160,9 +177,9 @@ function openProjectMenu(id, btn) {
     + '<hr>' + menuBtn('arch-p', id, ICON.archive, 'Archive') + menuBtn('del-p', id, ICON.trash, 'Delete');
   placeMenu(btn);
 }
-// show the menu below btn (above it if there's no room), kept inside the window
-function placeMenu(btn) {
-  const r = btn.getBoundingClientRect();
+// show the menu below btn (above it if there's no room), kept inside the window; at = { x, y }: at that point instead
+function placeMenu(btn, at) {
+  const r = at ? { left: at.x, top: at.y, bottom: at.y } : btn.getBoundingClientRect();
   menu.style.display = 'block';
   menu.style.left = Math.max(8, Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + 'px';
   menu.style.top = (r.bottom + menu.offsetHeight + 6 > innerHeight ? r.top - menu.offsetHeight - 4 : r.bottom + 4) + 'px';

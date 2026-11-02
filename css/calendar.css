@@ -19,8 +19,8 @@ main{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden
 .items{display:flex;flex-direction:column;gap:4px;flex:1 1 auto;min-height:0;overflow-y:auto;padding:3px;margin:-3px;scrollbar-width:thin;isolation:isolate}
 /* --cs: a thread's color as used for chip edge strips, checkboxes, highlight rings and the sidebar's dots / bars.
    Same as the thread color in light mode; toned down in dark mode so bright colors don't glare. */
-.thread,.chip,.grp,.dv-th,.dv-item,.dv-blk,#dvtip,#tpop{--cs:var(--c)}
-:root[data-theme="dark"] :is(.thread,.chip,.grp,.dv-th,.dv-item,.dv-blk,#dvtip,#tpop){--cs:color-mix(in srgb,var(--c) 62%,#16171a)}
+.thread,.chip,.grp,.dv-th,.dv-item,.dv-blk,#dvtip,#tpop,#ntip{--cs:var(--c)}
+:root[data-theme="dark"] :is(.thread,.chip,.grp,.dv-th,.dv-item,.dv-blk,#dvtip,#tpop,#ntip){--cs:color-mix(in srgb,var(--c) 62%,#16171a)}
 .chip{display:flex;gap:6px;align-items:flex-start;background:color-mix(in srgb,var(--c) 14%,var(--chip));border-left:3px solid var(--cs);border-radius:5px;padding:4px 6px 4px 5px;cursor:grab}
 .chip input{margin:2px 0 0;flex:none;accent-color:var(--cs)}
 .cb{min-width:0;flex:1;cursor:pointer}

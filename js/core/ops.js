@@ -49,6 +49,12 @@ function setLink(id, type) {
   const f = findTask(id); if (!f || f.i === 0) return;
   mutate(() => { f.task.linkToPrev = type || null; });
 }
+// a task's notes: free text, shown after resting on the task a moment (empty = none)
+function setTaskNotes(id, text) {
+  const f = findTask(id); if (!f) return;
+  const v = String(text ?? '').trim();
+  mutate(() => { if (v) f.task.notes = v; else delete f.task.notes; });
+}
 function delTask(id) {
   const f = findTask(id); if (!f) return;
   mutate(() => detachTask(f));

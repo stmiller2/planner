@@ -21,6 +21,7 @@ const ICON = {
   day: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
   timeline: svg('<path d="M4 4v16"/><path d="M8 7h7"/><path d="M11 12h9"/><path d="M8 17h5"/>'),
   archive: svg('<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/>'),
+  notes: svg('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/>'),
   gear: svg('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'),
 };
 
@@ -85,6 +86,9 @@ function editDateIn(btn, opt) {
 /* ---------- popup menu (the link menu) ---------- */
 const menu = $('#menu');
 function closeMenu() { menu.style.display = 'none'; }
+// it stays put while what it belongs to moves: scrolling (or a wheel step to other weeks / days) closes it
+document.addEventListener('scroll', e => { if (menu.style.display === 'block' && !menu.contains(e.target)) closeMenu(); }, true);
+document.addEventListener('wheel', e => { if (menu.style.display === 'block' && !menu.contains(e.target)) closeMenu(); }, { capture: true, passive: true });
 
 /* ---------- inline rename ---------- */
 // rename in place: in the sidebar (default), or on a calendar chip / day-view block or list item (el given)

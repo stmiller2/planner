@@ -122,3 +122,20 @@ test('scratch tasks: add (at the end or before one), tick, reorder, clear done, 
   P.delScratch(x); assert.deepStrictEqual(titles(), ['second', 'before third', 'third']);
   assert.strictEqual(P.findThread('t').t.tasks.length, 1);   // nothing to do with any project
 });
+
+test('task notes: set, trimmed, cleared when empty, one undo step each, and kept through archive / restore', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02'), T('b')])]));
+  P.setTaskNotes('a', '  use 2x buffer\nfreezer B, shelf 3 \n');
+  assert.strictEqual(P.findTask('a').task.notes, 'use 2x buffer\nfreezer B, shelf 3');
+  const n = P.undoStack.length;
+  P.setTaskNotes('a', 'use 2x buffer\nfreezer B, shelf 3');   // unchanged: no undo step
+  assert.strictEqual(P.undoStack.length, n);
+  P.archiveTask('a');
+  assert.strictEqual(P.state.archive[0].item.notes, 'use 2x buffer\nfreezer B, shelf 3');
+  P.restoreEntry(P.state.archive[0].id);
+  assert.strictEqual(P.findTask('a').task.notes, 'use 2x buffer\nfreezer B, shelf 3');
+  P.setTaskNotes('a', '   ');
+  assert.ok(!('notes' in P.findTask('a').task));
+  P.undo();
+  assert.strictEqual(P.findTask('a').task.notes, 'use 2x buffer\nfreezer B, shelf 3');
+});

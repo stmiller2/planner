@@ -276,6 +276,82 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.deepStrictEqual(JSON.parse(fs.readFileSync(DATA, 'utf8')).scratch.map(s => s.title), ['Call EHS']);
       await page.keyboard.press('c');
     });
+    await check('task gear menu: notes (shown after resting on a task), delete, and the delete button staying 2 s', async () => {
+      await page.keyboard.press('Escape'); await page.keyboard.press('c'); await sleep(300);
+      const row = id => `#tree .task[data-id="${id}"]`, visible = sel => page.locator(sel).isVisible();
+      assert.strictEqual(await visible(`${row('l3')} [data-act="del-k"]`), false);   // archive / delete live in the menu
+      await page.hover(row('l3')); await page.click(`${row('l3')} [data-act="kmenu"]`);
+      await page.click('#menu [data-act="k-notes"]');
+      await page.keyboard.type('Freezer B, shelf 3'); await page.keyboard.press('Control+Enter');
+      assert.strictEqual((await task('l3')).notes, 'Freezer B, shelf 3');
+      assert.ok(await visible(`${row('l3')} .nti`));
+      await page.mouse.move(5, 5); await page.hover(`${row('l3')} .title`);
+      await sleep(600); assert.strictEqual(await visible('#ntip'), false);
+      await sleep(700); assert.ok(await visible('#ntip')); assert.match(await page.locator('#ntip').textContent(), /Freezer B, shelf 3/);
+      await page.mouse.move(5, 5); assert.strictEqual(await visible('#ntip'), false);
+      await page.hover(row('l4')); await page.click(`${row('l4')} [data-act="kmenu"]`); await page.click('#menu [data-act="del-k"]');
+      assert.ok(!(await task('l4')));
+      await page.hover(row('l1')); assert.ok(await visible(`${row('l1')} [data-act="del-k"]`));
+      assert.strictEqual(await visible(`${row('l1')} [data-act="arch-k"]`), false);   // only the one just used
+      await page.click(`${row('l1')} [data-act="del-k"]`); assert.ok(!(await task('l1')));
+      await sleep(1500); await page.hover(row('l2')); assert.ok(await visible(`${row('l2')} [data-act="del-k"]`));   // the timer restarted
+      await sleep(700); assert.strictEqual(await visible(`${row('l2')} [data-act="del-k"]`), false);
+      await page.mouse.move(5, 5); await page.keyboard.press('Control+z'); await page.keyboard.press('Control+z');
+      assert.ok(await task('l1')); assert.ok(await task('l4'));
+    });
+    await check('right-clicking a task (sidebar, calendar, day view) opens its menu at the pointer', async () => {
+      await page.keyboard.press('Escape'); await page.keyboard.press('c'); await sleep(300);
+      const shown = () => page.evaluate(() => getComputedStyle(document.querySelector('#menu')).display === 'block' && document.querySelector('#menu').textContent);
+      await page.click('#grid .chip[data-id="a5"] .tt', { button: 'right' });
+      assert.match(await shown(), /notes.*Archive.*Delete/);
+      await page.click('#menu [data-act="del-k"]'); assert.ok(!(await task('a5')));
+      await page.keyboard.press('Control+z'); assert.ok(await task('a5'));
+      await page.click('#tree .task[data-id="a5"] .title', { button: 'right' }); assert.ok(await shown());
+      await page.keyboard.press('Escape'); assert.strictEqual(await shown(), false);
+      // the thread menu stays open while its switch redraws everything
+      await page.hover('.trow[data-tdrag="t1"]'); await page.click('.trow[data-tdrag="t1"] [data-act="tmenu"]');
+      await page.click('#menu .mtog'); await sleep(200); assert.ok(await shown());
+      await page.click('#menu .mtog'); await page.keyboard.press('Escape');
+      // a Mac Ctrl-click: the menu opens on the press, then the release sends a plain click, which must do nothing
+      const ctrlClick = async sel => {
+        const bb = await page.locator(sel).first().boundingBox(), x = bb.x + 30, y = bb.y + 8;
+        await page.mouse.move(x, y); await page.keyboard.down('Control'); await page.mouse.down();
+        await page.evaluate(([x, y]) => document.elementFromPoint(x, y).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y, ctrlKey: true })), [x, y]);
+        await page.mouse.up(); await page.keyboard.up('Control'); await sleep(400);
+      };
+      await ctrlClick('#grid .chip[data-id="a5"] .tt');
+      assert.ok(await shown(), 'menu stays open after a Ctrl-click on a chip');
+      await ctrlClick('#tree .task[data-id="a5"] .title'); assert.ok(await shown(), '… and on a sidebar row');
+      await page.click('#range'); assert.strictEqual(await shown(), false);   // the next ordinary click closes it as usual
+      await page.keyboard.press('d'); await sleep(400);
+      await ctrlClick('#dayview .dv-item');
+      assert.ok(await shown(), '… and in day view'); assert.strictEqual(await page.evaluate(() => !!tpop), false, 'no time box');
+      await page.keyboard.press('Escape');
+      const it = page.locator('#dayview .dv-item').first(), id = await it.getAttribute('data-id');
+      await it.click({ button: 'right' }); assert.ok(await shown());
+      assert.strictEqual(await page.evaluate(() => dv), null);
+      await page.keyboard.press('Escape');
+    });
+    await check('day view: Ctrl-click (a Mac right-click) never leaves a task stuck to the pointer; a drop that changes nothing leaves no faded block', async () => {
+      assert.ok(await page.evaluate(() => !!ui.dayView));   // (Escape closed only the menu)
+      const b = page.locator('#dayview .dv-blk').first(), bb = await b.boundingBox();
+      await page.mouse.move(bb.x + 30, bb.y + 8); await page.keyboard.down('Control'); await page.mouse.down();
+      await page.mouse.move(bb.x + 80, bb.y + 80, { steps: 5 });
+      assert.strictEqual(await page.evaluate(() => dv), null);
+      assert.strictEqual(await page.locator('.dv-ghost').count(), 0);
+      await page.mouse.up(); await page.keyboard.up('Control'); await sleep(300); await page.evaluate(() => { closeMenu(); closeTimePop(false); });   // (on Linux a Ctrl-click is a click: the time box)
+      // a drag whose release is lost (e.g. to a context menu) is called off by the next press, putting things back
+      await page.mouse.move(bb.x + 30, bb.y + 8); await page.mouse.down(); await page.mouse.move(bb.x + 30, bb.y + 60, { steps: 5 });
+      assert.strictEqual(await page.locator('.dv-ghost').count(), 1);
+      await page.evaluate(() => document.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
+      assert.strictEqual(await page.locator('.dv-ghost').count(), 0);
+      await page.mouse.up(); await sleep(100);
+      assert.strictEqual(await page.evaluate(() => [...document.querySelectorAll('#dayview .dv-blk')].filter(x => x.style.opacity).length), 0);
+      // drag a block and put it back where it was: it isn't left faded
+      await page.mouse.move(bb.x + 30, bb.y + 8); await page.mouse.down(); await page.mouse.move(bb.x + 30, bb.y + 40, { steps: 4 }); await page.mouse.move(bb.x + 30, bb.y + 8, { steps: 4 }); await page.mouse.up(); await sleep(100);
+      assert.strictEqual(await page.evaluate(() => [...document.querySelectorAll('#dayview .dv-blk')].filter(x => x.style.opacity).length), 0);
+      await page.keyboard.press('Escape');
+    });
     await check('Help shows where the data is; Settings > Data file moves it to another folder', async () => {
       await page.keyboard.press('h');
       assert.ok((await page.textContent('#modal .mbody')).includes(DATA), 'full path in Help');
