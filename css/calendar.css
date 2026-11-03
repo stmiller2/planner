@@ -5,12 +5,12 @@ main{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden
 #dow div{padding:6px 8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;overflow:hidden;white-space:nowrap}
 #grid{flex:1;overflow:auto;min-height:0;will-change:transform}
 #grid.settle{transition:transform .18s ease-out,opacity .18s ease-out}
-.day{border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);padding:4px 5px 8px;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;position:relative}
+.day{border-right:1px solid var(--cal-line);border-bottom:1px solid var(--cal-line);padding:4px 5px 8px;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;position:relative}
 .day:nth-child(7n){border-right:0}
 .day.we{background:var(--weekend)}
 .day.more::after{content:'';position:absolute;left:0;right:0;bottom:0;height:22px;pointer-events:none;background:linear-gradient(to bottom,transparent,var(--bg))}
 .day.we.more::after{background:linear-gradient(to bottom,transparent,var(--weekend))}
-.dn{font-size:12px;font-weight:600;padding:1px 2px 4px;display:flex;align-items:center;gap:6px}
+.dn{font-size:12px;font-weight:600;color:var(--cal-num);padding:1px 2px 4px;display:flex;align-items:center;gap:6px}
 .dn .n{padding:0 6px;border-radius:10px;line-height:19px}
 .day.past .dn{color:var(--muted);font-weight:500}
 .day.today .dn .n{background:var(--today);color:#fff}
@@ -51,3 +51,20 @@ main{position:relative}
 /* outline that follows the chips' own rounded shapes (incl. the notches between them) */
 .grp.hl{filter:drop-shadow(2px 0 0 var(--cs)) drop-shadow(-2px 0 0 var(--cs)) drop-shadow(0 2px 0 var(--cs)) drop-shadow(0 -2px 0 var(--cs)) drop-shadow(0 3px 5px rgba(0,0,0,.18))}
 body.dragging .chip, body.dragging .task{cursor:grabbing}
+
+/* dark mode: chips (calendar and day view) are filled with a softened (less saturated) version of the thread's color
+   rather than a dark tint.
+   --fill: the chip's background; --on: its text color, near-black, or a soft white when the fill is too dark for black
+   (picked from the fill's lightness, so it works for any color chosen with the color picker). Done chips stay dim. */
+:root[data-theme="dark"] :is(.chip,.grp,.dv-item,.dv-blk){--cs:color-mix(in srgb,var(--c) 55%,#fff)}
+:root[data-theme="dark"] :is(.chip,.dv-item,.dv-blk){--fill:color-mix(in srgb,var(--c) 72%,#77777c);--on:#151515;background:var(--fill);color:var(--on);color-scheme:light;
+  border-left-color:color-mix(in srgb,var(--fill) 68%,#000)}
+@supports (color:lch(from red l c h)){
+  :root[data-theme="dark"] :is(.chip,.dv-item,.dv-blk){--fill:oklch(from var(--c) l calc(c * .62) h);   /* same lightness and hue, ~60% of the saturation */
+    --on:lch(from var(--fill) clamp(8,(46 - l) * 1000,88) 0 0)}
+}
+:root[data-theme="dark"] :is(.chip,.dv-item,.dv-blk).done{--fill:color-mix(in srgb,var(--c) 22%,var(--chip));--on:var(--muted);color-scheme:dark;
+  border-left-color:color-mix(in srgb,var(--c) 45%,var(--chip))}
+:root[data-theme="dark"] :is(.chip,.dv-item,.dv-blk) :is(.tt,.ts .nd){color:var(--on)}
+:root[data-theme="dark"] :is(.chip,.dv-item,.dv-blk) :is(.ts,.tm,.tmi,.nti){color:color-mix(in srgb,var(--on) 72%,transparent)}
+:root[data-theme="dark"] :is(.chip .cx,.dv-blk .x){background:var(--fill);color:var(--on)}
