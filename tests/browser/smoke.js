@@ -298,6 +298,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       await page.dblclick('#ntip .nt-b'); await page.keyboard.type(' (moved)'); await page.mouse.click(5, 300);   // a press elsewhere saves and closes
       assert.strictEqual((await task('l3')).notes, 'Freezer B, shelf 3, left (moved)'); assert.strictEqual(await visible('#ntip'), false);
       await page.hover(`${row('l3')} .title`); await sleep(1200); assert.ok(await visible('#ntip'));
+      // web addresses are links (trailing punctuation left out); text around them stays plain and escaped
+      await page.evaluate(() => setTaskNotes('l3', 'See https://example.com/a_(b). Or www.example.org, <b>x</b>'));
+      await page.mouse.move(5, 5); await page.hover(`${row('l3')} .title`); await sleep(1200);
+      assert.deepStrictEqual(await page.$$eval('#ntip .nt-b a', as => as.map(a => [a.getAttribute('href'), a.textContent, a.target])),
+        [['https://example.com/a_(b)', 'https://example.com/a_(b)', '_blank'], ['https://www.example.org', 'www.example.org', '_blank']]);
+      assert.strictEqual(await page.locator('#ntip .nt-b b').count(), 0);
       await page.mouse.move(5, 5); await sleep(400); assert.strictEqual(await visible('#ntip'), false);
       await page.hover(row('l4')); await page.click(`${row('l4')} [data-act="kmenu"]`); await page.click('#menu [data-act="del-k"]');
       assert.ok(!(await task('l4')));

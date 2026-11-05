@@ -26,16 +26,34 @@ function editNotes(id) {
 }
 
 /* ---------- showing them ---------- */
+// the note's text as HTML, with web addresses (http://, https://, www.) as links that open in a new tab. Punctuation
+// right after an address (a full stop, a closing bracket that isn't part of it) stays outside the link.
+const NT_URL = /\b(?:https?:\/\/|www\.)[^\s<>"]+/gi;
+function linkifyNotes(text) {
+  let out = '', at = 0;
+  for (const m of text.matchAll(NT_URL)) {
+    let u = m[0];
+    for (;;) {
+      const c = u.slice(-1), opens = (u.match(/\(/g) || []).length, closes = (u.match(/\)/g) || []).length;
+      if (/[.,;:!?'\]}>]/.test(c) || (c === ')' && closes > opens)) u = u.slice(0, -1); else break;
+    }
+    if (u.length < 5) continue;
+    const href = /^www\./i.test(u) ? 'https://' + u : u;
+    out += esc(text.slice(at, m.index)) + `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a>`;
+    at = m.index + u.length;
+  }
+  return out + esc(text.slice(at));
+}
 // After resting on a task for NT_DELAY ms. The note stays while the pointer is on the task or on the note itself
 // (crossing the gap between them, or a quick slip off, is forgiven for NT_GRACE ms), so a long note can be scrolled.
-// Double-clicking its text edits it in place: ⌘↩ / Ctrl+↩ saves and keeps the note open, Esc goes back without
+// Web addresses in it are links. Double-clicking its text (not a link) edits it in place: ⌘↩ / Ctrl+↩ saves and keeps the note open, Esc goes back without
 // saving, and pressing anywhere else saves and closes it (Enter is a new line). Gone on leaving both the task and the
 // note, pressing elsewhere, scrolling elsewhere, typing or dragging.
 const NT_DELAY = 1000, NT_GRACE = 300, NT_SEL = '#tree .task[data-id], #grid .chip[data-id], #dayview .dv-item[data-id], #dayview .dv-blk[data-id]';
 const ntip = document.createElement('div'); ntip.id = 'ntip'; document.body.appendChild(ntip);
 // ntFor: the task under the pointer; ntOn / ntId: the task (element, id) whose note is showing; ntGone: the grace timer;
 // ntEdit: the in-place editor while open ({ ta, save })
-let ntFor = null, ntTimer = null, ntOn = null, ntId = null, ntGone = null, ntEdit = null;
+let ntFor = null, ntTimer = null, ntOn = null, ntId = null, ntGone = null, ntEdit = null, ntShownText = null;   // ntShownText: the text shown
 function dropNotesTip() {   // the note itself (an in-place edit is saved first); a task waiting to show its note still will
   clearTimeout(ntGone); ntGone = null;
   if (ntEdit) ntEdit.save();
@@ -47,7 +65,10 @@ document.addEventListener('mouseover', e => {
   if (ntip.contains(e.target)) return ntStay();
   if (ntEdit) return;                                   // while editing, only a press elsewhere (or ⌘↩ / Esc) ends it
   const el = e.target.closest ? e.target.closest(NT_SEL) : null;
-  if (ntOn && el && !ntOn.isConnected && el.dataset.id === ntId) ntOn = el;   // its task was redrawn (e.g. after saving)
+  if (ntOn && el && !ntOn.isConnected && el.dataset.id === ntId) {   // its task was redrawn (e.g. after saving): the same task
+    const now = (findTask(ntId) || { task: {} }).task.notes;
+    if (now === ntShownText) ntOn = el; else if (now) showNotesTip(el); else dropNotesTip();   // (its notes changed meanwhile)
+  }
   if (ntOn) { if (el === ntOn) ntStay(); else if (!ntGone) ntGone = setTimeout(dropNotesTip, NT_GRACE); }
   if (el === ntFor) return;
   ntFor = el; clearTimeout(ntTimer); ntTimer = null;
@@ -70,14 +91,14 @@ function showNotesTip(el) {
   const p = el.classList.contains('dv-blk') && el.classList.contains('short') && planOf(f.task);
   const sub = p ? `${fmtSpan(p.start, p.dur)} · ${f.t.name}` : el.classList.contains('chip') ? [f.p.name, ...f.path].join(' › ') + (isLoose(f.p, f.t) ? '' : ` #${f.i + 1}`) : '';
   ntip.style.setProperty('--c', colorOf(f.t));
-  ntip.innerHTML = `<div class="nt-t">${esc(f.task.title)}</div>${sub ? `<div class="tm">${esc(sub)}</div>` : ''}<div class="nt-b">${esc(f.task.notes)}</div>`;
+  ntip.innerHTML = `<div class="nt-t">${esc(f.task.title)}</div>${sub ? `<div class="tm">${esc(sub)}</div>` : ''}<div class="nt-b">${linkifyNotes(f.task.notes)}</div>`;
   ntip.style.display = 'block'; ntip.scrollTop = 0;
-  ntOn = el; ntId = f.task.id; ntRect = el.getBoundingClientRect();
+  ntOn = el; ntId = f.task.id; ntShownText = f.task.notes; ntRect = el.getBoundingClientRect();
   placeNotesTip();
 }
 // editing in place: double-click the note's text
 ntip.addEventListener('dblclick', e => {
-  const b = e.target.closest('.nt-b'); if (!b || ntEdit || !ntId) return;
+  const b = e.target.closest('.nt-b'); if (!b || ntEdit || !ntId || e.target.closest('a')) return;   // (a link: just opens it)
   const f = findTask(ntId); if (!f) return;
   e.preventDefault(); getSelection().removeAllRanges();
   const id = ntId, cur = f.task.notes || '';
@@ -93,7 +114,7 @@ ntip.addEventListener('dblclick', e => {
     if (save && v !== cur.trim()) setTaskNotes(id, v);
     const now = (findTask(id) || { task: {} }).task.notes;
     if (!keep || !now) { if (keep) dropNotesTip(); return; }
-    const nb = document.createElement('div'); nb.className = 'nt-b'; nb.textContent = now;
+    const nb = document.createElement('div'); nb.className = 'nt-b'; nb.innerHTML = linkifyNotes(now); ntShownText = now;
     ta.replaceWith(nb); k.remove(); ntip.style.width = ''; placeNotesTip();
   };
   const ed = { ta, save: () => done(true, false) };
