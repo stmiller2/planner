@@ -288,7 +288,17 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       await page.mouse.move(5, 5); await page.hover(`${row('l3')} .title`);
       await sleep(600); assert.strictEqual(await visible('#ntip'), false);
       await sleep(700); assert.ok(await visible('#ntip')); assert.match(await page.locator('#ntip').textContent(), /Freezer B, shelf 3/);
-      await page.mouse.move(5, 5); assert.strictEqual(await visible('#ntip'), false);
+      // the note stays while the pointer moves onto it, and can be edited there (double-click; Ctrl+Enter saves)
+      const nb = await page.locator('#ntip .nt-b').boundingBox();
+      await page.mouse.move(nb.x + 5, nb.y + nb.height / 2, { steps: 8 }); await sleep(400); assert.ok(await visible('#ntip'));
+      await page.dblclick('#ntip .nt-b'); assert.ok(await visible('#ntip .nt-ed'));
+      await page.keyboard.press('End'); await page.keyboard.type(', left'); await page.keyboard.press('Control+Enter');
+      assert.strictEqual((await task('l3')).notes, 'Freezer B, shelf 3, left');
+      assert.ok(await visible('#ntip .nt-b')); assert.match(await page.locator('#ntip').textContent(), /shelf 3, left/);
+      await page.dblclick('#ntip .nt-b'); await page.keyboard.type(' (moved)'); await page.mouse.click(5, 300);   // a press elsewhere saves and closes
+      assert.strictEqual((await task('l3')).notes, 'Freezer B, shelf 3, left (moved)'); assert.strictEqual(await visible('#ntip'), false);
+      await page.hover(`${row('l3')} .title`); await sleep(1200); assert.ok(await visible('#ntip'));
+      await page.mouse.move(5, 5); await sleep(400); assert.strictEqual(await visible('#ntip'), false);
       await page.hover(row('l4')); await page.click(`${row('l4')} [data-act="kmenu"]`); await page.click('#menu [data-act="del-k"]');
       assert.ok(!(await task('l4')));
       await page.hover(row('l1')); assert.ok(await visible(`${row('l1')} [data-act="del-k"]`));

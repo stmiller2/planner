@@ -178,6 +178,8 @@ function showGuide(el, y, x, right) {
   Object.assign(el.style, { display: 'block', top: (y - (el === insline ? 0.5 : 1)) + 'px', left: (x + inset) + 'px', width: Math.max(20, right - x - inset - 8) + 'px' });
 }
 function hideInsline() { insline.style.display = 'none'; }
+// any scroll (sidebar, day list, scratch board) moves the rows out from under the line: hide it until the next mousemove
+document.addEventListener('scroll', hideInsline, true);
 
 /* ---------- motion ---------- */
 // run frame(k) on every animation frame for ms milliseconds (k eases out from 0 to 1), then done(); returns { cancel }

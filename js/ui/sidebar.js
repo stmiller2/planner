@@ -327,7 +327,6 @@ tree.addEventListener('mousemove', e => {
   showGuide(insline, s.line[0], s.line[1], tree.getBoundingClientRect().right);
 });
 tree.addEventListener('mouseleave', hideInsline);
-tree.addEventListener('scroll', hideInsline);
 tree.addEventListener('mousedown', e => {
   if (e.button !== 0) return;
   const s = insertSpot(e); if (!s) return;

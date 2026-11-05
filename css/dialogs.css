@@ -107,8 +107,11 @@ code.path{word-break:break-all}
 .nt-ta:focus{border-color:var(--accent)}
 .card .nt-row{align-items:center}
 .card .nt-row .sub{margin:0 0 0 auto;color:var(--muted);font-size:11.5px}
-#ntip{position:fixed;z-index:55;pointer-events:none;display:none;width:max-content;max-width:340px;max-height:min(50vh,380px);overflow:hidden;background:var(--panel);color:var(--ink);
+#ntip{position:fixed;z-index:55;display:none;width:max-content;max-width:340px;max-height:min(50vh,380px);overflow:auto;overscroll-behavior:contain;box-sizing:border-box;background:var(--panel);color:var(--ink);
   border:1px solid var(--line);border-left:3px solid var(--cs);border-radius:7px;padding:6px 10px 7px 9px;box-shadow:0 6px 20px rgba(0,0,0,.2);font-size:13px;line-height:1.4}
 #ntip .nt-t{font-weight:600;font-size:12px;margin-bottom:3px;overflow-wrap:break-word}
 #ntip .tm{font-size:11px;color:var(--muted);margin:-2px 0 4px}
-#ntip .nt-b{white-space:pre-wrap;overflow-wrap:break-word}
+#ntip .nt-b{white-space:pre-wrap;overflow-wrap:break-word;cursor:text}
+/* editing in place (double-click the text): a box the note's width, growing with what's typed */
+#ntip .nt-ed{display:block;width:100%;box-sizing:border-box;min-height:60px;max-height:min(38vh,300px);resize:none;font:inherit;line-height:1.4;color:var(--ink);background:var(--bg);border:1px solid var(--accent);border-radius:6px;padding:4px 6px;margin:1px 0 0;outline:none}
+#ntip .nt-k{font-size:10.5px;color:var(--muted);margin-top:4px}

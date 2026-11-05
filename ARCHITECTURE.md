@@ -60,7 +60,7 @@ js/core/  (no DOM: the data and its rules; loaded by the unit tests too)
 
 js/ui/  (views; each draws its part of the page and handles its own events)
   dom.js                shared building blocks: $ / $$, icons, menu, inline text + date boxes, rename,
-                        warning bar, toast, modals, guide lines, tween(), wheelSteps() scroll gestures
+                        warning bar, toast, modals, guide lines (any scroll hides the "+" insert line), tween(), wheelSteps() scroll gestures
   dragdrop.js           HTML5 drag state (`drag`) shared by sidebar and calendar; Option-drop
   archive.js            the Archive window
   sidebar.js            the sidebar tree, link menu, task menu (notes, archive, delete; from the task's gear in the
@@ -80,7 +80,8 @@ js/ui/  (views; each draws its part of the page and handles its own events)
   dayview.js            day view: list + hour timeline (renderDay), adding tasks to a day, day swiping
   dayview-edit.js       day view editing: time popover, dragging / resizing blocks, conflict drag, tooltips
   notes.js              task notes: noteMark (the mark after a title), editNotes (the window, from the task's gear
-                        menu), and the note shown after resting on a task for 1 s (sidebar, calendar, day view)
+                        menu), and the note shown after resting on a task for 1 s (sidebar, calendar, day view); it stays
+                        while the pointer is on the task or the note, and double-clicking its text edits it in place
   scratch.js            the scratch board, #app's third column beside the calendar and day view: scratch tasks
                         (add / insert / tick / rename / reorder / clear done), resizing, opening / closing it (X;
                         per-view defaults in Settings: scratchCal / scratchDay, or scratchRemember + scratchOpen;

@@ -100,7 +100,6 @@ scEl.addEventListener('mousemove', e => {
   showGuide(insline, s.y, s.x, e.target.closest('.sc-list').getBoundingClientRect().right);
 });
 scEl.addEventListener('mouseleave', hideInsline);
-scEl.addEventListener('scroll', hideInsline, true);
 scEl.addEventListener('mousedown', e => {
   if (e.button !== 0) return;
   const s = scSeam(e); if (!s) return;
