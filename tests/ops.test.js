@@ -139,3 +139,86 @@ test('task notes: set, trimmed, cleared when empty, one undo step each, and kept
   P.undo();
   assert.strictEqual(P.findTask('a').task.notes, 'use 2x buffer\nfreezer B, shelf 3');
 });
+
+/* ---------- several tasks at once (a sidebar selection) ---------- */
+test('several tasks dropped on a day: unscheduled ones all get that date, in one undo step', () => {
+  const P = load(plan([TH('t', [T('a'), T('b'), T('c')]), TH('u', [T('x')])]));
+  assert.ok(P.dateTasks(['x', 'a', 'c'], '2026-11-10'));
+  assert.deepStrictEqual(dates(P, 'a', 'b', 'c', 'x'), { a: '2026-11-10', b: null, c: '2026-11-10', x: '2026-11-10' });
+  P.undo();
+  assert.deepStrictEqual(dates(P, 'a', 'c', 'x'), { a: null, c: null, x: null });
+});
+
+test('several scheduled tasks dropped on a day: earlier first, later tasks keep their spacing from the last one', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02'), T('b', '2026-11-04'), T('c', '2026-11-06')])]), { prefs: { shiftLater: true } });
+  P.dateTasks(['b', 'a'], '2026-11-10');
+  assert.deepStrictEqual(dates(P, 'a', 'b', 'c'), { a: '2026-11-10', b: '2026-11-10', c: '2026-11-12' });
+});
+
+test('a linked chain in the selection is placed by its first selected task, not dragged around by each one', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02'), T('b', '2026-11-03', { link: 'nextDay' }), T('c', '2026-11-04', { link: 'nextDay' })])]));
+  P.dateTasks(['a', 'b', 'c'], '2026-11-10');
+  assert.deepStrictEqual(dates(P, 'a', 'b', 'c'), { a: '2026-11-10', b: '2026-11-11', c: '2026-11-12' });
+  P.dateTasks(['b'], '2026-11-20');   // one task of a chain: the chain comes along, as with a single drag
+  assert.deepStrictEqual(dates(P, 'a', 'b', 'c'), { a: '2026-11-19', b: '2026-11-20', c: '2026-11-21' });
+});
+
+test('Option-drop of several tasks: only they move; links among them stay, links to others are cut', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02'), T('b', '2026-11-02', { link: 'sameDay' }), T('c', '2026-11-02', { link: 'sameDay' }), T('d', '2026-11-05')])]), { prefs: { shiftLater: true } });
+  P.dateTasks(['b', 'c'], '2026-11-12', true);
+  assert.deepStrictEqual(dates(P, 'a', 'b', 'c', 'd'), { a: '2026-11-02', b: '2026-11-12', c: '2026-11-12', d: '2026-11-05' });
+  assert.deepStrictEqual(links(P, 't'), [null, null, 'sameDay', null]);
+});
+
+test('unscheduling several tasks at once', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02'), T('b', '2026-11-03')])]));
+  P.dateTasks(['a', 'b'], null);
+  assert.deepStrictEqual(dates(P, 'a', 'b'), { a: null, b: null });
+});
+
+test('linking several tasks same-day gathers them after the first one, per thread', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02'), T('b'), T('c'), T('d', '2026-11-09')]), TH('u', [T('x'), T('y')]), TH('v', [T('z')])]));
+  assert.strictEqual(P.linkTasks(['d', 'a', 'c', 'x', 'y', 'z'], 'sameDay'), 2);   // z: alone in its thread, left as is
+  assert.deepStrictEqual(ids(P, 't'), ['a', 'c', 'd', 'b']);
+  assert.deepStrictEqual(links(P, 't'), [null, 'sameDay', 'sameDay', null]);
+  assert.deepStrictEqual(dates(P, 'a', 'c', 'd'), { a: '2026-11-02', c: '2026-11-02', d: '2026-11-02' });
+  assert.deepStrictEqual(links(P, 'u'), [null, 'sameDay']);
+  assert.strictEqual(P.linkTasks(['z'], 'sameDay'), 0);
+  P.linkTasks(['a', 'c', 'd'], 'nextDay');
+  assert.deepStrictEqual(dates(P, 'a', 'c', 'd'), { a: '2026-11-02', c: '2026-11-03', d: '2026-11-04' });
+  P.unlinkTasks(['c', 'd']);
+  assert.deepStrictEqual(links(P, 't'), [null, null, null, null]);
+});
+
+test('linking keeps sub-threads and other chains intact', () => {
+  const P = load(plan([TH('t', [T('a'), T('b'), T('c'), T('d', null, { link: 'sameDay' })], { threads: [TH('s', [T('s1')], { after: 'a' })] })]));
+  P.linkTasks(['a', 'c'], 'sameDay');
+  const L = P.layout(P.findThread('t').t).map(x => x.obj.id);
+  assert.deepStrictEqual(j(L), ['a', 'c', 's', 'b', 'd']);
+  assert.deepStrictEqual(links(P, 't'), [null, 'sameDay', null, null]);   // c leaves its chain with d: d starts over
+});
+
+test('several tasks: done, archive, delete, each one undo step', () => {
+  const P = load(plan([TH('t', [T('a'), T('b'), T('c'), T('d')])]));
+  P.setTasksDone(['a', 'c'], true);
+  assert.deepStrictEqual(j(P.findThread('t').t.tasks.map(k => k.done)), [true, false, true, false]);
+  P.archiveTasks(['b', 'c']);
+  assert.deepStrictEqual(ids(P, 't'), ['a', 'd']);
+  assert.strictEqual(P.state.archive.length, 2);
+  P.undo(); assert.deepStrictEqual(ids(P, 't'), ['a', 'b', 'c', 'd']);
+  P.delTasks(['a', 'd']);
+  assert.deepStrictEqual(ids(P, 't'), ['b', 'c']);
+  P.undo(); assert.deepStrictEqual(ids(P, 't'), ['a', 'b', 'c', 'd']);
+});
+
+test('dragging several tasks in the sidebar: they land together in sidebar order, adjacent links kept', () => {
+  const P = load(plan([TH('t', [T('a'), T('b', null, { link: 'sameDay' }), T('c'), T('d')]), TH('u', [T('x'), T('y')])]));
+  P.moveManyTo(['d', 'x', 'b'], false, { tid: 'u', refId: 'y', side: 'before' });   // b brings its chain (a)
+  assert.deepStrictEqual(ids(P, 't'), ['c']);
+  assert.deepStrictEqual(ids(P, 'u'), ['a', 'b', 'd', 'x', 'y']);
+  assert.deepStrictEqual(links(P, 'u'), [null, 'sameDay', null, null, null]);
+  P.moveManyTo(['b', 'x'], true, { tid: 't', refId: null });                       // Option: just those two
+  assert.deepStrictEqual(ids(P, 't'), ['c', 'b', 'x']);
+  assert.deepStrictEqual(ids(P, 'u'), ['a', 'd', 'y']);
+  assert.deepStrictEqual(links(P, 't'), [null, null, null]);
+});

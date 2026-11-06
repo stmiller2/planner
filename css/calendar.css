@@ -50,6 +50,20 @@ main{position:relative}
 .grp{display:flex;flex-direction:column;gap:0;border-radius:5px}   /* same-day group: chips stacked flush into one bubble */
 /* outline that follows the chips' own rounded shapes (incl. the notches between them) */
 .grp.hl{filter:drop-shadow(2px 0 0 var(--cs)) drop-shadow(-2px 0 0 var(--cs)) drop-shadow(0 2px 0 var(--cs)) drop-shadow(0 -2px 0 var(--cs)) drop-shadow(0 3px 5px rgba(0,0,0,.18))}
+/* selected in the sidebar (ui/sidebar.js): each run of selected chips sits in a .selrun (selRuns, ui/calendar.js), outlined
+   in blue round the run's own shape (rounded corners, the notches between same-day chips; no line between selected
+   chips), and the colored tab turns blue too. (z-index: drawn over an unselected chip next to it.)
+   Hovered, the usual highlight: a lone chip in blue; a same-day group with some of it selected outlines its selected
+   run(s) in blue and its other chips (.unrun) in the thread's color, with the group's lift shadow under it all. */
+.selrun{display:flex;flex-direction:column;position:relative;z-index:1;
+  filter:drop-shadow(1.5px 0 0 var(--accent)) drop-shadow(-1.5px 0 0 var(--accent)) drop-shadow(0 1.5px 0 var(--accent)) drop-shadow(0 -1.5px 0 var(--accent))}
+#grid .selrun>.chip{border-left-color:var(--accent)}
+.unrun{display:flex;flex-direction:column}
+.selrun>.chip.hl{box-shadow:none}
+.grp.hl>.selrun{filter:drop-shadow(2.5px 0 0 var(--accent)) drop-shadow(-2.5px 0 0 var(--accent)) drop-shadow(0 2.5px 0 var(--accent)) drop-shadow(0 -2.5px 0 var(--accent))}
+.selrun:has(>.chip.hl){filter:drop-shadow(2.5px 0 0 var(--accent)) drop-shadow(-2.5px 0 0 var(--accent)) drop-shadow(0 2.5px 0 var(--accent)) drop-shadow(0 -2.5px 0 var(--accent)) drop-shadow(0 3px 5px rgba(0,0,0,.18))}
+.grp.hl>.unrun{filter:drop-shadow(2px 0 0 var(--cs)) drop-shadow(-2px 0 0 var(--cs)) drop-shadow(0 2px 0 var(--cs)) drop-shadow(0 -2px 0 var(--cs))}
+.grp.hl:has(>.selrun){filter:drop-shadow(0 3px 5px rgba(0,0,0,.18))}
 body.dragging .chip, body.dragging .task{cursor:grabbing}
 
 /* dark mode: chips (calendar and day view) are filled with a softened (less saturated) version of the thread's color

@@ -51,23 +51,28 @@ css/  (one file per area, loaded in this order; later files can override earlier
 
 js/core/  (no DOM: the data and its rules; loaded by the unit tests too)
   util.js               escaping, ids, date strings, formatting (dates, times, durations), colors, plural, clamp
-  parse.js              reading typed dates ("fri", "11/26", "+3") and times ("2pm", "930")
+  parse.js              reading typed dates ("fri", "11/26", "+3", "td" / "tm") and times ("2pm", "930")
   prefs.js              `ui`: this browser's preferences (UI_PREFS table) + shared new-task-box state
   model.js              `state`, migrate (loading old files), the index (findTask / findThread / dayTasks),
                         chains and links, sub-thread layout, order + conflict warnings, mutate / undo / redo
   ops.js                every edit: move / link / add / delete / reorder tasks, threads and projects,
-                        archive / restore, conflict dates
+                        archive / restore, conflict dates; several tasks at once (a selection): dateTasks, linkTasks,
+                        unlinkTasks, setTasksDone, archiveTasks, delTasks, moveManyTo (inOrder / taskRank: sidebar order)
 
 js/ui/  (views; each draws its part of the page and handles its own events)
   dom.js                shared building blocks: $ / $$, icons, menu, inline text + date boxes, rename,
                         warning bar, toast, modals, guide lines (any scroll hides the "+" insert line), tween(), wheelSteps() scroll gestures
-  dragdrop.js           HTML5 drag state (`drag`) shared by sidebar and calendar; Option-drop
+  dragdrop.js           HTML5 drag state (`drag`; drag.ids = a selection dragged together, with its stacked drag image)
+                        shared by sidebar and calendar; Option-drop
   archive.js            the Archive window
   sidebar.js            the sidebar tree, link menu, task menu (notes, archive, delete; from the task's gear in the
                         sidebar or the day view list, or right-clicking a task anywhere: the contextmenu handler in app.js; quickAct keeps the last-used
                         archive / delete button on every task's hover buttons for 2 s), thread / project gear menus
-                        (+ subthread, ordered, archive, delete), new-task boxes, click-to-insert, sidebar drag & drop
-  calendar.js           the calendar: renderCal, row heights (fitRows), week scrolling, dropping on days
+                        (+ subthread, ordered, archive, delete), new-task boxes, click-to-insert, sidebar drag & drop,
+                        selecting several tasks (`sel`: ⌘ / Shift-click; shown on rows and calendar chips) and the
+                        selection bar under the tree (#selbar: renderSelBar / selAct)
+  calendar.js           the calendar: renderCal, row heights (fitRows), week scrolling, dropping on days; selected chips
+                        are wrapped in runs (selRuns) so each run gets one blue outline
   conflicts.js          conflicts in the sidebar (+ form), dragging conflict bars, conflict hover
   dialogs.js            Help and Settings windows
   timeline-data.js      Timeline data: admireData() (lanes, spans, per-day counts), cached per change; unordered
@@ -149,6 +154,7 @@ If you ever change `state` in place outside `mutate()` (only conflict dragging d
 | dragging / resizing in day view, the time popover | ui/dayview-edit.js |
 | the scratch board | ui/scratch.js + css/scratch.css; its edits are `addScratch` … `moveScratch` (core/ops.js) |
 | the Timeline view | `admireData` (ui/timeline-data.js), `renderAdmire`, `admTipHTML` (ui/timeline.js) + css/timeline.css |
+| selecting several tasks, the selection bar, dragging a selection | "selecting several tasks" at the end of ui/sidebar.js + css/sidebar.css; the operations are in "several tasks at once" (core/ops.js) |
 | task notes: writing them, the hover note | ui/notes.js; `setTaskNotes` (core/ops.js); the task gear menu `openTaskMenu` (ui/sidebar.js) |
 | a setting | `UI_PREFS` (core/prefs.js), `renderSettings` / `applySetting` (ui/dialogs.js) |
 | the header: view switcher, ‹ Today ›, the dates in view, 1–5 weeks / days | markup in Planner.html; `renderHeader`, `setRange`, `navStep` / `navToday` (ui/app.js) + css/base.css |

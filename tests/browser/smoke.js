@@ -371,7 +371,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await check('day view: a short block shows its hover note with a checkbox, kept open while the pointer is on it', async () => {
       if (!(await page.evaluate(() => !!ui.dayView))) { await page.keyboard.press('d'); await sleep(400); }
       const id = await page.locator('#dayview .dv-blk').first().getAttribute('data-id');
-      await page.evaluate(id => { const f = findTask(id); mutate(() => { delete f.task.notes; f.task.done = false; f.task.plan.dur = Math.max(5, Math.floor(30 / PPM)); });   // (under 38 px tall: short) }, id);
+      await page.evaluate(id => { const f = findTask(id); mutate(() => { delete f.task.notes; f.task.done = false; f.task.plan.dur = Math.max(5, Math.floor(30 / PPM)); }); }, id);   // (under 38 px tall: short)
       const blk = page.locator(`#dayview .dv-blk[data-id="${id}"]`);
       assert.ok(await blk.evaluate(b => b.classList.contains('short')));
       await page.mouse.move(5, 5); const bb = await blk.boundingBox(); await page.mouse.move(bb.x + bb.width - 20, bb.y + bb.height / 2);
@@ -397,6 +397,58 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       await it2.hover(); assert.ok(await it2.locator('[data-act="del-k"]').isVisible());
       assert.strictEqual(await it2.locator('[data-act="arch-k"]').isVisible(), false);
       await page.mouse.move(5, 5); await page.keyboard.press('Control+z'); assert.ok(await task(id));
+      await page.keyboard.press('Escape');
+    });
+    await check('selecting several sidebar tasks: ⌘-click, Shift-click range, the bar, Esc', async () => {
+      await page.keyboard.press('Escape'); await page.keyboard.press('c'); await sleep(300);
+      await page.click('.task[data-id="m3"] .title', { modifiers: ['Meta'] });
+      await page.click('.task[data-id="m5"] .title', { modifiers: ['Shift'] });
+      assert.deepStrictEqual(await page.$$eval('#tree .task.sel', rs => rs.map(r => r.dataset.id)), ['m3', 'm4', 'm5']);
+      assert.ok(await page.locator('#selbar.on').isVisible());
+      assert.match(await page.locator('#selbar .sb-n').textContent(), /3 tasks selected/);
+      assert.ok(await page.locator('#grid .chip.sel[data-id="m4"]').count() === 1);
+      await page.click('.task[data-id="m4"] .title', { modifiers: ['Meta'] });   // ⌘-click again: out
+      assert.strictEqual(await page.locator('#tree .task.sel').count(), 2);
+      await page.keyboard.press('Escape');
+      assert.strictEqual(await page.locator('#tree .task.sel').count(), 0);
+      assert.strictEqual(await page.locator('#selbar.on').count(), 0);
+    });
+    await check('several selected tasks dragged onto a calendar day all get that date (one undo step)', async () => {
+      const was = [(await task('a7')).date, (await task('l3')).date];
+      for (const id of ['a7', 'l3', 'l4']) await page.click(`.task[data-id="${id}"] .title`, { modifiers: ['Meta'] });
+      const s = await page.locator('.task[data-id="l3"] .title').boundingBox(), d = await page.locator('#grid .day[data-date="2026-11-10"]').boundingBox();
+      await page.mouse.move(s.x + 10, s.y + s.height / 2); await page.mouse.down();
+      for (let i = 1; i <= 10; i++) { await page.mouse.move(s.x + (d.x + 20 - s.x) * i / 10, s.y + (d.y + 30 - s.y) * i / 10); await sleep(20); }
+      await page.mouse.up(); await sleep(300);
+      for (const id of ['a7', 'l3', 'l4']) assert.strictEqual((await task(id)).date, '2026-11-10', id);
+      assert.strictEqual(await page.locator('#tree .task.sel').count(), 3);   // still selected
+      await page.keyboard.press('Control+z');
+      assert.deepStrictEqual([(await task('a7')).date, (await task('l3')).date], was);
+      await page.click('.task[data-id="l3"] .title');   // a plain click on a selected task keeps the selection
+      assert.strictEqual(await page.locator('#tree .task.sel').count(), 3);
+      await page.click('#prev'); await sleep(400); await page.click('#next'); await sleep(400);   // the header: kept too
+      assert.strictEqual(await page.locator('#tree .task.sel').count(), 3);
+      const day = await page.locator('#grid .day[data-date="2026-11-13"]').boundingBox();
+      await page.mouse.click(day.x + day.width / 2, day.y + day.height - 6);   // clicking away (an empty spot on the calendar) clears it
+      assert.strictEqual(await page.locator('#tree .task.sel').count(), 0);
+      assert.strictEqual(await page.locator('#tree .task.sel').count(), 0);
+    });
+    await check('the selection bar: link same day, date typed as "tm", unlink, done', async () => {
+      await page.click('.task[data-id="m3"] .title', { modifiers: ['Meta'] });
+      await page.click('.task[data-id="m6"] .title', { modifiers: ['Meta'] });
+      await page.click('#selbar [data-act="sel-link"][data-v="sameDay"]');
+      const ids = await page.evaluate(() => findThread('t2').t.tasks.map(k => k.id + ':' + (k.linkToPrev || '')));
+      assert.deepStrictEqual(ids.slice(2, 5), ['m3:', 'm6:sameDay', 'm4:']);
+      assert.strictEqual((await task('m6')).date, (await task('m3')).date);
+      await page.click('#selbar [data-act="sel-date"]'); await page.keyboard.type('tm'); await page.keyboard.press('Enter');
+      assert.deepStrictEqual([(await task('m3')).date, (await task('m6')).date], ['2026-10-29', '2026-10-29']);
+      assert.ok(await page.locator('#selbar [data-act="sel-date"]').isVisible());   // the bar is back (not left with a dead date box)
+      await page.click('#selbar [data-act="sel-unlink"]');
+      assert.strictEqual((await task('m6')).linkToPrev, null);
+      await page.click('#selbar [data-act="sel-done"]');
+      assert.ok((await task('m3')).done && (await task('m6')).done);
+      for (let i = 0; i < 4; i++) await page.keyboard.press('Control+z');
+      assert.strictEqual((await task('m3')).date, '2026-11-06');
       await page.keyboard.press('Escape');
     });
     await check('Help shows where the data is; Settings > Data file moves it to another folder', async () => {

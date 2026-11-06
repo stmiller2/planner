@@ -7,6 +7,9 @@ const svg = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICON = {
   x: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
   trash: svg('<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/>'),
+  unlink: svg('<path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M5.17 11.75l-1.71 1.71a5 5 0 0 0 7.07 7.07l1.71-1.71"/><path d="M8 2v3M2 8h3M16 22v-3M22 16h-3"/>'),
+  check: svg('<path d="M20 6 9 17l-5-5"/>'),
+  undone: svg('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>'),
   link: svg('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
   sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
@@ -50,10 +53,11 @@ const dhint = document.createElement('div'); dhint.id = 'dhint'; document.body.a
 function dateHint(inp, opt = {}) {
   const v = parseDateText(inp.value), bad = v === null || (v === '' && !opt.allowEmpty && inp.value.trim() !== '') || (v && opt.min && v < opt.min);
   inp.classList.toggle('bad', !!bad);
-  dhint.textContent = v ? (opt.min && v < opt.min ? `before ${fmtShort(opt.min)}` : dayLabel(v)) : v === '' ? (opt.emptyText || '') : 'try Nov 26, 11/26, fri, tomorrow, +3';
+  dhint.textContent = v ? (opt.min && v < opt.min ? `before ${fmtShort(opt.min)}` : dayLabel(v)) : v === '' ? (opt.emptyText || '') : 'try Nov 26, 11/26, fri, td, tm, +3';
   if (!dhint.textContent || document.activeElement !== inp) { dhint.style.display = 'none'; return bad ? null : v; }
   const r = inp.getBoundingClientRect(); dhint.style.display = 'block';
-  dhint.style.left = Math.min(innerWidth - dhint.offsetWidth - 8, Math.max(8, r.left)) + 'px'; dhint.style.top = (r.bottom + 4) + 'px';
+  dhint.style.left = Math.min(innerWidth - dhint.offsetWidth - 8, Math.max(8, r.left)) + 'px';
+  dhint.style.top = (r.bottom + 4 + dhint.offsetHeight > innerHeight - 4 ? r.top - 4 - dhint.offsetHeight : r.bottom + 4) + 'px';   // (no room below: above)
   return bad ? null : v;
 }
 // swap a date button for a box you type into: Enter / clicking away saves, Esc cancels, ↑ / ↓ move a day
@@ -162,7 +166,8 @@ document.addEventListener('mouseover', e => {
   hideHint(); if (!el) return;
   hintFor = el; hintEl.textContent = el.dataset.hint;
   const r = el.getBoundingClientRect(), w = hintEl.offsetWidth;
-  hintEl.style.left = clamp(r.left + r.width / 2 - w / 2, 6, innerWidth - w - 6) + 'px'; hintEl.style.top = (r.bottom + 7) + 'px';
+  hintEl.style.left = clamp(r.left + r.width / 2 - w / 2, 6, innerWidth - w - 6) + 'px';
+  hintEl.style.top = (r.bottom + 7 + hintEl.offsetHeight > innerHeight - 4 ? r.top - 7 - hintEl.offsetHeight : r.bottom + 7) + 'px';   // (no room below: above)
   void hintEl.offsetWidth; hintEl.classList.add('on');
 });
 document.addEventListener('pointerdown', hideHint, true);

@@ -1,7 +1,7 @@
 'use strict';
 /* Reading what people type: dates (parseDateText) and times of day (parseTime). No DOM. */
 /* ---------- typed dates ----------
-   "Nov 26", "26 Nov", "11/26", "11/26/27", "2026-11-26", "fri", "next fri", "today", "tomorrow", "+3", "+2w", "26".
+   "Nov 26", "26 Nov", "11/26", "11/26/27", "2026-11-26", "fri", "next fri", "today" / "td", "tomorrow" / "tm", "+3", "+2w", "26".
    Without a year: this year, unless that's more than two months ago (then next year). '' = no date, null = can't read it. */
 const MONTH3 = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], WD3 = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 function parseDateText(str, base = todayISO()) {
@@ -11,8 +11,8 @@ function parseDateText(str, base = todayISO()) {
   const guess = (mo, d) => { const a = mk(t.getFullYear(), mo, d); return a && diffDays(a, base) < -60 ? mk(t.getFullYear() + 1, mo, d) : a; };
   const mon = w => w.length >= 3 ? MONTH3.indexOf(w.slice(0, 3)) : -1;
   let m;
-  if (/^(today|tod|now)$/.test(s)) return base;
-  if (/^(tomorrow|tmrw?|tom)$/.test(s)) return addDays(base, 1);
+  if (/^(today|tod|td|now)$/.test(s)) return base;
+  if (/^(tomorrow|tmrw?|tom|tm)$/.test(s)) return addDays(base, 1);
   if (s === 'yesterday') return addDays(base, -1);
   if ((m = s.match(/^([+-])\s*(\d+)\s*(d|days?|w|wks?|weeks?)?$/))) { const n = +m[2] * (m[3] && m[3][0] === 'w' ? 7 : 1); return addDays(base, m[1] === '-' ? -n : n); }
   if ((m = s.match(/^(next )?(sun|mon|tue|wed|thu|fri|sat)[a-z]*$/))) { let k = (WD3.indexOf(m[2]) - t.getDay() + 7) % 7; if (m[1]) k += 7; return addDays(base, k); }

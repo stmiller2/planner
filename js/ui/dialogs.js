@@ -9,11 +9,13 @@ function showHelp() {
   <h4>Notes</h4>
   <p>To add notes to a task (e.g., a protocol tweak or where a sample is stored), choose <b>Add notes</b> from the task’s settings menu <span class="hic">${ICON.gear}</span> in the sidebar or the day view list, or right-click the task anywhere (sidebar, calendar or day view) for the same menu. Tasks with notes get a small mark <span class="hic">${ICON.notes}</span>; rest the pointer on one for a second (in the sidebar, the calendar or day view) to read them. The note stays open while the pointer is on the task or on the note, web addresses in it are clickable links, and double-clicking its text edits it right there (<kbd>⌘</kbd><kbd>↩</kbd> saves, <kbd>Esc</kbd> cancels, clicking elsewhere saves).</p>
   <h4>Scheduling</h4>
-  <p>To schedule a task, drag it onto the calendar, or click the date box and type e.g. “fri”, “11/26”, “+3”. Tasks can also be scheduled relative to one another: click the link icon <span class="hic">${ICON.link}</span> to link two tasks to the <b>same day</b> (e.g., “do transformation” and “plate cells”) or <b>next day</b> (e.g., “start overnights” and “miniprep plasmids”).</p>
+  <p>To schedule a task, drag it onto the calendar, or click the date box and type e.g. “fri”, “11/26”, “+3”, “td” (today) or “tm” (tomorrow). Tasks can also be scheduled relative to one another: click the link icon <span class="hic">${ICON.link}</span> to link two tasks to the <b>same day</b> (e.g., “do transformation” and “plate cells”) or <b>next day</b> (e.g., “start overnights” and “miniprep plasmids”).</p>
   <p>Tasks are expected to be ordered based on their number in the sidebar. If scheduled out of order, a warning will display. This can be turned off in Settings, or for a thread or whole project whose tasks have no set order (e.g., “mentoring”) by switching off <b>Ordered tasks</b> in its settings menu <span class="hic">${ICON.gear}</span>.</p>
   <h4>Rescheduling</h4>
   <p>When rescheduling tasks, linked tasks move too, unless holding <kbd>⌥ Option</kbd> while dropping the task (this breaks links and moves only the dragged task).</p>
   <p>By default, all tasks within a thread get shifted relative to each other when rescheduling. This can be turned off in Settings, or bypassed by holding <kbd>⌥ Option</kbd>. Tasks in unordered threads never shift.</p>
+  <h4>Several tasks at once</h4>
+  <p><kbd>⌘</kbd>-click tasks in the sidebar to select several (<kbd>⇧ Shift</kbd>-click selects every task between the last one clicked and this one). Drag any of them onto a calendar day to give them all that date, or to another spot in the sidebar to move them together. A bar at the bottom of the sidebar acts on the whole selection: set a date, link them to the <b>same day</b> <span class="hic">=</span> or <b>next day</b> <span class="hic">+1d</span> (tasks in one thread are gathered under the first one, in order), unlink, mark done, archive or delete. <kbd>Esc</kbd>, or clicking anywhere off the selected tasks, clears the selection.</p>
   <h4>Day view</h4>
   <p>To plan the timing of tasks within a single day, enter day view with the view switcher, pressing <kbd>d</kbd>, or by clicking the date number from calendar view. Drag tasks onto the timeline, then drag or click blocks to set their times. Swipe sideways or use the arrow keys to move between days.</p>
   <h4>Timeline</h4>
@@ -36,6 +38,7 @@ function showHelp() {
 function shortcutsHTML() {
   return [
     ['<kbd>⌥ Option</kbd> + drop', 'Move only the task you dragged, unlinking from other tasks if applicable'],
+    ['<kbd>⌘</kbd>-click / <kbd>⇧</kbd>-click', 'Select several tasks in the sidebar (a range with <kbd>⇧</kbd>)'],
     ['<kbd>←</kbd> / <kbd>→</kbd> or <kbd>↑</kbd> / <kbd>↓</kbd>', 'Previous / next week (previous / next day in day view)'],
     ['<kbd>T</kbd>', 'Jump to today'],
     ['<kbd>C</kbd> / <kbd>D</kbd> / <kbd>-</kbd>', 'Switch to the calendar / day view / timeline (<kbd>-</kbd> again: back)'],
@@ -46,7 +49,7 @@ function shortcutsHTML() {
     ['<kbd>1</kbd> – <kbd>5</kbd>', 'Show that many weeks (days in day view)'],
     ['<kbd>X</kbd>', 'Open / close the scratch board (if it’s turned on)'],
     ['<kbd>N</kbd>', 'New task on the scratch board (while it’s open)'],
-    ['<kbd>Esc</kbd>', 'Close day view, a menu, or a window'],
+    ['<kbd>Esc</kbd>', 'Close day view, a menu, or a window; clear a selection of tasks'],
     ['<kbd>Enter</kbd> / <kbd>Esc</kbd>', 'In a new-task box: add the task / stop adding'],
     ['Double-click', 'Rename a project, thread, task or the planner'],
   ].map(([k, d]) => `<div class="kd">${k}</div><div>${d}</div>`).join('');

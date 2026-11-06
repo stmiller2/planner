@@ -74,7 +74,7 @@ kbd{font:inherit;font-size:11.5px;border:1px solid var(--line);border-bottom-wid
 .help p{margin-bottom:8px}
 .help .hkeys .keys{margin-top:4px}
 .help .hui{display:inline-block;font-size:11.5px;font-weight:500;line-height:1.4;padding:0 6px;border:1px solid var(--line);border-radius:5px;background:var(--hover);white-space:nowrap}
-.help .hic{display:inline-grid;place-items:center;width:18px;height:18px;vertical-align:-4px;border:1px solid var(--line);border-radius:5px;background:var(--hover);color:var(--muted)}
+.help .hic{display:inline-grid;place-items:center;min-width:18px;padding:0 3px;font-size:10.5px;font-weight:650;height:18px;vertical-align:-4px;border:1px solid var(--line);border-radius:5px;background:var(--hover);color:var(--muted)}
 .help .hic svg{width:11px;height:11px}
 .set .snote{margin:8px 0 0}
 .set .ssub{margin:0 0 4px;padding:2px 0 6px 14px;border-left:2px solid var(--line2);transition:opacity .15s}

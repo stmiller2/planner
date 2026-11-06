@@ -168,6 +168,105 @@ function moveThreadTo(id, spot) {
     }
   });
 }
+/* ---------- several tasks at once (a selection in the sidebar) ----------
+   Each operation is one undo step. Tasks are handled in sidebar order (taskRank), so an earlier task's move (and the
+   shifting of later tasks it causes) happens before a later task's. */
+// task id -> its position in sidebar display order (projects, threads and sub-threads, interleaved as shown)
+const taskRank = memo(() => {
+  const m = new Map(), walk = t => layout(t).forEach(x => x.kind === 'task' ? m.set(x.obj.id, m.size) : walk(x.obj));
+  state.projects.forEach(p => p.threads.forEach(walk));
+  return m;
+});
+// the ids that still exist, once each, in sidebar order
+const inOrder = ids => { const r = taskRank(); return [...new Set(ids)].filter(id => r.has(id)).sort((a, b) => r.get(a) - r.get(b)); };
+// ids that move when several tasks are dragged together: with their linked chains, or (single) just those tasks
+function movingMany(ids, single) {
+  if (single) return inOrder(ids);
+  return inOrder(ids.flatMap(id => movingIds(id, false)));
+}
+// give every task the date `date` (null = unschedule). Normally each one moves as a drag would: its linked chain moves
+// with it (a chain with several of the tasks in it is placed by its first one) and later tasks in the thread shift.
+// split (Option): only these tasks move; links between them are kept, links to other tasks are cut, nothing shifts.
+function dateTasks(ids, date, split = false) {
+  const list = inOrder(ids); if (!list.length) return false;
+  const chosen = new Set(list);
+  return mutate(() => {
+    const placed = new Set();
+    for (const id of list) {
+      const f = findTask(id);   // (moving dates leaves every task where it is, so the index stays valid in here)
+      if (split) {
+        const ts = f.t.tasks, i = f.i, nx = ts[i + 1];
+        if (nx && nx.linkToPrev && !chosen.has(nx.id)) nx.linkToPrev = null;
+        if (f.task.linkToPrev && !chosen.has(ts[i - 1].id)) f.task.linkToPrev = null;
+        f.task.date = date;      // (a run of linked chosen tasks: normalize spaces the rest from its first)
+        continue;
+      }
+      if (placed.has(id)) continue;
+      const [s, e] = runOf(f.t, f.i); f.t.tasks.slice(s, e + 1).forEach(k => placed.add(k.id));
+      if (f.task.date !== date) applyMove(f.t, f.i, date, false);
+    }
+  });
+}
+// link the tasks to each other (same day / day after each one before), thread by thread: in each thread with two or
+// more of them, the rest are moved up to sit right after the first one, in order. Returns how many threads were linked.
+function linkTasks(ids, type) {
+  const by = new Map();
+  for (const id of inOrder(ids)) { const f = findTask(id); if (!by.has(f.t)) by.set(f.t, []); by.get(f.t).push(f.task); }
+  const groups = [...by].filter(([, ks]) => ks.length > 1); if (!groups.length) return 0;
+  mutate(() => {
+    for (const [t, ks] of groups) {
+      const [first, ...rest] = ks;
+      rest.forEach(k => detachTask({ t, i: t.tasks.indexOf(k), task: k }));   // (repairs the links around each one)
+      const L = layout(t);
+      L.splice(L.findIndex(x => x.obj === first) + 1, 0, ...rest.map(o => ({ kind: 'task', obj: o })));
+      writeLayout(t, L);
+      rest.forEach(k => k.linkToPrev = type);
+    }
+  });
+  return groups.length;
+}
+// each task's own link to the task before it is removed ("Not linked")
+function unlinkTasks(ids) {
+  const fs = inOrder(ids).map(findTask);
+  return mutate(() => fs.forEach(f => { f.task.linkToPrev = null; }));
+}
+function setTasksDone(ids, done) {
+  const fs = inOrder(ids).map(findTask);
+  return mutate(() => fs.forEach(f => { f.task.done = !!done; }));
+}
+function archiveTasks(ids) {
+  const fs = inOrder(ids).map(findTask); if (!fs.length) return;
+  mutate(() => fs.forEach(f => {
+    const from = { pid: f.p.id, tid: f.t.id, path: [f.p.name, ...f.path], ...neighbours(layout(f.t), f.task) };
+    detachTask({ ...f, i: f.t.tasks.indexOf(f.task) });
+    archiveEntry('task', { ...f.task, linkToPrev: null }, from);
+  }), true);
+  toast(`Archived ${plural(fs.length, 'task')}. They’re under Archive at the top of the sidebar; ⌘Z to undo.`, 4500);
+}
+function delTasks(ids) {
+  const fs = inOrder(ids).map(findTask); if (!fs.length) return false;
+  if (fs.length > 1 && ui.confirmDelete && !confirm(`Delete ${plural(fs.length, 'task')}? (Undo is available.)`)) return false;
+  mutate(() => fs.forEach(f => detachTask({ ...f, i: f.t.tasks.indexOf(f.task) })));
+  if (fs.length > 1 && !ui.confirmDelete) toast(`Deleted ${plural(fs.length, 'task')} — ⌘Z to undo.`);
+  return true;
+}
+// move several tasks (with their chains unless `single`) to a drop spot in the sidebar, in sidebar order. Links
+// between tasks that move together and sat next to each other are kept; any other link is cut.
+function moveManyTo(ids, single, spot) {
+  const g = findThread(spot.tid); if (!g) return;
+  const moving = movingMany(ids, single).map(findTask); if (!moving.length) return;
+  if (spot.refId && moving.some(f => f.task.id === spot.refId)) return;
+  const keep = moving.map((f, j) => !!f.task.linkToPrev && j > 0 && moving[j - 1].t === f.t && moving[j - 1].i === f.i - 1 ? f.task.linkToPrev : null);
+  ui.collapsed[spot.tid] = false; saveUI();
+  mutate(() => {
+    moving.forEach(f => detachTask({ ...f, i: f.t.tasks.indexOf(f.task) }));
+    const L = layout(g.t);
+    L.splice(layoutIndex(L, spot.refId, spot.side), 0, ...moving.map(f => ({ kind: 'task', obj: f.task })));
+    writeLayout(g.t, L);
+    moving.forEach((f, j) => { f.task.linkToPrev = keep[j]; });
+  });
+}
+
 function delProject(id) {
   const p = state.projects.find(x => x.id === id); if (!p) return;
   const n = p.threads.reduce((a, t) => a + subtreeTasks(t).length, 0);

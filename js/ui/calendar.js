@@ -54,8 +54,8 @@ function renderCal(strip) {
     const cls = ['day', (wd === 0 || wd === 6) && 'we', d === today && 'today', d < today && 'past', cs.some(c => c.start <= d && d <= c.end) && 'cf'].filter(Boolean).join(' ');
     const label = (n === 0 || dd.getDate() === 1) ? `${MON[dd.getMonth()]} ${dd.getDate()}` : dd.getDate();
     const items = (byDate[d] || []).map(r => {
-      const chips = []; for (let k = r.s; k <= r.e; k++) chips.push(chip(r, k));
-      return r.e > r.s ? `<div class="grp" style="--c:${esc(colorOf(r.t))}">${chips.join('')}</div>` : chips[0];
+      const chips = []; for (let k = r.s; k <= r.e; k++) chips.push([r.t.tasks[k].id, chip(r, k)]);
+      return r.e > r.s ? `<div class="grp" style="--c:${esc(colorOf(r.t))}">${selRuns(chips)}</div>` : selRuns(chips);
     }).join('') + (archOn[d] || []).map(archChip).join('');
     const gap = wkSlots[w] ? `<div class="cf-gap" style="height:${wkSlots[w] * CF_PITCH + 4}px"></div>` : '';
     html += `<div class="${cls}" data-date="${d}" style="grid-row:${w + 1};grid-column:${n % 7 + 1}"><div class="dn"><span class="n" data-act="openday" data-date="${d}">${label}</span></div>${gap}<div class="items">${items}</div></div>`;
@@ -166,13 +166,23 @@ const weekWheel = wheelSteps({
   back: () => { const g = $('#grid'); g.classList.add('settle'); g.style.transform = ''; weekWheel.reset(); },               // let go too early
 });
 $('main').addEventListener('wheel', weekWheel, { passive: false });
+// chips ([id, html]) in order, each run of ones selected in the sidebar wrapped in one .selrun, which draws a single
+// blue outline round the run's shape. Where some are selected, the runs of unselected ones are wrapped too (.unrun), so
+// a hovered same-day group can outline each part in its own color (see css/calendar.css). None selected: as they are.
+function selRuns(chips) {
+  if (!chips.some(([id]) => sel.has(id))) return chips.map(c => c[1]).join('');
+  let out = '', run = '', on = null;
+  const end = () => { if (run) out += `<div class="${on ? 'selrun' : 'unrun'}">${run}</div>`; run = ''; };
+  for (const [id, h] of chips) { if (sel.has(id) !== on) { end(); on = sel.has(id); } run += h; }
+  end(); return out;
+}
 function chip({ p, t, path }, i) {
   const k = t.tasks[i];
   // next-day links to the task before / after it in the thread (see showLinkLines)
   const prev = k.linkToPrev === 'nextDay' && i > 0 ? t.tasks[i - 1] : null, next = t.tasks[i + 1] && t.tasks[i + 1].linkToPrev === 'nextDay' ? t.tasks[i + 1] : null;
   const nd = prev || next ? `<span class="nd">linked to ${prev && next ? 'prior and later tasks' : prev ? 'a prior task' : 'a later task'}</span>` : '';
   const links = (prev ? [prev.id] : []).concat(next ? [next.id] : []).join(' ');
-  return `<div class="chip ${k.done ? 'done' : ''}" draggable="true" data-id="${k.id}" data-thread="${t.id}" ${links ? `data-links="${links}"` : ''} style="--c:${esc(colorOf(t))}"
+  return `<div class="chip ${k.done ? 'done' : ''}${sel.has(k.id) ? ' sel' : ''}" draggable="true" data-id="${k.id}" data-thread="${t.id}" ${links ? `data-links="${links}"` : ''} style="--c:${esc(colorOf(t))}"
       ${k.notes ? '' : `title="${esc([p.name, ...path].join(' › '))}${isLoose(p, t) ? '' : ` #${i + 1}`}"`}>
     <input type="checkbox" data-act="done" data-id="${k.id}" ${k.done ? 'checked' : ''}>
     <div class="cb" data-act="reveal" data-id="${k.id}"><div class="tt">${esc(k.title)}${noteMark(k)}</div><div class="ts"><span class="tn">${esc(t.name)}${isLoose(p, t) ? '' : ` · ${i + 1}/${t.tasks.length}`}</span>${nd}</div></div>
@@ -202,8 +212,9 @@ grid.addEventListener('dragover', e => {
 grid.addEventListener('dragleave', e => { if (!grid.contains(e.relatedTarget)) $$('.day.over').forEach(x => x.classList.remove('over')); });
 grid.addEventListener('drop', e => {
   const day = e.target.closest('.day') || (e.target.closest('.cfb') && $(`#grid .day[data-date="${calDayAt(e.clientX, e.clientY)}"]`)); if (!drag || drag.kind !== 'task' || !day) return;
-  e.preventDefault(); const id = drag.id; drag = null;
-  moveTask(id, day.dataset.date, splitHeld(e));
+  e.preventDefault(); const id = drag.id, many = drag.ids; drag = null;
+  if (many) selDate(many, day.dataset.date, splitHeld(e));   // a selection from the sidebar: every task to that day
+  else moveTask(id, day.dataset.date, splitHeld(e));
 });
 
 /* Next-day links: resting on a chip that's linked to the task before or after it (on another day) for LINK_HOVER_MS

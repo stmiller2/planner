@@ -1,8 +1,9 @@
 'use strict';
 /* The sidebar: projects › threads › tasks (renderTree / renderThread / renderTaskRow), the link menu, typing new
    tasks (end-of-thread box, click-between-items insert line, multi-line paste), and drag & drop inside the sidebar
-   (reorder tasks / threads, move between threads, drop a calendar chip here to unschedule it). The Conflicts
-   section at the bottom of the sidebar is in conflicts.js. */
+   (reorder tasks / threads, move between threads, drop a calendar chip here to unschedule it), and selecting several
+   tasks (⌘ / Ctrl / Shift-click) with the bar of actions for them at the bottom. The Conflicts section at the bottom
+   of the sidebar is in conflicts.js. */
 // "Collapse completed tasks" (Settings): ids of tasks in a "+ N completed" run that was clicked open (until reload)
 const drOpen = new Set();
 // a task's row in the sidebar, or the "+ N completed" line it's folded into
@@ -22,6 +23,8 @@ function reveal(id) {
 function renderTree() {
   const tree = $('#tree'), na = (state.archive || []).length + pastConfs().length;
   $('#archBtn').textContent = na ? `Archive · ${na}` : 'Archive';
+  for (const id of sel) if (!findTask(id)) sel.delete(id);   // (deleted, archived, or gone with an undo)
+  renderSelBar();
   if (!state.projects.length) { tree.innerHTML = `<div class="empty">No projects yet. Click <b>+ Project</b> to start, then add threads and tasks.</div>` + renderConflicts(); return; }
   // keep any half-typed text in an open new-task box across re-renders
   const keep = {}; $$('.add', tree).forEach(i => { if (i.value) keep[(i.classList.contains('ins') ? 'ins:' : 'end:') + i.dataset.tid] = i.value; });
@@ -116,7 +119,7 @@ function renderTaskRow(t, k, i, loose) {
   const nx = t.tasks[i + 1];
   const starts = !k.linkToPrev && nx && nx.linkToPrev;
   const ends = k.linkToPrev && !(nx && nx.linkToPrev);
-  const cls = ['task', k.done && 'done', (k.linkToPrev || starts) && 'g', starts && 'gs', ends && 'ge'].filter(Boolean).join(' ');
+  const cls = ['task', k.done && 'done', sel.has(k.id) && 'sel', (k.linkToPrev || starts) && 'g', starts && 'gs', ends && 'ge'].filter(Boolean).join(' ');
   // number boxes for linked chains: a box opens at a chain start or a next-day step, and runs through same-day links
   const inChain = k.linkToPrev || (nx && nx.linkToPrev);
   const numCls = ['num', loose && 'nn', inChain && 'nb', inChain && k.linkToPrev !== 'sameDay' && 'nbs', inChain && !(nx && nx.linkToPrev === 'sameDay') && 'nbe',
@@ -239,7 +242,7 @@ function treeTarget(e) {
     const r = row.getBoundingClientRect(), before = e.clientY < r.top + r.height / 2;
     const [s, en] = runOf(g.t, g.i);                     // snap to the edges of a linked chain
     const anchor = g.t.tasks[before ? s : en];
-    if (isTask && movingIds(drag.id, splitHeld(e)).includes(anchor.id)) return null;
+    if (isTask && dragMoving(e).includes(anchor.id)) return null;
     const ar = taskEl(anchor.id).getBoundingClientRect();
     tg = { spot: { tid: g.t.id, refId: anchor.id, side: before ? 'before' : 'after' }, line: [before ? ar.top : ar.bottom, ar.left] };
   } else if (tr) {                                       // thread header: top edge = before it; otherwise into it
@@ -258,7 +261,7 @@ function treeTarget(e) {
     tg = { spot: { pid: pr.dataset.pdrop }, el: pr };
   }
   if (!tg) return null;
-  if (isTask ? isNoopTasks(drag.id, splitHeld(e), tg.spot) : isNoopThread(drag.id, tg.spot)) return null;   // no guide for "where it already is"
+  if (isTask ? !drag.ids && isNoopTasks(drag.id, splitHeld(e), tg.spot) : isNoopThread(drag.id, tg.spot)) return null;   // no guide for "where it already is"
   if (tg.line && tg.spot.tid) {                          // same canonical line as click-to-insert for the same position
     const L = layout(findThread(tg.spot.tid).t);
     tg.line = spotLine(tg.spot.tid, layoutIndex(L, tg.spot.refId, tg.spot.side)) || tg.line;
@@ -293,7 +296,7 @@ function spotLine(tid, at) {
   return [y, left];
 }
 function insertSpot(e) {
-  if (drag || e.target.closest('input, button, label, .add, .inl, #menu')) return null;
+  if (drag || e.metaKey || e.ctrlKey || e.shiftKey || e.target.closest('input, button, label, .add, .inl, #menu')) return null;
   const y = e.clientY, row = e.target.closest('.task'), tr = e.target.closest('.trow');
   let s = null;
   if (row) {
@@ -338,8 +341,110 @@ tree.addEventListener('mousedown', e => {
 tree.addEventListener('drop', e => {
   const tg = treeTarget(e); if (!tg) return;
   e.preventDefault(); tree.classList.remove('drop'); clearTdrop();
-  const id = drag.id; drag = null;
+  const id = drag.id, many = drag.ids; drag = null;
   if (tg.type === 'unsched') moveTask(id, null);
-  else if (tg.type === 'tasks') moveTasksTo(id, splitHeld(e), tg.spot);
+  else if (tg.type === 'tasks') many ? moveManyTo(many, splitHeld(e), tg.spot) : moveTasksTo(id, splitHeld(e), tg.spot);
   else moveThreadTo(id, tg.spot);
+});
+
+/* ---------- selecting several tasks ----------
+   ⌘-click (Ctrl-click on Windows) a task row to add it to / take it out of the selection; Shift-click adds every
+   task row shown between the last one clicked and this one. A click anywhere off the selection (not on a selected task,
+   the bar, the header, a menu or a window), Esc, or the bar's × clears it. While anything is selected, a bar at the bottom of the sidebar acts on all of it (date, links,
+   done, archive, delete), and dragging any selected row carries the whole selection: onto a calendar day (dateTasks)
+   or to a spot in the sidebar (moveManyTo). The selection is UI state only (until reload); it is never saved. */
+const sel = new Set();
+let selAnchor = null;
+const selIds = () => inOrder([...sel]);
+function clearSel() { if (!sel.size) return; sel.clear(); selAnchor = null; paintSel(); }
+// show the selection without redrawing everything: sidebar rows and the bar now; the calendar (whose outlines wrap runs
+// of selected chips: selRuns) just after, so a click that changed the selection still reaches the element it was on
+// (e.g. a checkbox's change event)
+let selCalTimer = 0;
+function paintSel() {
+  $$('#tree .task[data-id]').forEach(r => r.classList.toggle('sel', sel.has(r.dataset.id)));
+  $$('#grid .chip[data-id]').forEach(c => c.classList.toggle('sel', sel.has(c.dataset.id)));
+  renderSelBar();
+  clearTimeout(selCalTimer);
+  selCalTimer = setTimeout(() => { if (ui.dayView || admOpen) calStale = true; else { renderCal(); if (hl) setHL(hl, true); } }, 0);
+}
+function selClick(id, range) {
+  const rows = $$('#tree .task[data-id]').map(r => r.dataset.id), a = rows.indexOf(selAnchor), b = rows.indexOf(id);
+  if (range && a >= 0 && b >= 0) rows.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(x => sel.add(x));
+  else if (sel.has(id)) sel.delete(id);
+  else sel.add(id);
+  selAnchor = id; paintSel();
+}
+// the ids a drag would move: a dragged selection, or the dragged task (with its chain unless Option is held)
+const dragMoving = e => drag.ids ? movingMany(drag.ids, splitHeld(e)) : movingIds(drag.id, splitHeld(e));
+function renderSelBar() {
+  const bar = $('#selbar');
+  if (!sel.size) { bar.classList.remove('on'); bar.innerHTML = ''; return; }
+  if (bar.querySelector('.inl:not([data-done])')) return;   // its date box is open (not just closing): leave it be
+  const ids = selIds(), fs = ids.map(findTask);
+  const perThread = new Map(); fs.forEach(f => perThread.set(f.t, (perThread.get(f.t) || 0) + 1));
+  const canLink = [...perThread.values()].some(n => n > 1), anyLinked = fs.some(f => f.task.linkToPrev);
+  const allDone = fs.every(f => f.task.done);
+  const noLink = 'Select two or more tasks in the same thread to link them';
+  // (a button that can't be used now says why; aria-disabled, not disabled, so its hint still shows on hover)
+  const b = (act, hint, html, off, v) => `<button class="sbb${off ? ' off' : ''}" data-act="${act}" ${v ? `data-v="${v}"` : ''} data-hint="${off || hint}" aria-label="${hint}" ${off ? 'aria-disabled="true"' : ''}>${html}</button>`;
+  bar.innerHTML = `<div class="sb-top"><span class="sb-n">${plural(ids.length, 'task')} selected</span>
+      <span class="sb-tip">${ids.length > 1 ? 'drag to a day to schedule all' : '⌘-click to select more'}</span>
+      <button class="ic" data-act="sel-clear" data-hint="Clear selection (Esc)" aria-label="Clear selection">${ICON.x}</button></div>
+    <div class="sb-acts">
+      ${b('sel-date', 'Set a date for all', `${ICON.calendar}<span>Date</span>`)}
+      <span class="sb-grp">
+        ${b('sel-link', 'Link: same day', '<span class="k">=</span>', canLink ? '' : noLink, 'sameDay')}
+        ${b('sel-link', 'Link: each the day after the one before', '<span class="k">+1d</span>', canLink ? '' : noLink, 'nextDay')}
+        ${b('sel-unlink', 'Unlink', ICON.unlink, anyLinked ? '' : 'None of these are linked')}
+      </span>
+      <span class="sb-sp"></span>
+      ${b('sel-done', allDone ? 'Mark not done' : 'Mark done', allDone ? ICON.undone : ICON.check)}
+      ${b('sel-arch', 'Archive', ICON.archive)}
+      ${b('sel-del', 'Delete', ICON.trash)}
+    </div>`;
+  bar.classList.add('on');
+}
+// set (or clear) the date of every selected task, from the bar or a drop on the calendar
+function selDate(ids, date, split) {
+  if (!dateTasks(ids, date, split)) return;
+  toast(date ? `Scheduled ${plural(ids.length, 'task')} on ${dayLabel(date)}.` : `Unscheduled ${plural(ids.length, 'task')}.`, 2500);
+}
+// the bar's buttons (called from the click dispatcher in app.js)
+function selAct(act, a) {
+  const ids = selIds(); if (!ids.length || a.classList.contains('off')) return;
+  if (act === 'sel-clear') return clearSel();
+  if (act === 'sel-date') {
+    const ds = new Set(ids.map(id => findTask(id).task.date)), one = ds.size === 1 ? [...ds][0] : null;
+    return editDateIn(a, { value: one, allowEmpty: true, emptyText: 'no date (unschedule all)', placeholder: 'e.g. fri, tm',
+      commit: v => selDate(ids, v), clear: one ? () => selDate(ids, null) : null });
+  }
+  if (act === 'sel-link') {
+    const n = linkTasks(ids, a.dataset.v), threads = new Set(ids.map(id => findTask(id).t.id)).size;
+    if (n && n < threads) toast('Linked within each thread (tasks in different threads can’t be linked to each other).', 4000);
+    return;
+  }
+  if (act === 'sel-unlink') return unlinkTasks(ids);
+  if (act === 'sel-done') return setTasksDone(ids, !ids.every(id => findTask(id).task.done));
+  if (act === 'sel-arch') { archiveTasks(ids); return clearSel(); }
+  if (act === 'sel-del') { if (delTasks(ids)) clearSel(); }
+}
+// ⌘ / Ctrl / Shift-click on a task row selects
+tree.addEventListener('mousedown', e => {   // (Shift-click would otherwise select the text in between)
+  if (e.shiftKey && e.target.closest('.task[data-id]') && !e.target.closest('input, button, .inl')) e.preventDefault();
+});
+tree.addEventListener('click', e => {
+  const row = e.target.closest('.task[data-id]'), mod = e.metaKey || e.ctrlKey;
+  if (e.target.closest('input, button, label, .inl, .add')) return;
+  if (row && (mod || e.shiftKey)) { e.stopPropagation(); closeMenu(); selClick(row.dataset.id, e.shiftKey); return; }
+});
+// a plain click off the selection clears it. Not: a selected task itself (sidebar row, calendar chip, day view; its
+// checkbox or date box act on that one task), the selection bar, the header (‹ Today › to find a day to drop on),
+// menus, windows, messages, or the sidebar / scratch board resize edges. (Runs before app.js's click dispatcher.)
+document.addEventListener('click', e => {
+  if (!sel.size || e.metaKey || e.ctrlKey || e.shiftKey) return;
+  const t = e.target; if (!t.closest) return;
+  if (t.closest('#selbar, header, #menu, #modal, #toast, #warn, #resizer, .sc-rz, #dhint, .inl, .dwrap')) return;
+  const el = t.closest(TASK_EL); if (el && sel.has(el.dataset.id)) return;
+  clearSel();
 });

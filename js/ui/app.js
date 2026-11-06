@@ -101,6 +101,7 @@ document.addEventListener('click', e => {
       const ids = a.dataset.has.split(' '), open = ids.some(x => drOpen.has(x));
       ids.forEach(x => open ? drOpen.delete(x) : drOpen.add(x)); render(); break;
     }
+    case 'sel-clear': case 'sel-date': case 'sel-link': case 'sel-unlink': case 'sel-done': case 'sel-arch': case 'sel-del': selAct(act, a); break;
     case 'unplan': { const f = findTask(id); if (f) mutate(() => { delete f.task.plan; }); break; }
   }
 });
@@ -241,6 +242,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (menu.style.display === 'block') { closeMenu(); return; }   // just the menu (not day view / the timeline under it)
     if (tpop) { closeTimePop(false); return; }
+    if (sel.size && !modalOpen && !e.target.closest('input,textarea')) { clearSel(); return; }   // a selection of tasks in the sidebar
     if (admOpen && !modalOpen) { closeAdmire(); return; }
     if (modalOpen) { if ($('#modal').dataset.dismiss) hideModal(); }
     else if (ui.dayView && !e.target.closest('input,textarea,select')) closeDay();

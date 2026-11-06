@@ -9,7 +9,7 @@ test('typed dates', () => {
     '2026-02-03': '2026-02-03', 'Thu Nov 26': '2026-11-26', 'november 3rd': '2026-11-03',
     'jan 5': '2027-01-05',               // more than two months ago this year: next year
     'oct 1': '2026-10-01',               // within two months: this year
-    'today': base, 'tomorrow': '2026-10-29', 'yesterday': '2026-10-27',
+    'today': base, 'tomorrow': '2026-10-29', 'td': base, 'tm': '2026-10-29', 'TM': '2026-10-29', 'yesterday': '2026-10-27',
     'fri': '2026-10-30', 'next fri': '2026-11-06', 'wed': base,
     '+3': '2026-10-31', '+2w': '2026-11-11', '-1': '2026-10-27',
     '30': '2026-10-30', '5': '2026-11-05',   // a day number: this month, or next if it has passed

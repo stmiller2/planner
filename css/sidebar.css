@@ -113,3 +113,40 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 .drun:not(.open).lu.ld::before{-webkit-mask-image:linear-gradient(#000,transparent 40%,transparent 60%,#000);mask-image:linear-gradient(#000,transparent 40%,transparent 60%,#000)}
 .drun:not(.open) .drn::before{-webkit-mask-image:linear-gradient(#000,transparent);mask-image:linear-gradient(#000,transparent)}
 .drun:not(.open) .drn::after{-webkit-mask-image:linear-gradient(transparent,#000);mask-image:linear-gradient(transparent,#000)}
+/* several tasks selected (⌘ / Shift-click, ui/sidebar.js): tinted rows, and the bar of actions under the tree */
+.task.sel{--selbg:color-mix(in srgb,var(--accent) 13%,var(--panel));background:var(--selbg)}
+.task.sel:hover,.task.sel.hl{--selbg:color-mix(in srgb,var(--accent) 19%,var(--panel));background:var(--selbg)}   /* (hover highlight: in the selection's blue) */
+.task.sel .rt>.acts{background:var(--selbg);box-shadow:-10px 0 8px -2px var(--selbg)}
+.task.sel+.task.sel{border-top-left-radius:0;border-top-right-radius:0}
+.task.sel:has(+.task.sel){border-bottom-left-radius:0;border-bottom-right-radius:0}
+body.drag-many #tree .task.sel{opacity:.45}
+#selbar{display:none;flex:none;margin:0 6px 6px;padding:5px 5px 6px 10px;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:10px;
+  background:var(--panel);box-shadow:0 -4px 18px rgba(0,0,0,.08)}
+#selbar.on{display:block;animation:selIn .16s ease-out}
+@keyframes selIn{from{transform:translateY(10px);opacity:0}}
+#selbar .sb-top{display:flex;align-items:center;gap:8px;min-height:22px}
+#selbar .sb-n{font-weight:650;white-space:nowrap}
+#selbar .sb-tip{flex:1;min-width:0;color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#selbar .sb-acts{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:5px}
+#selbar .sb-sp{flex:1}
+#selbar .sb-grp{display:inline-flex}
+#selbar .sb-grp .sbb{border-radius:0;margin-left:-1px}
+#selbar .sb-grp .sbb:first-child{border-radius:6px 0 0 6px;margin-left:0}
+#selbar .sb-grp .sbb:last-child{border-radius:0 6px 6px 0}
+.sbb{position:relative;height:26px;min-width:30px;padding:0 7px;display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer;font-size:12px;white-space:nowrap}
+.sbb:hover{background:var(--hover);border-color:color-mix(in srgb,var(--muted) 60%,var(--line));z-index:1}
+.sbb svg{width:14px;height:14px;flex:none}
+.sbb .k{font-size:11px;font-weight:650;font-variant-numeric:tabular-nums}
+.sbb.off{opacity:.38;cursor:default}
+.sbb.off:hover{background:var(--panel);border-color:var(--line)}
+.sbb[data-act="sel-del"]:not(.off):hover{color:var(--danger)}
+#selbar .inl.dinp{height:26px;width:78px;font-size:12px}
+/* what's under the pointer while dragging several tasks: the task grabbed, stacked on two more cards, and the count
+   (fixed off-screen: only its snapshot is seen, as the drag image) */
+#dragstack{position:fixed;left:0;top:-300px;z-index:100;padding:0 6px 6px 0;font:13px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;color:var(--ink)}
+#dragstack .ds-c{position:relative;display:flex;align-items:center;gap:8px;max-width:240px;padding:5px 7px 5px 8px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--c);border-radius:6px}
+#dragstack .ds-c::before,#dragstack .ds-c::after{content:'';position:absolute;inset:-1px -1px -1px -3px;border:1px solid var(--line);border-radius:6px;background:var(--panel);z-index:-1}
+#dragstack .ds-c::before{transform:translate(3px,3px)}
+#dragstack .ds-c::after{transform:translate(6px,6px);z-index:-2}
+#dragstack .ds-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dragstack .ds-n{flex:none;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:var(--accent);color:#fff;font-size:11px;font-weight:650;display:grid;place-items:center}
