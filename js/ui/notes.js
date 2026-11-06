@@ -44,7 +44,7 @@ function linkifyNotes(text) {
   }
   return out + esc(text.slice(at));
 }
-// After resting on a task for NT_DELAY ms. The note stays while the pointer is on the task or on the note itself
+// After resting on a task for NT_DELAY ms (a task with notes, or a short day-view block: see ntWants). The note stays while the pointer is on the task or on the note itself
 // (crossing the gap between them, or a quick slip off, is forgiven for NT_GRACE ms), so a long note can be scrolled.
 // Web addresses in it are links. Double-clicking its text (not a link) edits it in place: ⌘↩ / Ctrl+↩ saves and keeps the note open, Esc goes back without
 // saving, and pressing anywhere else saves and closes it (Enter is a new line). Gone on leaving both the task and the
@@ -67,15 +67,17 @@ document.addEventListener('mouseover', e => {
   const el = e.target.closest ? e.target.closest(NT_SEL) : null;
   if (ntOn && el && !ntOn.isConnected && el.dataset.id === ntId) {   // its task was redrawn (e.g. after saving): the same task
     const now = (findTask(ntId) || { task: {} }).task.notes;
-    if (now === ntShownText) ntOn = el; else if (now) showNotesTip(el); else dropNotesTip();   // (its notes changed meanwhile)
+    if (now === ntShownText) ntOn = el; else if (ntWants(el, findTask(ntId))) showNotesTip(el); else dropNotesTip();   // (its notes changed meanwhile)
   }
   if (ntOn) { if (el === ntOn) ntStay(); else if (!ntGone) ntGone = setTimeout(dropNotesTip, NT_GRACE); }
   if (el === ntFor) return;
   ntFor = el; clearTimeout(ntTimer); ntTimer = null;
   if (!el || el === ntOn || drag || dv || $('#modal').style.display === 'grid') return;
-  const f = findTask(el.dataset.id); if (!f || !f.task.notes) return;
+  if (!ntWants(el, findTask(el.dataset.id))) return;
   ntTimer = setTimeout(() => showNotesTip(el), NT_DELAY);
 });
+// a task with notes gets the hover note; so does a short day-view block (its label is cut off), notes or not
+const ntWants = (el, f) => !!f && (!!f.task.notes || (el.classList.contains('dv-blk') && el.classList.contains('short')));
 let ntRect = null;   // where the task was when its note opened (the note is placed beside it)
 function placeNotesTip() {
   const r = ntRect, w = ntip.offsetWidth, h = ntip.offsetHeight;
@@ -84,14 +86,16 @@ function placeNotesTip() {
 }
 function showNotesTip(el) {
   const f = findTask(el.dataset.id);
-  if (!el.isConnected || !f || !f.task.notes || drag || dv || el.querySelector('.inl') || menu.style.display === 'block') return;
+  if (!el.isConnected || !ntWants(el, f) || drag || dv || el.querySelector('.inl') || menu.style.display === 'block') return;
   dropNotesTip();
   // a short day-view block shows only part of its label, so the note carries its time and thread too; a calendar
   // chip with notes has no hover title (it would cover this), so its path goes here instead
   const p = el.classList.contains('dv-blk') && el.classList.contains('short') && planOf(f.task);
   const sub = p ? `${fmtSpan(p.start, p.dur)} · ${f.t.name}` : el.classList.contains('chip') ? [f.p.name, ...f.path].join(' › ') + (isLoose(f.p, f.t) ? '' : ` #${f.i + 1}`) : '';
   ntip.style.setProperty('--c', colorOf(f.t));
-  ntip.innerHTML = `<div class="nt-t">${esc(f.task.title)}</div>${sub ? `<div class="tm">${esc(sub)}</div>` : ''}<div class="nt-b">${linkifyNotes(f.task.notes)}</div>`;
+  // a short block's checkbox is hard to hit, so its note carries one too (ticking it is the same as ticking the block)
+  const ck = p ? `<input type="checkbox" data-act="done" data-id="${f.task.id}" ${f.task.done ? 'checked' : ''}>` : '';
+  ntip.innerHTML = `<div class="nt-t ${ck ? 'ck' : ''}">${ck}<span>${esc(f.task.title)}</span></div>${sub ? `<div class="tm">${esc(sub)}</div>` : ''}${f.task.notes ? `<div class="nt-b">${linkifyNotes(f.task.notes)}</div>` : ''}`;
   ntip.style.display = 'block'; ntip.scrollTop = 0;
   ntOn = el; ntId = f.task.id; ntShownText = f.task.notes; ntRect = el.getBoundingClientRect();
   placeNotesTip();
@@ -113,7 +117,7 @@ ntip.addEventListener('dblclick', e => {
     const v = ta.value.trim();
     if (save && v !== cur.trim()) setTaskNotes(id, v);
     const now = (findTask(id) || { task: {} }).task.notes;
-    if (!keep || !now) { if (keep) dropNotesTip(); return; }
+    if (!keep || !now) { if (keep) dropNotesTip(); return; }   // (a short block's note stays open once it's hovered again)
     const nb = document.createElement('div'); nb.className = 'nt-b'; nb.innerHTML = linkifyNotes(now); ntShownText = now;
     ta.replaceWith(nb); k.remove(); ntip.style.width = ''; placeNotesTip();
   };

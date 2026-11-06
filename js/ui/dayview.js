@@ -119,7 +119,8 @@ function renderDayList(box, only, cur = ui.dayView) {
       if (dvAdd && dvAdd.beforeId === it.k.id) sec += addBox(it.t.id);
       sec += `<div class="dv-item ${p ? 'placed' : ''} ${it.k.done ? 'done' : ''}" data-id="${it.k.id}" style="--c:${esc(colorOf(it.t))}">
         <input type="checkbox" data-act="done" data-id="${it.k.id}" ${it.k.done ? 'checked' : ''}>
-        <div class="bd"><div class="tt">${esc(it.k.title)}${noteMark(it.k)}</div>${p ? `<div class="tm">${fmtSpan(p.start, p.dur)}</div>` : ''}</div></div>`;
+        <div class="bd"><div class="tt">${esc(it.k.title)}${noteMark(it.k)}</div>${p ? `<div class="tm">${fmtSpan(p.start, p.dur)}</div>` : ''}</div>
+        <span class="acts"><button class="ic" data-act="kmenu" data-id="${it.k.id}" title="Task settings">${ICON.gear}</button><button class="ic qk qk-arch" data-act="arch-k" data-id="${it.k.id}" title="Archive">${ICON.archive}</button><button class="ic qk qk-del" data-act="del-k" data-id="${it.k.id}" title="Delete">${ICON.trash}</button></span></div>`;
       if (dvAdd && dvAdd.afterId === it.k.id) sec += addBox(it.t.id);
     });
     if (lastT) sec += '</div>';

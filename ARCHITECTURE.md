@@ -64,7 +64,7 @@ js/ui/  (views; each draws its part of the page and handles its own events)
   dragdrop.js           HTML5 drag state (`drag`) shared by sidebar and calendar; Option-drop
   archive.js            the Archive window
   sidebar.js            the sidebar tree, link menu, task menu (notes, archive, delete; from the task's gear in the
-                        sidebar, or right-clicking a task anywhere: the contextmenu handler in app.js; quickAct keeps the last-used
+                        sidebar or the day view list, or right-clicking a task anywhere: the contextmenu handler in app.js; quickAct keeps the last-used
                         archive / delete button on every task's hover buttons for 2 s), thread / project gear menus
                         (+ subthread, ordered, archive, delete), new-task boxes, click-to-insert, sidebar drag & drop
   calendar.js           the calendar: renderCal, row heights (fitRows), week scrolling, dropping on days
@@ -78,10 +78,11 @@ js/ui/  (views; each draws its part of the page and handles its own events)
                         project blocks (pieces: name + ribbon row, lane stretches, pipes, and a dot-sized spot for
                         each unordered dot off its host's line) into the highest free spot
   dayview.js            day view: list + hour timeline (renderDay), adding tasks to a day, day swiping
-  dayview-edit.js       day view editing: time popover, dragging / resizing blocks, conflict drag, tooltips
+  dayview-edit.js       day view editing: time popover, dragging / resizing blocks, conflict drag, thread-heading tooltip
   notes.js              task notes: noteMark (the mark after a title), editNotes (the window, from the task's gear
                         menu), and the note shown after resting on a task for 1 s (sidebar, calendar, day view); it stays
-                        while the pointer is on the task or the note, and double-clicking its text edits it in place
+                        while the pointer is on the task or the note, and double-clicking its text edits it in place.
+                        Short day-view blocks get the same note (notes or not: ntWants), with a checkbox
   scratch.js            the scratch board, #app's third column beside the calendar and day view: scratch tasks
                         (add / insert / tick / rename / reorder / clear done), resizing, opening / closing it (X;
                         per-view defaults in Settings: scratchCal / scratchDay, or scratchRemember + scratchOpen;

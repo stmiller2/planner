@@ -155,11 +155,12 @@ function openTaskMenu(id, btn, at) {
 }
 // After a task is deleted or archived (from its gear menu, or with this button), that one button joins every task's
 // hover buttons for 2 s, restarting with each use, so a run of tasks can go without opening the menu for each one.
-// (#tree[data-quick] shows it: see css/sidebar.css; nothing is redrawn when it goes.)
+// (#tree[data-quick] / #dayview[data-quick] show it, in the sidebar and the day list: see css/sidebar.css; nothing is
+// redrawn when it goes.)
 let quickTimer = null;
 function quickAct(kind) {
-  const t = $('#tree'); t.dataset.quick = kind; clearTimeout(quickTimer);
-  quickTimer = setTimeout(() => { delete t.dataset.quick; }, 2000);
+  const els = [$('#tree'), $('#dayview')]; els.forEach(t => t.dataset.quick = kind); clearTimeout(quickTimer);
+  quickTimer = setTimeout(() => els.forEach(t => delete t.dataset.quick), 2000);
 }
 // a thread's / project's settings menu (its gear button): (+ subthread,) "Ordered tasks" switch, archive, delete.
 // In an unordered project, a thread's switch shows off and can't be changed.

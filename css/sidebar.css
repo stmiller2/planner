@@ -29,7 +29,7 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 .meta{font-size:11px;color:var(--muted);white-space:nowrap}
 .acts{display:none;gap:1px;flex:none}
 /* a task's archive / delete button: only for 2 s after one was used (quickAct, ui/sidebar.js); otherwise in its gear menu */
-#tree:not([data-quick="del"]) .qk-del,#tree:not([data-quick="arch"]) .qk-arch{display:none}
+:is(#tree,#dayview):not([data-quick="del"]) .qk-del,:is(#tree,#dayview):not([data-quick="arch"]) .qk-arch{display:none}
 .prow:hover>.acts,.trow:hover>.acts,.task:hover .acts{display:flex}
 .task .rt{position:relative;flex:none;display:flex;align-items:center;min-height:20px}
 .task .rt>.acts{position:absolute;right:calc(100% + 2px);top:50%;transform:translateY(-50%);background:var(--hover);border-radius:6px;padding:1px;box-shadow:-10px 0 8px -2px var(--hover)}

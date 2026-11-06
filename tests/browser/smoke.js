@@ -368,6 +368,37 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.strictEqual(await page.evaluate(() => [...document.querySelectorAll('#dayview .dv-blk')].filter(x => x.style.opacity).length), 0);
       await page.keyboard.press('Escape');
     });
+    await check('day view: a short block shows its hover note with a checkbox, kept open while the pointer is on it', async () => {
+      if (!(await page.evaluate(() => !!ui.dayView))) { await page.keyboard.press('d'); await sleep(400); }
+      const id = await page.locator('#dayview .dv-blk').first().getAttribute('data-id');
+      await page.evaluate(id => { const f = findTask(id); mutate(() => { delete f.task.notes; f.task.done = false; f.task.plan.dur = Math.max(5, Math.floor(30 / PPM)); });   // (under 38 px tall: short) }, id);
+      const blk = page.locator(`#dayview .dv-blk[data-id="${id}"]`);
+      assert.ok(await blk.evaluate(b => b.classList.contains('short')));
+      await page.mouse.move(5, 5); const bb = await blk.boundingBox(); await page.mouse.move(bb.x + bb.width - 20, bb.y + bb.height / 2);
+      await sleep(1200); assert.ok(await page.locator('#ntip').isVisible());
+      assert.strictEqual(await page.locator('#dvtip').isVisible(), false);
+      const ck = page.locator(`#ntip input[data-act="done"][data-id="${id}"]`);
+      const cb = await ck.boundingBox(); await page.mouse.move(cb.x + cb.width / 2, cb.y + cb.height / 2, { steps: 8 }); await page.mouse.down(); await page.mouse.up();
+      assert.strictEqual((await task(id)).done, true);
+      await sleep(400); assert.ok(await page.locator('#ntip').isVisible()); assert.ok(await ck.isChecked());
+      await page.mouse.move(5, 5); await sleep(400); assert.strictEqual(await page.locator('#ntip').isVisible(), false);
+      await page.keyboard.press('Control+z'); await page.keyboard.press('Control+z'); await page.keyboard.press('Escape');
+    });
+    await check('day view list: the task gear menu (notes, archive, delete) and the quick delete button after using it', async () => {
+      if (!(await page.evaluate(() => !!ui.dayView))) { await page.keyboard.press('d'); await sleep(400); }
+      const items = page.locator('#dayview .dv-item'), n = await items.count(); assert.ok(n >= 2);
+      const id = await items.nth(0).getAttribute('data-id'), id2 = await items.nth(1).getAttribute('data-id');
+      assert.strictEqual(await items.nth(0).locator('[data-act="kmenu"]').isVisible(), false);
+      await items.nth(0).hover(); await items.nth(0).locator('[data-act="kmenu"]').click();
+      assert.deepStrictEqual(await page.$$eval('#menu button', bs => bs.map(b => b.dataset.act)), ['k-notes', 'arch-k', 'del-k']);
+      assert.strictEqual(await page.evaluate(() => tpop), null);   // (the gear doesn't open the time box)
+      await page.click('#menu [data-act="del-k"]'); assert.ok(!(await task(id)));
+      const it2 = page.locator(`#dayview .dv-item[data-id="${id2}"]`);
+      await it2.hover(); assert.ok(await it2.locator('[data-act="del-k"]').isVisible());
+      assert.strictEqual(await it2.locator('[data-act="arch-k"]').isVisible(), false);
+      await page.mouse.move(5, 5); await page.keyboard.press('Control+z'); assert.ok(await task(id));
+      await page.keyboard.press('Escape');
+    });
     await check('Help shows where the data is; Settings > Data file moves it to another folder', async () => {
       await page.keyboard.press('h');
       assert.ok((await page.textContent('#modal .mbody')).includes(DATA), 'full path in Help');

@@ -40,27 +40,21 @@ $('#dayview').addEventListener('focusout', e => {
   setTimeout(() => { if (dvAdd && !document.activeElement.closest('.dvadd')) { dvAdd = null; renderDay(); } }, 0);
 });
 
-// full label for short blocks, and the full project › thread › sub path for a thread heading in the list,
-// only after hovering a moment (so it doesn't cover what's below while you work)
+// the full project › thread › sub path for a thread heading in the list, only after hovering a moment (so it doesn't
+// cover what's below while you work). (Short timeline blocks get the hover note instead, with its own rules: notes.js)
 const dvtip = $('#dvtip');
 let tipTimer = null, tipFor = null;
 function hideTip() { clearTimeout(tipTimer); tipTimer = null; tipFor = null; dvtip.style.display = 'none'; }
 $('#dayview').addEventListener('mouseover', e => {
-  const b = e.target.closest('.dv-blk.short, .dv-th');
-  if (!b || dv || (b.dataset.id && (findTask(b.dataset.id) || { task: {} }).task.notes)) return hideTip();   // (notes: see notes.js)
+  const b = e.target.closest('.dv-th');
+  if (!b || dv) return hideTip();
   if (b === tipFor) return;
   hideTip(); tipFor = b;
   tipTimer = setTimeout(() => {
     if (!b.isConnected || dv) return;
-    if (b.classList.contains('dv-th')) {
-      const x = findThread(b.closest('.dv-grp').dataset.tid); if (!x) return;
-      dvtip.style.setProperty('--c', colorOf(x.t));
-      dvtip.innerHTML = `<div>${esc([x.p.name, ...x.path].join(' › '))}</div>`;
-    } else {
-      const f = findTask(b.dataset.id), p = f && planOf(f.task); if (!p) return;
-      dvtip.style.setProperty('--c', colorOf(f.t));
-      dvtip.innerHTML = `<div>${esc(f.task.title)}</div><div class="tm">${fmtSpan(p.start, p.dur)} · ${esc(f.t.name)}</div>`;
-    }
+    const x = findThread(b.closest('.dv-grp').dataset.tid); if (!x) return;
+    dvtip.style.setProperty('--c', colorOf(x.t));
+    dvtip.innerHTML = `<div>${esc([x.p.name, ...x.path].join(' › '))}</div>`;
     const r = b.getBoundingClientRect(); dvtip.style.display = 'block';
     const w = dvtip.offsetWidth, h = dvtip.offsetHeight;
     dvtip.style.left = Math.min(innerWidth - w - 8, r.left + 10) + 'px';
