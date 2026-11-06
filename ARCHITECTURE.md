@@ -69,7 +69,8 @@ js/ui/  (views; each draws its part of the page and handles its own events)
                         sidebar or the day view list, or right-clicking a task anywhere: the contextmenu handler in app.js; quickAct keeps the last-used
                         archive / delete button on every task's hover buttons for 2 s), thread / project gear menus
                         (+ subthread, ordered, archive, delete), new-task boxes, click-to-insert, sidebar drag & drop,
-                        selecting several tasks (`sel`: ⌘ / Shift-click; shown on rows and calendar chips) and the
+                        selecting several tasks (`sel`: ⌘ / Shift-click on rows or calendar chips; revealChips scrolls a day
+                        to a chip just selected) and the
                         selection bar under the tree (#selbar: renderSelBar / selAct)
   calendar.js           the calendar: renderCal, row heights (fitRows), week scrolling, dropping on days; selected chips
                         are wrapped in runs (selRuns) so each run gets one blue outline

@@ -342,14 +342,15 @@ tree.addEventListener('drop', e => {
   const tg = treeTarget(e); if (!tg) return;
   e.preventDefault(); tree.classList.remove('drop'); clearTdrop();
   const id = drag.id, many = drag.ids; drag = null;
-  if (tg.type === 'unsched') moveTask(id, null);
+  if (tg.type === 'unsched') many ? selDate(many, null) : moveTask(id, null);
   else if (tg.type === 'tasks') many ? moveManyTo(many, splitHeld(e), tg.spot) : moveTasksTo(id, splitHeld(e), tg.spot);
   else moveThreadTo(id, tg.spot);
 });
 
 /* ---------- selecting several tasks ----------
    ⌘-click (Ctrl-click on Windows) a task row to add it to / take it out of the selection; Shift-click adds every
-   task row shown between the last one clicked and this one. A click anywhere off the selection (not on a selected task,
+   task row shown between the last one clicked and this one. Calendar chips select the same way (Shift: the chips between,
+   day by day); selecting in the sidebar scrolls a chip hidden in its day's list into view. A click anywhere off the selection (not on a selected task,
    the bar, the header, a menu or a window), Esc, or the bar's × clears it. While anything is selected, a bar at the bottom of the sidebar acts on all of it (date, links,
    done, archive, delete), and dragging any selected row carries the whole selection: onto a calendar day (dateTasks)
    or to a spot in the sidebar (moveManyTo). The selection is UI state only (until reload); it is never saved. */
@@ -360,20 +361,46 @@ function clearSel() { if (!sel.size) return; sel.clear(); selAnchor = null; pain
 // show the selection without redrawing everything: sidebar rows and the bar now; the calendar (whose outlines wrap runs
 // of selected chips: selRuns) just after, so a click that changed the selection still reaches the element it was on
 // (e.g. a checkbox's change event)
+// added: ids just selected, whose chips are then scrolled into view in their days' lists (revealChips)
 let selCalTimer = 0;
-function paintSel() {
+function paintSel(added = []) {
   $$('#tree .task[data-id]').forEach(r => r.classList.toggle('sel', sel.has(r.dataset.id)));
   $$('#grid .chip[data-id]').forEach(c => c.classList.toggle('sel', sel.has(c.dataset.id)));
   renderSelBar();
   clearTimeout(selCalTimer);
-  selCalTimer = setTimeout(() => { if (ui.dayView || admOpen) calStale = true; else { renderCal(); if (hl) setHL(hl, true); } }, 0);
+  selCalTimer = setTimeout(() => {
+    if (ui.dayView || admOpen) { calStale = true; return; }
+    renderCal(); if (hl) setHL(hl, true);
+    revealChips(added);
+  }, 0);
 }
-function selClick(id, range) {
-  const rows = $$('#tree .task[data-id]').map(r => r.dataset.id), a = rows.indexOf(selAnchor), b = rows.indexOf(id);
-  if (range && a >= 0 && b >= 0) rows.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(x => sel.add(x));
+// ⌘-click (toggle) or Shift-click (a range from the last one clicked) on task `id`, in the sidebar or on the calendar:
+// `order` = the ids shown there, in order (sidebar rows, or calendar chips day by day), for the range
+function selClick(id, range, order) {
+  if (!findTask(id)) return;
+  const a = order.indexOf(selAnchor), b = order.indexOf(id), before = new Set(sel);
+  if (range && a >= 0 && b >= 0) order.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(x => sel.add(x));
   else if (sel.has(id)) sel.delete(id);
   else sel.add(id);
-  selAnchor = id; paintSel();
+  selAnchor = id; paintSel([...sel].filter(x => !before.has(x)));
+}
+// scroll each day's list on the calendar (smoothly) so the chips of these tasks are in view: all of them in that day
+// if they fit, else the first
+let revealAnim = null;
+function revealChips(ids) {
+  const byList = new Map();
+  ids.forEach(id => { const c = $(`#grid .chip[data-id="${id}"]`), it = c && c.closest('.items'); if (it) { if (!byList.has(it)) byList.set(it, []); byList.get(it).push(c); } });
+  const moves = [...byList].map(([it, cs]) => {
+    const ir = it.getBoundingClientRect(), s0 = it.scrollTop, h = it.clientHeight;
+    const top = Math.min(...cs.map(c => c.getBoundingClientRect().top)) - ir.top + s0 - 4;
+    const bot = Math.max(...cs.map(c => c.getBoundingClientRect().bottom)) - ir.top + s0 + 4;
+    let s1 = s0;
+    if (top < s0 || bot - top > h) s1 = top; else if (bot > s0 + h) s1 = bot - h;
+    return [it, s0, clamp(s1, 0, it.scrollHeight - h)];
+  }).filter(([, s0, s1]) => Math.abs(s1 - s0) >= 1);
+  if (!moves.length) return;
+  if (revealAnim) revealAnim.cancel();
+  revealAnim = tween(300, k => moves.forEach(([it, s0, s1]) => { it.scrollTop = s0 + (s1 - s0) * k; }), () => { revealAnim = null; });
 }
 // the ids a drag would move: a dragged selection, or the dragged task (with its chain unless Option is held)
 const dragMoving = e => drag.ids ? movingMany(drag.ids, splitHeld(e)) : movingIds(drag.id, splitHeld(e));
@@ -436,7 +463,7 @@ tree.addEventListener('mousedown', e => {   // (Shift-click would otherwise sele
 tree.addEventListener('click', e => {
   const row = e.target.closest('.task[data-id]'), mod = e.metaKey || e.ctrlKey;
   if (e.target.closest('input, button, label, .inl, .add')) return;
-  if (row && (mod || e.shiftKey)) { e.stopPropagation(); closeMenu(); selClick(row.dataset.id, e.shiftKey); return; }
+  if (row && (mod || e.shiftKey)) { e.stopPropagation(); closeMenu(); selClick(row.dataset.id, e.shiftKey, $$('#tree .task[data-id]').map(r => r.dataset.id)); return; }
 });
 // a plain click off the selection clears it. Not: a selected task itself (sidebar row, calendar chip, day view; its
 // checkbox or date box act on that one task), the selection bar, the header (‹ Today › to find a day to drop on),

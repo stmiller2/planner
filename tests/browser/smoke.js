@@ -433,6 +433,29 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.strictEqual(await page.locator('#tree .task.sel').count(), 0);
       assert.strictEqual(await page.locator('#tree .task.sel').count(), 0);
     });
+    await check('⌘ / Shift-click on calendar chips selects; dragging a selected chip takes the whole selection', async () => {
+      await page.click('#grid .chip[data-id="a4"] .tt', { modifiers: ['Meta'] });
+      await page.click('#grid .chip[data-id="m2"] .tt', { modifiers: ['Meta'] });
+      assert.deepStrictEqual(await page.$$eval('#tree .task.sel', rs => rs.map(r => r.dataset.id)).then(x => x.sort()), ['a4', 'm2']);
+      await sleep(100); assert.strictEqual(await page.locator('#grid .selrun .chip[data-id="m2"]').count(), 1);
+      const s = await page.locator('#grid .chip[data-id="m2"] .tt').boundingBox(), d = await page.locator('#grid .day[data-date="2026-11-13"]').boundingBox();
+      await page.mouse.move(s.x + 10, s.y + s.height / 2); await page.mouse.down();
+      for (let i = 1; i <= 10; i++) { await page.mouse.move(s.x + (d.x + 20 - s.x) * i / 10, s.y + (d.y + 30 - s.y) * i / 10); await sleep(20); }
+      await page.mouse.up(); await sleep(300);
+      assert.deepStrictEqual([(await task('a4')).date, (await task('m2')).date], ['2026-11-13', '2026-11-13']);
+      await page.keyboard.press('Control+z'); await page.keyboard.press('Escape');
+    });
+    await check('selecting in the sidebar scrolls a chip hidden in its day\'s list into view', async () => {
+      await page.setViewportSize({ width: 1440, height: 700 }); await sleep(300);
+      const it = page.locator('#grid .day[data-date="2026-11-09"] .items');
+      await it.evaluate(x => { x.scrollTop = 0; });
+      assert.ok(await it.evaluate(x => x.scrollHeight > x.clientHeight + 20), 'the day overflows');
+      await page.click('.task[data-id="m11"] .title', { modifiers: ['Meta'] }); await sleep(500);
+      const vis = await page.evaluate(() => { const c = document.querySelector('#grid .chip[data-id="m11"]'), it = c.closest('.items');
+        const r = c.getBoundingClientRect(), ir = it.getBoundingClientRect(); return r.top >= ir.top - 1 && r.bottom <= ir.bottom + 1; });
+      assert.ok(vis, 'm11 in view');
+      await page.keyboard.press('Escape'); await page.setViewportSize({ width: 1440, height: 1600 }); await sleep(300);
+    });
     await check('the selection bar: link same day, date typed as "tm", unlink, done', async () => {
       await page.click('.task[data-id="m3"] .title', { modifiers: ['Meta'] });
       await page.click('.task[data-id="m6"] .title', { modifiers: ['Meta'] });

@@ -204,6 +204,16 @@ function setHL(id, force) {
 const grid = $('#grid');
 grid.addEventListener('mouseover', e => { if (drag) return; const c = e.target.closest('.chip'); setHL(c ? c.dataset.id : null); });
 grid.addEventListener('mouseleave', () => setHL(null));
+// ⌘ / Ctrl / Shift-click a chip: select it, as in the sidebar (Shift: every chip between, day by day; selClick in sidebar.js)
+grid.addEventListener('mousedown', e => {   // (Shift-click would otherwise select the text in between)
+  if (e.shiftKey && e.target.closest('.chip[data-id]') && !e.target.closest('input, button, .inl')) e.preventDefault();
+});
+grid.addEventListener('click', e => {
+  const c = e.target.closest('.chip[data-id]');
+  if (!c || !(e.metaKey || e.ctrlKey || e.shiftKey) || e.target.closest('input, button, .inl')) return;
+  e.stopPropagation(); clearTimeout(revealTimer); closeMenu();
+  selClick(c.dataset.id, e.shiftKey, $$('#grid .chip[data-id]').map(x => x.dataset.id));
+});
 grid.addEventListener('dragover', e => {
   if (!drag || drag.kind !== 'task') return; const day = e.target.closest('.day') || (e.target.closest('.cfb') && $(`#grid .day[data-date="${calDayAt(e.clientX, e.clientY)}"]`)); if (!day) return;
   e.preventDefault(); e.dataTransfer.dropEffect = splitHeld(e) ? 'copy' : 'move';

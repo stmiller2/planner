@@ -119,7 +119,7 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 .task.sel .rt>.acts{background:var(--selbg);box-shadow:-10px 0 8px -2px var(--selbg)}
 .task.sel+.task.sel{border-top-left-radius:0;border-top-right-radius:0}
 .task.sel:has(+.task.sel){border-bottom-left-radius:0;border-bottom-right-radius:0}
-body.drag-many #tree .task.sel{opacity:.45}
+body.drag-many :is(#tree .task.sel,#grid .selrun){opacity:.45}
 #selbar{display:none;flex:none;margin:0 6px 6px;padding:5px 5px 6px 10px;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:10px;
   background:var(--panel);box-shadow:0 -4px 18px rgba(0,0,0,.08)}
 #selbar.on{display:block;animation:selIn .16s ease-out}

@@ -15,7 +15,7 @@ function showHelp() {
   <p>When rescheduling tasks, linked tasks move too, unless holding <kbd>⌥ Option</kbd> while dropping the task (this breaks links and moves only the dragged task).</p>
   <p>By default, all tasks within a thread get shifted relative to each other when rescheduling. This can be turned off in Settings, or bypassed by holding <kbd>⌥ Option</kbd>. Tasks in unordered threads never shift.</p>
   <h4>Several tasks at once</h4>
-  <p><kbd>⌘</kbd>-click tasks in the sidebar to select several (<kbd>⇧ Shift</kbd>-click selects every task between the last one clicked and this one). Drag any of them onto a calendar day to give them all that date, or to another spot in the sidebar to move them together. A bar at the bottom of the sidebar acts on the whole selection: set a date, link them to the <b>same day</b> <span class="hic">=</span> or <b>next day</b> <span class="hic">+1d</span> (tasks in one thread are gathered under the first one, in order), unlink, mark done, archive or delete. <kbd>Esc</kbd>, or clicking anywhere off the selected tasks, clears the selection.</p>
+  <p><kbd>⌘</kbd>-click tasks in the sidebar or on the calendar to select several (<kbd>⇧ Shift</kbd>-click selects every task between the last one clicked and this one). Drag any of them onto a calendar day to give them all that date, or to another spot in the sidebar to move them together. A bar at the bottom of the sidebar acts on the whole selection: set a date, link them to the <b>same day</b> <span class="hic">=</span> or <b>next day</b> <span class="hic">+1d</span> (tasks in one thread are gathered under the first one, in order), unlink, mark done, archive or delete. <kbd>Esc</kbd>, or clicking anywhere off the selected tasks, clears the selection.</p>
   <h4>Day view</h4>
   <p>To plan the timing of tasks within a single day, enter day view with the view switcher, pressing <kbd>d</kbd>, or by clicking the date number from calendar view. Drag tasks onto the timeline, then drag or click blocks to set their times. Swipe sideways or use the arrow keys to move between days.</p>
   <h4>Timeline</h4>
@@ -38,7 +38,7 @@ function showHelp() {
 function shortcutsHTML() {
   return [
     ['<kbd>⌥ Option</kbd> + drop', 'Move only the task you dragged, unlinking from other tasks if applicable'],
-    ['<kbd>⌘</kbd>-click / <kbd>⇧</kbd>-click', 'Select several tasks in the sidebar (a range with <kbd>⇧</kbd>)'],
+    ['<kbd>⌘</kbd>-click / <kbd>⇧</kbd>-click', 'Select several tasks, in the sidebar or on the calendar (a range with <kbd>⇧</kbd>)'],
     ['<kbd>←</kbd> / <kbd>→</kbd> or <kbd>↑</kbd> / <kbd>↓</kbd>', 'Previous / next week (previous / next day in day view)'],
     ['<kbd>T</kbd>', 'Jump to today'],
     ['<kbd>C</kbd> / <kbd>D</kbd> / <kbd>-</kbd>', 'Switch to the calendar / day view / timeline (<kbd>-</kbd> again: back)'],

@@ -14,8 +14,9 @@ document.addEventListener('dragstart', e => {
   else return;
   e.dataTransfer.effectAllowed = 'copyMove';
   e.dataTransfer.setData('text/plain', el.dataset.id);
-  // dragging one of several selected sidebar rows: the whole selection goes, shown as a small stack with a count
-  if (drag.kind === 'task' && drag.from === 'side' && sel.size > 1 && sel.has(drag.id)) {
+  // dragging one of several selected tasks (sidebar row or calendar chip): the whole selection goes, shown as a small
+  // stack with a count
+  if (drag.kind === 'task' && sel.size > 1 && sel.has(drag.id)) {
     drag.ids = selIds();
     const g = document.createElement('div'); g.id = 'dragstack';
     const f = findTask(drag.id);
