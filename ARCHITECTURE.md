@@ -82,7 +82,8 @@ js/ui/  (views; each draws its part of the page and handles its own events)
                         what a row shows). No ordered work = no ribbon (p.s null; p.as..p.ae = all it shows)
   timeline.js           Timeline drawing (renderAdmire), hover lists, folding, resizing; each week-row packs its
                         project blocks (pieces: name + ribbon row, lane stretches, pipes, and a dot-sized spot for
-                        each unordered dot off its host's line) into the highest free spot
+                        each unordered dot off its host's line) into the highest free spot; a project's name goes
+                        after / before its ribbon, or above it when that packs higher. Label widths are measured (admTW)
   dayview.js            day view: list + hour timeline (renderDay), adding tasks to a day, day swiping
   dayview-edit.js       day view editing: time popover, dragging / resizing blocks, conflict drag, thread-heading tooltip
   notes.js              task notes: noteMark (the mark after a title), editNotes (the window, from the task's gear

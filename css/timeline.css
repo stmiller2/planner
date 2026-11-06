@@ -127,7 +127,7 @@ body.adm-rs-y,body.adm-rs-y *{cursor:ns-resize !important;user-select:none}
 .adm-tag.cft[data-side="l"]{transform:translate(-100%,-50%)}
 .adm-tag.cft[data-side="t"]{top:-3px;transform:none;font-size:9.5px}
 .adm-tag.pjt{color:var(--ink);font-weight:700;font-size:11px;opacity:1;max-width:260px;pointer-events:auto}
-.adm-tag.pjt[data-side="t"]{top:-1px;font-size:10px}
+.adm-tag.pjt[data-side="t"]{top:-4px;font-size:10px}   /* (clear of the ribbon; ADM_TTOP in timeline-data.js) */
 /* an unordered project's thread names, on its row of loose dots */
 .adm-tag.ltg{pointer-events:auto;transition:color .12s}
 .adm-tag.ltg.planonly{opacity:.55}

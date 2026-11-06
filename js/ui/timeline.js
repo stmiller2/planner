@@ -33,6 +33,18 @@ function basisPath(pts) {   // smooth B-spline through control points (stays bet
   return out;
 }
 
+// how wide a label is drawn (its text in the label's font, at its boldest, i.e. hovered, plus padding), so packing
+// leaves room for what's really there. kind: 'proj' (a project's name), 'lane' (a thread's), 'conf' (a conflict's)
+const admTW = (() => {
+  const ctx = document.createElement('canvas').getContext('2d'), cache = new Map();
+  const spec = { proj: ['700 11px', 6, 260], lane: ['620 10px', 6, 220], conf: ['700 10px', 0, 220] };
+  return (text, kind) => {
+    const k = kind + '|' + text; if (cache.has(k)) return cache.get(k);
+    const [font, padX, max] = spec[kind];
+    ctx.font = `${font} ${getComputedStyle(document.body).fontFamily}`;
+    const w = Math.min(max, Math.ceil(ctx.measureText(text).width) + padX + 1); cache.set(k, w); return w;
+  };
+})();
 let admD = null;
 function renderAdmire() {
   const el = $('#admire'); if (!admOpen || !el) return;
@@ -131,7 +143,7 @@ function renderAdmire() {
     if (rc.length) {
       const lines = [], free = (occ, [a0, a1]) => occ.every(([b0, b1]) => a1 <= b0 || a0 >= b1);
       const its = rc.map(c => {
-        const st = c.start >= r0, en = c.end <= rEnd, x0 = st ? xc(ix(c.start)) - pad : 0, x1 = en ? xc(ix(c.end)) + pad : tw, w = Math.min(220, c.title.length * 6 + 10);
+        const st = c.start >= r0, en = c.end <= rEnd, x0 = st ? xc(ix(c.start)) - pad : 0, x1 = en ? xc(ix(c.end)) + pad : tw, w = admTW(c.title, 'conf');
         const opts = [];
         if (en && tw - (x1 + 8) >= w) opts.push(['r', x1 - x0 + 8, [x0 - 6, x1 + 14 + w]]);
         if (st && x0 - 8 >= w) opts.push(['l', -8, [x0 - 14 - w, x1 + 6]]);
@@ -219,7 +231,7 @@ function renderAdmire() {
         if (!line && !days.length) return;   // (what it hosts lies before and after this row)
         const cs = line ? L.s : days[0], ce = line ? L.e : days[0];
         const dotP = days.filter(d => d < cs || d > ce).map(d => [xc(ix(d)) - half(d) - 3, xc(ix(d)) + half(d) + 3]);
-        const ext = clipX(cs, ce), estW = Math.min(220, L.name.length * 5.4 + 10);
+        const ext = clipX(cs, ce), estW = admTW(L.name, 'lane');
         const rEdge = ext[3] ? tw : Math.max(ext[1], xc(ix(ce)) + half(ce)), lEdge = ext[2] ? 0 : Math.min(ext[0], xc(ix(cs)) - half(cs));
         const xr = rEdge + 7, xl = lEdge - 7, room = ext[2] ? lEdge : lEdge - 14;   // 14: the bend of its connector
         // name options, best first: [side, x, the stretch of the row this lane then takes up]
@@ -319,18 +331,23 @@ function renderAdmire() {
       // the project's name beside its ribbon (with none in this row: its first dot there): after it if there's room,
       // else before, else just above; never on one of the row's other dots. Those only take up their own spot.
       const hdays = [...hd.keys()].sort(), rb = clipX(p.s, p.e), hs = rb ? p.s : hdays[0], he = rb ? p.e : hdays[0];
-      const pe = (hs && clipX(hs, he)) || clipX(p.as, p.ae), pw = Math.min(260, p.name.length * 6.4 + 10);
+      const pe = (hs && clipX(hs, he)) || clipX(p.as, p.ae), pw = admTW(p.name, 'proj');
       const hdot = d => [xc(ix(d)) - dotSize(hd.get(d)) / 2 - 3, xc(ix(d)) + dotSize(hd.get(d)) / 2 + 3];
       const hdotP = hdays.filter(d => !hs || d < hs || d > he).map(hdot);
       const pr_ = (pe[3] ? tw : pe[1]) + 8, pl_ = (pe[2] ? 0 : pe[0]) - 8;
       const popts = (rb ? [] : [['l', pl_ + 4, [pl_ + 4 - pw, pe[1]], !pe[2] && pl_ + 4 >= pw]]).concat([
         ['r', pr_, [pe[0], pr_ + pw], !pe[3] && tw - pr_ >= pw], ['l', pl_, [pl_ - pw, pe[1]], !pe[2] && pl_ >= pw]]);
-      const [ps_, px_, pocc] = popts.find(o => o[3] && hdotP.every(([a, b]) => o[2][1] <= a || o[2][0] >= b))
-        || ['t', pe[0] + 4, [pe[0], Math.max(pe[1], pe[0] + 4 + pw)]];
-      let ptag = `<span class="adm-tag pjt" data-side="${ps_}" style="left:${px_.toFixed(1)}px;--d:${dl(pe[0] / DW, .5, .5)}s">${esc(p.name)}</span>`;
+      // every place its name can go, best first; just above its ribbon's start always can (that one reaches ADM_TTOP
+      // above the block: see .pjt[data-side="t"]). Packing below takes the first that lets the block sit as high as any.
+      const tagAt = ([s_, x_]) => `<span class="adm-tag pjt" data-side="${s_}" style="left:${x_.toFixed(1)}px;--d:${dl(pe[0] / DW, .5, .5)}s">${esc(p.name)}</span>`;
+      const pvars = popts.filter(o => o[3] && hdotP.every(([a, b]) => o[2][1] <= a || o[2][0] >= b))
+        .concat([['t', pe[0] + 4, [pe[0], Math.max(pe[1], pe[0] + 4 + pw)]]]);
+      const pieceOf = o => [...o[2], o[0] === 't' ? -ADM_TTOP : 0, ADM_PROJ];
+      const pocc = pvars[0][2];
+      let ptag = tagAt(pvars[0]);
       // what this block takes up, for packing below: [x0, x1, y0, y1] pieces for its name + ribbon row, each lane's
       // stretch (with its name) in its row, and each pipe down from a parent
-      const pieces = [[...pocc, 0, ADM_PROJ], ...hdotP.map(([a, b]) => [a, b, 0, ADM_PROJ])];
+      const pieces = [pieceOf(pvars[0]), ...hdotP.map(([a, b]) => [a, b, 0, ADM_PROJ])];
       if (!p.s && !folded) {
         // an unordered project (no ribbon, just a row of loose dots): its threads are named instead of the project
         // (the list beside says whose they are), each once per row, beside its first dot there: after it, else
@@ -341,7 +358,7 @@ function renderAdmire() {
         hosted(null).map(L => ({ L, ds: [...L.own.keys()].filter(d => d >= r0 && d <= rEnd).sort() })).filter(x => x.ds.length)
           .sort((a, b) => a.ds[0] < b.ds[0] ? -1 : a.ds[0] > b.ds[0] ? 1 : 0)
           .forEach(({ L, ds }) => {
-            const w = Math.min(220, L.name.length * 5.4 + 10), f = hdot(ds[0]), l = hdot(ds[ds.length - 1]);
+            const w = admTW(L.name, 'lane'), f = hdot(ds[0]), l = hdot(ds[ds.length - 1]);
             let o = [['r', f[1], [f[1], f[1] + w]], ['l', f[0], [f[0] - w, f[0]]], ['r', l[1], [l[1], l[1] + w]]]
               .find(o => o[2][0] >= 0 && o[2][1] <= tw && clr(o[2], allDots) && clr(o[2], occ));
             if (o) occ.push(o[2]);
@@ -352,27 +369,36 @@ function renderAdmire() {
             ptag += `<span class="adm-tag ltg ${L.n ? '' : 'planonly'}" data-lk="${esc(L.key)}" data-pk="${esc(p.key)}" data-side="${o[0]}" style="left:${o[1].toFixed(1)}px;--c:${L.color};--d:${dl(f[0] / DW, .5, .5)}s">${esc(L.name)}</span>`;
           });
         [...occ, ...topOcc, ...allDots].forEach(([a, b]) => pieces.push([a, b, 0, ADM_PROJ]));
+        pvars.length = 1;   // (its thread names are placed already: one way to place it)
       }
       rows.forEach((rw, k) => rw.occ.forEach(([a, b]) => pieces.push([a, b, ADM_PROJ + k * ADM_LANE, ADM_PROJ + (k + 1) * ADM_LANE])));
       joins.forEach(j => pieces.push([j.xv - 3, j.xv + 3, j.y0, j.y1]));
-      blks.push({ h, pieces, html: y => `<div class="adm-blk" style="top:${y}px;height:${h}px">
+      // one way to place the block per place for its name (pieces[0] is the name + ribbon stretch)
+      const vars = pvars.map((o, k) => k ? { pieces: [pieceOf(o), ...pieces.slice(1)], tag: tagAt(o) } : { pieces, tag: ptag });
+      blks.push({ h, vars, html: (y, tg) => `<div class="adm-blk" style="top:${y}px;height:${h}px">
         <svg class="adm-links" width="${tw}" height="${h}" style="--tw:${tw}px">${links}</svg>
         <div class="adm-g adm-lane pj ${p.n ? '' : 'planonly'} ${rb ? '' : 'norib'}" data-lk="${esc(p.key)}" data-pk="${esc(p.key)}" style="--c:${p.color}"><div></div>
-          <div class="adm-trk" style="--tw:${tw}px">${rib}${pdots}${ptag}</div></div>
+          <div class="adm-trk" style="--tw:${tw}px">${rib}${pdots}${tg}</div></div>
         ${lanesH}</div>` });
     });
     // projects share the row's height: each goes in at the highest spot where none of its pieces touch those of a
     // project placed before it (in the order above: ribbons by start date, then projects without one). So projects
     // that don't overlap in time sit side by side, and a later one can tuck in beside an earlier one's lower lanes.
+    // A project's name can go in several places (after its ribbon, before it, just above it): it takes the first of
+    // those that gets the block as high as any of them.
     const BX = 20, BY = 6, placed = [];
     blks.forEach(b => {
-      const hits = y => placed.some(q => q.pieces.some(([qa, qb, qc, qd]) => b.pieces.some(([a, c, t, u]) =>
-        a < qb + BX && qa < c + BX && y + t < q.y + qd + BY && q.y + qc < y + u + BY)));
-      const ys = [0]; placed.forEach(q => q.pieces.forEach(qp => b.pieces.forEach(bp => { const y = q.y + qp[3] + BY - bp[2]; if (y > 0) ys.push(y); })));
-      b.y = ys.sort((a, c) => a - c).find(y => !hits(y));
-      placed.push(b);
+      const spot = v => {
+        const hits = y => placed.some(q => q.pieces.some(([qa, qb, qc, qd]) => v.pieces.some(([a, c, t, u]) =>
+          a < qb + BX && qa < c + BX && y + t < q.y + qd + BY && q.y + qc < y + u + BY)));
+        const ys = [0]; placed.forEach(q => q.pieces.forEach(qp => v.pieces.forEach(bp => { const y = q.y + qp[3] + BY - bp[2]; if (y > 0) ys.push(y); })));
+        return ys.sort((a, c) => a - c).find(y => !hits(y));
+      };
+      let best = null;
+      b.vars.forEach(v => { const y = spot(v); if (!best || y < best.y) best = { y, v }; });
+      placed.push({ y: best.y, h: b.h, pieces: best.v.pieces, html: () => b.html(best.y, best.v.tag) });
     });
-    const blocks = `<div class="adm-blks" style="height:${Math.max(0, ...placed.map(q => q.y + q.h))}px">${placed.map(b => b.html(b.y)).join('')}</div>`;
+    const blocks = `<div class="adm-blks" style="height:${Math.max(0, ...placed.map(q => q.y + q.h))}px">${placed.map(q => q.html()).join('')}</div>`;
     rowsHTML.push(`<section class="adm-row" style="--tw:${tw}px;--ct:34px">
       <div class="adm-cols">${cols}</div>
       <div class="adm-g adm-axis"><div></div><div class="adm-trk" style="--tw:${tw}px">${axis}</div></div>

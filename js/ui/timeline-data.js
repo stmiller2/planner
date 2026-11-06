@@ -12,6 +12,7 @@
    fit the window. Read-only: nothing here changes the plan. */
 const ADM_PROJ = 32, ADM_LANE = 24, ADM_PULSE = 66, ADM_TIP_DELAY = 1000;
 // bar thickness (px) for the project ribbon, a thread, a sub-thread; and bar opacity at its left / right end
+const ADM_TTOP = 4;   // a project's name just above its ribbon reaches this far above its block (css: .pjt[data-side="t"])
 const ADM_BAR = { rib: 12, top: 6, sub: 4 }, ADM_A0 = .38, ADM_A1 = .68, ADM_PLAN = .4;
 const isoDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '') ? s : null;
 // lanes form trees (a sub-thread's lane has parentKey = its parent's): walk up from L (itself first unless self = false)
