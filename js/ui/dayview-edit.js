@@ -41,10 +41,11 @@ $('#dayview').addEventListener('focusout', e => {
 });
 
 // the full project › thread › sub path for a thread heading in the list, only after hovering a moment (so it doesn't
-// cover what's below while you work). (Short timeline blocks get the hover note instead, with its own rules: notes.js)
+// cover what's below while you work; once one has shown, the next opens at once: hoverDelay, dom.js). (Short timeline
+// blocks get the hover note instead, with its own rules: notes.js)
 const dvtip = $('#dvtip');
 let tipTimer = null, tipFor = null;
-function hideTip() { clearTimeout(tipTimer); tipTimer = null; tipFor = null; dvtip.style.display = 'none'; }
+function hideTip() { clearTimeout(tipTimer); tipTimer = null; tipFor = null; if (dvtip.style.display === 'block') hoverGone('th'); dvtip.style.display = 'none'; }
 $('#dayview').addEventListener('mouseover', e => {
   const b = e.target.closest('.dv-th');
   if (!b || dv) return hideTip();
@@ -55,11 +56,11 @@ $('#dayview').addEventListener('mouseover', e => {
     const x = findThread(b.closest('.dv-grp').dataset.tid); if (!x) return;
     dvtip.style.setProperty('--c', colorOf(x.t));
     dvtip.innerHTML = `<div>${esc([x.p.name, ...x.path].join(' › '))}</div>`;
-    const r = b.getBoundingClientRect(); dvtip.style.display = 'block';
+    const r = b.getBoundingClientRect(); dvtip.style.display = 'block'; hoverShown('th');
     const w = dvtip.offsetWidth, h = dvtip.offsetHeight;
     dvtip.style.left = Math.min(innerWidth - w - 8, r.left + 10) + 'px';
     dvtip.style.top = (r.bottom + h + 6 < innerHeight ? r.bottom + 4 : r.top - h - 4) + 'px';
-  }, 1250);
+  }, hoverDelay('th', 1250));
 });
 $('#dayview').addEventListener('mouseleave', hideTip);
 

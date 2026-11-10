@@ -46,7 +46,7 @@ css/  (one file per area, loaded in this order; later files can override earlier
   calendar.css          calendar grid, days, chips, same-day groups, highlight
   dayview.css           day view: list, timeline, blocks, conflict strip, tooltip, time popover
   scratch.css           the scratch board (right of the calendar / day view), its collapsed tab and resize edge
-  dialogs.css           warning bar, toast, modal windows, Settings, Archive window; task notes (mark, window, hover note)
+  dialogs.css           warning bar, toast, modal windows, Settings, Archive window; task notes (mark, hover note)
   timeline.css          Timeline view ("admire") and its hover list
 
 js/core/  (no DOM: the data and its rules; loaded by the unit tests too)
@@ -55,13 +55,17 @@ js/core/  (no DOM: the data and its rules; loaded by the unit tests too)
   prefs.js              `ui`: this browser's preferences (UI_PREFS table) + shared new-task-box state
   model.js              `state`, migrate (loading old files), the index (findTask / findThread / dayTasks),
                         chains and links, sub-thread layout, order + conflict warnings, mutate / undo / redo
-  ops.js                every edit: move / link / add / delete / reorder tasks, threads and projects,
+  ops.js                every edit: move / link / add / delete / reorder tasks, threads and projects (sidebar task drops
+                        can land inside a linked chain: moveTasksTo(…, inChain) / dropSingle: reorder a same-day group,
+                        join one, or split a next-day link),
                         archive / restore, conflict dates; several tasks at once (a selection): dateTasks, linkTasks,
                         unlinkTasks, setTasksDone, archiveTasks, delTasks, moveManyTo (inOrder / taskRank: sidebar order)
 
 js/ui/  (views; each draws its part of the page and handles its own events)
   dom.js                shared building blocks: $ / $$, icons, menu, inline text + date boxes, rename,
                         warning bar, toast, modals, guide lines (any scroll hides the "+" insert line), tween(), wheelSteps() scroll gestures
+                        hover-tip warm-up (hoverDelay / hoverShown / hoverGone: once a kind of delayed hover tip has
+                        shown, the next of that kind opens at once for HOVER_WARM ms; a press, key or drag ends it)
   dragdrop.js           HTML5 drag state (`drag`; drag.ids = a selection dragged together, with its stacked drag image)
                         shared by sidebar and calendar; Option-drop
   archive.js            the Archive window
@@ -80,15 +84,17 @@ js/ui/  (views; each draws its part of the page and handles its own events)
                         threads are `loose` lanes: no row of their own, their dots ride on L.host's row (nearest
                         ordered thread above; null = the project's ribbon row) without stretching its line (vs..ve =
                         what a row shows). No ordered work = no ribbon (p.s null; p.as..p.ae = all it shows)
-  timeline.js           Timeline drawing (renderAdmire), hover lists, folding, resizing; each week-row packs its
+  timeline.js           Timeline drawing (renderAdmire), hover lists (admTipHTML / admTipList; also the undated
+                        finished tasks under the timeline, D.undatedG), folding, resizing; each week-row packs its
                         project blocks (pieces: name + ribbon row, lane stretches, pipes, and a dot-sized spot for
                         each unordered dot off its host's line) into the highest free spot; a project's name goes
                         after / before its ribbon, or above it when that packs higher. Label widths are measured (admTW)
   dayview.js            day view: list + hour timeline (renderDay), adding tasks to a day, day swiping
   dayview-edit.js       day view editing: time popover, dragging / resizing blocks, conflict drag, thread-heading tooltip
-  notes.js              task notes: noteMark (the mark after a title), editNotes (the window, from the task's gear
-                        menu), and the note shown after resting on a task for 1 s (sidebar, calendar, day view); it stays
-                        while the pointer is on the task or the note, and double-clicking its text edits it in place.
+  notes.js              task notes: noteMark (the mark after a title), and the note shown after resting on a task
+                        for 1 s (sidebar, calendar, day view); it stays while the pointer is on the task or the note,
+                        and is where notes are written (editInTip): double-click its text, or editNotes (the task
+                        menu's "Add notes" / "Edit notes") opens it beside the task already editing; ↩ saves.
                         Short day-view blocks get the same note (notes or not: ntWants), with a checkbox
   scratch.js            the scratch board, #app's third column beside the calendar and day view: scratch tasks
                         (add / insert / tick / rename / reorder / clear done), resizing, opening / closing it (X;

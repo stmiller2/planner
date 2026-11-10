@@ -106,9 +106,25 @@ function movingIds(id, single) {
 }
 /* A drop spot: { tid, refId, side } = in thread tid, before/after the task or sub-thread refId (no refId = at the end);
    or { pid, refId, side } = among a project's top-level threads. */
-function isNoopTasks(id, single, spot) {
+// the tasks on either side of a drop spot in its thread (null: none, or a sub-thread there)
+function spotNeighbours(t, spot) {
+  const L = layout(t), at = layoutIndex(L, spot.refId, spot.side), tk = x => x && x.kind === 'task' ? x.obj : null;
+  return { prev: tk(L[at - 1]), next: tk(L[at]) };
+}
+/* inChain drops (the sidebar): does dropping task `id` at `spot` move just that task rather than its whole chain?
+   Yes with Option, for a task with no links, and for a spot inside its own chain or at an edge of its own same-day
+   group (moving it around within that group). Otherwise the whole chain moves. */
+function dropSingle(id, split, spot) {
+  if (split) return true;
+  const f = findTask(id); if (!f) return true;
+  const [cs, ce] = runOf(f.t, f.i); if (cs === ce) return true;
+  if (spot.tid !== f.t.id) return false;
+  const ts = f.t.tasks, { prev, next } = spotNeighbours(f.t, spot), pi = ts.indexOf(prev), ni = ts.indexOf(next), [gs, ge] = dayRunOf(f.t, f.i);
+  return (pi >= cs && ni >= 0 && ni <= ce) || (pi >= 0 && pi === ge) || (ni >= 0 && ni === gs);
+}
+function isNoopTasks(id, single, spot, inChain = false) {
   const f = findTask(id); if (!f || f.t.id !== spot.tid) return false;
-  const ids = movingIds(id, single), L = layout(f.t);
+  const ids = movingIds(id, inChain ? dropSingle(id, single, spot) : single), L = layout(f.t);
   const ms = L.findIndex(x => x.obj.id === ids[0]), me = L.findIndex(x => x.obj.id === ids[ids.length - 1]);
   const at = layoutIndex(L, spot.refId, spot.side);
   return at >= ms && at <= me + 1;
@@ -125,12 +141,20 @@ function isNoopThread(id, spot) {
   const L = layout(f.parent), m = L.findIndex(x => x.obj === f.t), at = layoutIndex(L, spot.refId, spot.side);
   return at === m || at === m + 1;
 }
-// move task `id` (with its linked chain unless `single`) to a drop spot
-function moveTasksTo(id, single, spot) {
+/* move task `id` (with its linked chain unless `single`) to a drop spot.
+   inChain (the sidebar): the spot may be inside a linked chain (see dropSingle for what moves). Dropped into a same-day
+   group, the task joins it (same day). Dropped between two next-day-linked tasks, it unlinks them (it sits between
+   them on its own). Moved within its own same-day group, the group keeps its links and its place in the chain. */
+function moveTasksTo(id, single, spot, inChain = false) {
   const f = findTask(id), g = findThread(spot.tid); if (!f || !g) return;
+  const split = single;
+  if (inChain) single = dropSingle(id, split, spot);
   if (spot.refId && movingIds(id, single).includes(spot.refId)) return;
   if (isNoopTasks(id, single, spot)) return;
   ui.collapsed[spot.tid] = false; saveUI();
+  // the rest of the task's own same-day group (it may be moving around inside it)
+  const grp = new Set();
+  if (inChain && single && !split) { const [gs, ge] = dayRunOf(f.t, f.i); f.t.tasks.slice(gs, ge + 1).forEach(k => { if (k !== f.task) grp.add(k); }); }
   mutate(() => {
     let moved;
     if (single) { detachTask(f); moved = [f.task]; }
@@ -139,9 +163,16 @@ function moveTasksTo(id, single, spot) {
       writeLayout(f.t, layout(f.t).filter(x => !moved.includes(x.obj)));
     }
     moved[0].linkToPrev = null;
+    const { prev, next } = inChain ? spotNeighbours(g.t, spot) : {};
     const L = layout(g.t);
     L.splice(layoutIndex(L, spot.refId, spot.side), 0, ...moved.map(o => ({ kind: 'task', obj: o })));
     writeLayout(g.t, L);
+    if (!inChain || !next && !grp.has(prev)) return;
+    const gap = prev && next ? next.linkToPrev : null;
+    if (grp.has(next)) { moved[0].linkToPrev = gap; next.linkToPrev = 'sameDay'; }        // first in its own group
+    else if (grp.has(prev)) moved[0].linkToPrev = 'sameDay';                             // last in its own group
+    else if (gap === 'sameDay') moved[0].linkToPrev = 'sameDay';                         // joins that same-day group
+    else if (gap === 'nextDay') next.linkToPrev = null;                                  // splits that next-day link
   });
 }
 // move a thread to a drop spot (inside a thread, or top level of a project)

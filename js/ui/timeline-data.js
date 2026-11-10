@@ -27,11 +27,11 @@ function pieOf(parts, d, tot) {
 
 function admireData(range, withPlan) {
   const projs = new Map(), lanes = new Map(), all = [];
-  let undated = 0;
+  const undatedL = [];   // finished tasks with no date: [{ k, L }] (counted and listed under the timeline)
   const proj = (key, name, arch, loose = false) => { if (!projs.has(key)) projs.set(key, { key, name, arch, loose, lanes: [] }); return projs.get(key); };
   const addTask = (L, k, arch) => {
     const d = isoDate(k.date);
-    if (k.done) { if (d) all.push({ d, k, L, plan: false }); else undated++; }
+    if (k.done) { if (d) all.push({ d, k, L, plan: false }); else undatedL.push({ k, L }); }
     else if (d && withPlan && !arch) all.push({ d, k, L, plan: true });
   };
   // a thread and everything under it, as lanes in display order
@@ -66,8 +66,15 @@ function admireData(range, withPlan) {
     }
     addTask(L, e.item, true);
   });
+  // the undated ones grouped by lane, for the hover list on "+N finished tasks without a date" (admTipHTML)
+  const undated = undatedL.length, undatedG = [];
+  undatedL.forEach(({ k, L }) => {
+    let g = undatedG.find(x => x.L === L);
+    if (!g) { const P = projs.get(L.pkey); g = { L, name: L.name, up: [P ? P.name : ''].concat(L.path.slice(0, -1)).filter(Boolean).join(' › '), color: L.color, done: [], plan: [] }; undatedG.push(g); }
+    g.done.push(k);
+  });
   const done = all.filter(x => !x.plan), plan = all.filter(x => x.plan);
-  if (!all.length) return { total: 0, everTotal: 0, undated };
+  if (!all.length) return { total: 0, everTotal: 0, undated, undatedG };
   // date range: whole weeks; planned tasks stretch it to the last one on the calendar
   const today = todayISO(), minOf = xs => xs.reduce((m, x) => x.d < m ? x.d : m, xs[0].d), maxOf = xs => xs.reduce((m, x) => x.d > m ? x.d : m, xs[0].d);
   const first = range === 'all' ? minOf(done.length ? done : plan) : addDays(today, -7 * (range - 1));
@@ -136,7 +143,7 @@ function admireData(range, withPlan) {
   const laneList = projList.flatMap(p => p.lanes);
   const maxCell = laneList.reduce((m, L) => { L.own.forEach(o => m = Math.max(m, o.done.length)); return m; }, 0);
   const total = inR.filter(x => !x.plan).length;
-  return { total, planned: inR.length - total, everTotal: all.length, undated, R0, R1, days, projs: projList, lanes, maxCell,
+  return { total, planned: inR.length - total, everTotal: all.length, undated, undatedG, R0, R1, days, projs: projList, lanes, maxCell,
     nThreads: laneList.filter(L => L.n).length, nProjs: projList.filter(p => p.n).length, first: (() => { const f = done.filter(x => x.d >= R0 && x.d <= R1); return f.length ? minOf(f) : null; })() };
 }
 // the same, computed once per change to the plan (redraws for resizing, folding or hovering reuse it)

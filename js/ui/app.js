@@ -86,7 +86,7 @@ document.addEventListener('click', e => {
     case 'setlink': closeMenu(); setLink(id, a.dataset.v); break;
     case 'unsched': moveTask(id, null); break;
     case 'kmenu': openTaskMenu(id, a); break;
-    case 'k-notes': closeMenu(); editNotes(id); break;
+    case 'k-notes': closeMenu(); editNotes(id, menuTask); break;
     case 'del-k': closeMenu(); delTask(id); quickAct('del'); break;
     case 'arch-k': closeMenu(); archiveTask(id); quickAct('arch'); break;
     case 'date': { const f = findTask(id); if (f) editDateIn(a, { value: f.task.date, allowEmpty: true, emptyText: 'no date (unscheduled)', commit: v => moveTask(id, v), clear: f.task.date ? () => moveTask(id, null) : null }); break; }
@@ -115,7 +115,7 @@ document.addEventListener('contextmenu', e => {
   closeMenu();
   const el = e.target.closest && e.target.closest(TASK_EL); if (!el || e.target.closest('.inl')) return;
   e.preventDefault(); closeTimePop(true); hideTip(); hideNotesTip();
-  openTaskMenu(el.dataset.id, null, { x: e.clientX, y: e.clientY });
+  openTaskMenu(el.dataset.id, null, { x: e.clientX, y: e.clientY }, el);
   ctxEat = true;
 });
 document.addEventListener('pointerdown', () => { ctxEat = false; }, true);

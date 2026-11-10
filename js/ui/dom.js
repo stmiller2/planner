@@ -94,6 +94,20 @@ function closeMenu() { menu.style.display = 'none'; }
 document.addEventListener('scroll', e => { if (menu.style.display === 'block' && !menu.contains(e.target)) closeMenu(); }, true);
 document.addEventListener('wheel', e => { if (menu.style.display === 'block' && !menu.contains(e.target)) closeMenu(); }, { capture: true, passive: true });
 
+/* ---------- hover tips: warm after the first ---------- */
+// The tips that open after resting the pointer a moment (a task's notes, a short day-view block's note, a timeline
+// dot's list, a day-view thread heading's path): once one kind has shown, that kind opens at once on the next thing
+// hovered, while it is showing and for HOVER_WARM ms after it goes, so a row of them can be read without waiting on
+// each. Pressing (outside the tips), typing or dragging ends that. kind: 'notes' / 'blk' / 'adm' / 'th'.
+const HOVER_WARM = 2000, hoverWarm = {};   // kind → true (showing) or when it went
+const hoverDelay = (kind, ms) => hoverWarm[kind] === true || Date.now() - (hoverWarm[kind] || -Infinity) < HOVER_WARM ? 0 : ms;
+const hoverShown = kind => { hoverWarm[kind] = true; };
+const hoverGone = kind => { if (hoverWarm[kind] === true) hoverWarm[kind] = Date.now(); };
+const hoverCool = () => { for (const k in hoverWarm) delete hoverWarm[k]; };
+document.addEventListener('pointerdown', e => { if (!e.target.closest || !e.target.closest('#ntip, #admtip, #dvtip')) hoverCool(); }, true);
+document.addEventListener('keydown', e => { if (!['Meta', 'Control', 'Shift', 'Alt'].includes(e.key)) hoverCool(); }, true);
+document.addEventListener('dragstart', hoverCool, true);
+
 /* ---------- inline rename ---------- */
 // rename in place: in the sidebar (default), or on a calendar chip / day-view block or list item (el given)
 let revealTimer = null;

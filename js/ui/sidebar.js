@@ -149,9 +149,12 @@ function openLinkMenu(id, btn) {
   placeMenu(btn);
 }
 // a task's settings menu: notes, archive, delete. From its gear button in the sidebar (btn), or right-clicking the
-// task anywhere (sidebar row, calendar chip, day-view item or block: at = the pointer; see app.js)
-function openTaskMenu(id, btn, at) {
+// task anywhere (sidebar row, calendar chip, day-view item or block: at = the pointer, el = the task; see app.js).
+// menuTask: the task's element it was opened on (its notes open beside it: editNotes)
+let menuTask = null;
+function openTaskMenu(id, btn, at, el) {
   const f = findTask(id); if (!f) return;
+  menuTask = el || (btn && btn.closest(TASK_EL)) || null;
   menu.innerHTML = menuBtn('k-notes', id, ICON.notes, f.task.notes ? 'Edit notes' : 'Add notes')
     + '<hr>' + menuBtn('arch-k', id, ICON.archive, 'Archive') + menuBtn('del-k', id, ICON.trash, 'Delete');
   placeMenu(btn, at);
@@ -240,9 +243,12 @@ function treeTarget(e) {
     const g = findTask(row.dataset.id); if (!g) return null;
     if (!isTask && inSubtree(f.t, g.t.id)) return null;
     const r = row.getBoundingClientRect(), before = e.clientY < r.top + r.height / 2;
-    const [s, en] = runOf(g.t, g.i);                     // snap to the edges of a linked chain
-    const anchor = g.t.tasks[before ? s : en];
-    if (isTask && dragMoving(e).includes(anchor.id)) return null;
+    // one task on its own (see dropSingle) can go between any two tasks, inside a linked chain too; a whole chain
+    // snaps to the edges of a chain
+    const one = isTask && !drag.ids && dropSingle(drag.id, splitHeld(e), { tid: g.t.id, refId: g.task.id, side: before ? 'before' : 'after' });
+    const [s, en] = runOf(g.t, g.i);
+    const anchor = one ? g.task : g.t.tasks[before ? s : en];
+    if (isTask && (one ? anchor.id === drag.id : dragMoving(e).includes(anchor.id))) return null;
     const ar = taskEl(anchor.id).getBoundingClientRect();
     tg = { spot: { tid: g.t.id, refId: anchor.id, side: before ? 'before' : 'after' }, line: [before ? ar.top : ar.bottom, ar.left] };
   } else if (tr) {                                       // thread header: top edge = before it; otherwise into it
@@ -261,7 +267,7 @@ function treeTarget(e) {
     tg = { spot: { pid: pr.dataset.pdrop }, el: pr };
   }
   if (!tg) return null;
-  if (isTask ? !drag.ids && isNoopTasks(drag.id, splitHeld(e), tg.spot) : isNoopThread(drag.id, tg.spot)) return null;   // no guide for "where it already is"
+  if (isTask ? !drag.ids && isNoopTasks(drag.id, splitHeld(e), tg.spot, true) : isNoopThread(drag.id, tg.spot)) return null;   // no guide for "where it already is"
   if (tg.line && tg.spot.tid) {                          // same canonical line as click-to-insert for the same position
     const L = layout(findThread(tg.spot.tid).t);
     tg.line = spotLine(tg.spot.tid, layoutIndex(L, tg.spot.refId, tg.spot.side)) || tg.line;
@@ -343,7 +349,7 @@ tree.addEventListener('drop', e => {
   e.preventDefault(); tree.classList.remove('drop'); clearTdrop();
   const id = drag.id, many = drag.ids; drag = null;
   if (tg.type === 'unsched') many ? selDate(many, null) : moveTask(id, null);
-  else if (tg.type === 'tasks') many ? moveManyTo(many, splitHeld(e), tg.spot) : moveTasksTo(id, splitHeld(e), tg.spot);
+  else if (tg.type === 'tasks') many ? moveManyTo(many, splitHeld(e), tg.spot) : moveTasksTo(id, splitHeld(e), tg.spot, true);
   else moveThreadTo(id, tg.spot);
 });
 

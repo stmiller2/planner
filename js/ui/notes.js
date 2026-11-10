@@ -1,28 +1,19 @@
 'use strict';
-/* Task notes: free text kept on a task (task.notes). Written in a small window opened from the task's gear menu in
-   the sidebar ("Add notes" / "Edit notes"); a task with notes gets a small mark after its title, and resting the
-   pointer on it for a second (sidebar row, calendar chip, day-view list item or block) shows them in a hover note
-   that can also be edited in place (double-click its text). */
+/* Task notes: free text kept on a task (task.notes). A task with notes gets a small mark after its title, and resting
+   the pointer on it for a second (sidebar row, calendar chip, day-view list item or block) shows them in a hover note,
+   which is also where they are written: double-click its text, or choose "Add notes" / "Edit notes" from the task's
+   menu (its gear, or right-clicking it), which opens the note beside the task already in edit mode. */
 const noteMark = k => k.notes ? `<span class="nti">${ICON.notes}</span>` : '';
 
 /* ---------- writing them ---------- */
-// ⌘↩ / Ctrl+↩ or Save keeps them, Esc or Cancel doesn't; clicking outside the window keeps them too (so a stray
-// click never loses what was typed). Saved empty = no notes.
-function editNotes(id) {
+// from the task's menu: el = the task it was opened on (if it was redrawn since, the task's first element showing)
+function editNotes(id, el) {
   const f = findTask(id); if (!f) return;
+  if (!el || !el.isConnected || el.dataset.id !== id) el = [...document.querySelectorAll(NT_SEL)].find(x => x.dataset.id === id && x.getClientRects().length);
   hideNotesTip();
-  showModal(`<h3 class="nt-h">Notes<span>${esc(f.task.title)}</span></h3>
-    <textarea class="nt-ta" id="ntText" spellcheck="true" placeholder="Anything to remember for this task">${esc(f.task.notes || '')}</textarea>
-    <div class="row nt-row"><button class="btn primary" id="ntSave">Save</button><button class="btn" id="ntCancel">Cancel</button>
-      ${f.task.notes ? '<button class="btn" id="ntClear">Remove notes</button>' : ''}<span class="sub">⌘↩ to save · Esc to cancel</span></div>`);
-  const m = $('#modal'), ta = $('#ntText');
-  const save = v => { hideModal(); setTaskNotes(id, v); };
-  $('#ntSave').onclick = () => save(ta.value);
-  $('#ntCancel').onclick = hideModal;
-  if ($('#ntClear')) $('#ntClear').onclick = () => save('');
-  m.onclick = e => { if (e.target === m) save(ta.value); };
-  ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(ta.value); } });
-  ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  if (!el) return;
+  openNotesTip(el, f);
+  editInTip();
 }
 
 /* ---------- showing them ---------- */
@@ -46,24 +37,27 @@ function linkifyNotes(text) {
 }
 // After resting on a task for NT_DELAY ms (a task with notes, or a short day-view block: see ntWants). The note stays while the pointer is on the task or on the note itself
 // (crossing the gap between them, or a quick slip off, is forgiven for NT_GRACE ms), so a long note can be scrolled.
-// Web addresses in it are links. Double-clicking its text (not a link) edits it in place: ⌘↩ / Ctrl+↩ saves and keeps the note open, Esc goes back without
-// saving, and pressing anywhere else saves and closes it (Enter is a new line). Gone on leaving both the task and the
-// note, pressing elsewhere, scrolling elsewhere, typing or dragging.
+// Web addresses in it are links; double-clicking its text (not a link) edits it in place (editInTip). Once one has
+// shown, the next opens at once (hoverDelay, dom.js; a short block's note counts as its own kind). Gone on leaving
+// both the task and the note, pressing elsewhere, scrolling elsewhere, typing or dragging.
 const NT_DELAY = 1000, NT_GRACE = 300, NT_SEL = '#tree .task[data-id], #grid .chip[data-id], #dayview .dv-item[data-id], #dayview .dv-blk[data-id]';
 const ntip = document.createElement('div'); ntip.id = 'ntip'; document.body.appendChild(ntip);
 // ntFor: the task under the pointer; ntOn / ntId: the task (element, id) whose note is showing; ntGone: the grace timer;
 // ntEdit: the in-place editor while open ({ ta, save })
 let ntFor = null, ntTimer = null, ntOn = null, ntId = null, ntGone = null, ntEdit = null, ntShownText = null;   // ntShownText: the text shown
+let ntKind = null;   // 'notes' / 'blk' (a short day-view block) while shown from hovering (see hoverDelay)
+const ntKindOf = el => el.classList.contains('dv-blk') && el.classList.contains('short') ? 'blk' : 'notes';
 function dropNotesTip() {   // the note itself (an in-place edit is saved first); a task waiting to show its note still will
   clearTimeout(ntGone); ntGone = null;
   if (ntEdit) ntEdit.save();
   ntOn = ntId = null; ntip.style.display = 'none'; ntip.style.width = '';
+  if (ntKind) hoverGone(ntKind); ntKind = null;
 }
 function hideNotesTip() { clearTimeout(ntTimer); ntTimer = null; dropNotesTip(); }
 const ntStay = () => { clearTimeout(ntGone); ntGone = null; };
 document.addEventListener('mouseover', e => {
   if (ntip.contains(e.target)) return ntStay();
-  if (ntEdit) return;                                   // while editing, only a press elsewhere (or ⌘↩ / Esc) ends it
+  if (ntEdit) return;                                   // while editing, only a press elsewhere (or ↩ / Esc) ends it
   const el = e.target.closest ? e.target.closest(NT_SEL) : null;
   if (ntOn && el && !ntOn.isConnected && el.dataset.id === ntId) {   // its task was redrawn (e.g. after saving): the same task
     const now = (findTask(ntId) || { task: {} }).task.notes;
@@ -74,7 +68,7 @@ document.addEventListener('mouseover', e => {
   ntFor = el; clearTimeout(ntTimer); ntTimer = null;
   if (!el || el === ntOn || drag || dv || $('#modal').style.display === 'grid') return;
   if (!ntWants(el, findTask(el.dataset.id))) return;
-  ntTimer = setTimeout(() => showNotesTip(el), NT_DELAY);
+  ntTimer = setTimeout(() => showNotesTip(el), hoverDelay(ntKindOf(el), NT_DELAY));
 });
 // a task with notes gets the hover note; so does a short day-view block (its label is cut off), notes or not
 const ntWants = (el, f) => !!f && (!!f.task.notes || (el.classList.contains('dv-blk') && el.classList.contains('short')));
@@ -87,6 +81,10 @@ function placeNotesTip() {
 function showNotesTip(el) {
   const f = findTask(el.dataset.id);
   if (!el.isConnected || !ntWants(el, f) || drag || dv || el.querySelector('.inl') || menu.style.display === 'block') return;
+  openNotesTip(el, f);
+  ntKind = ntKindOf(el); hoverShown(ntKind);
+}
+function openNotesTip(el, f) {   // (also for a task without notes, to write some: editNotes)
   dropNotesTip();
   // a short day-view block shows only part of its label, so the note carries its time and thread too; a calendar
   // chip with notes has no hover title (it would cover this), so its path goes here instead
@@ -100,16 +98,23 @@ function showNotesTip(el) {
   ntOn = el; ntId = f.task.id; ntShownText = f.task.notes; ntRect = el.getBoundingClientRect();
   placeNotesTip();
 }
-// editing in place: double-click the note's text
+// editing in place: double-click the note's text, or the task menu's "Add notes" / "Edit notes" (editNotes). ↩ saves
+// and goes back to showing the note (⇧↩ is a new line), Esc goes back without saving, and pressing anywhere else saves
+// and closes it. Saving it empty removes the notes (and the note closes).
 ntip.addEventListener('dblclick', e => {
-  const b = e.target.closest('.nt-b'); if (!b || ntEdit || !ntId || e.target.closest('a')) return;   // (a link: just opens it)
-  const f = findTask(ntId); if (!f) return;
+  if (!e.target.closest('.nt-b') || ntEdit || !ntId || e.target.closest('a')) return;   // (a link: just opens it)
   e.preventDefault(); getSelection().removeAllRanges();
-  const id = ntId, cur = f.task.notes || '';
+  editInTip();
+});
+function editInTip() {
+  const f = findTask(ntId); if (!f || ntEdit) return;
+  const id = ntId, cur = f.task.notes || '', b = ntip.querySelector('.nt-b');
   ntip.style.width = clamp(Math.max(ntip.offsetWidth, 300), 0, Math.min(340, innerWidth - 16)) + 'px';   // room to type
   const ta = document.createElement('textarea'); ta.className = 'nt-ed'; ta.value = cur; ta.spellcheck = true;
-  const k = document.createElement('div'); k.className = 'nt-k'; k.textContent = '⌘↩ to save · Esc to cancel';
-  b.replaceWith(ta); ta.after(k);
+  ta.placeholder = 'Anything to remember for this task';
+  const k = document.createElement('div'); k.className = 'nt-k'; k.textContent = '↩ to save · Esc to cancel';
+  if (b) b.replaceWith(ta); else ntip.append(ta);   // (no notes yet: below the title)
+  ta.after(k);
   const fit = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
   // done: back to showing the note (keep = stay open); saving an empty note removes it (and the note closes)
   const done = (save, keep) => {
@@ -125,12 +130,12 @@ ntip.addEventListener('dblclick', e => {
   ntEdit = ed;
   ta.addEventListener('input', fit);
   ta.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); done(true, true); }
+    if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); done(true, true); }
     else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); done(false, true); }
   });
   fit(); placeNotesTip();
   ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
-});
+}
 // pressing (to click, drag or rename) anywhere but on the note hides it, and it stays hidden until the pointer moves
 // onto another task; so does typing, except in the note's own box (and ⌘C / Ctrl+C, to copy text selected in it)
 document.addEventListener('pointerdown', e => { if (!ntip.contains(e.target)) hideNotesTip(); }, true);

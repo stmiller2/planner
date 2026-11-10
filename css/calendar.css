@@ -39,12 +39,14 @@ main{position:relative}
 #linkline .ln{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-dasharray:4 5}   /* (round caps: ≈6px dashes, 3px gaps) */
 #linkline .rv{fill:none;stroke:#fff;stroke-width:10}
 #linkline circle{fill:currentColor}
-.chip{transition:box-shadow .2s}
-.chip.linkfrom{box-shadow:0 0 0 2px var(--cs),0 3px 10px rgba(0,0,0,.15)}
+/* every highlight ring (lone chip, same-day group, selected runs) grows in quickly, easing out */
+.chip,.grp,.unrun,.selrun{transition:filter .1s cubic-bezier(.33,1,.68,1)}
+/* a lone chip's highlight ring (hovered, or the far end of a next-day link): drop-shadows like a same-day group's (.grp.hl),
+   not a box-shadow spread, which some browsers draw with a hairline gap between it and the chip at the rounded corners */
+.chip:is(.hl,.linkfrom){filter:drop-shadow(2px 0 0 var(--cs)) drop-shadow(-2px 0 0 var(--cs)) drop-shadow(0 2px 0 var(--cs)) drop-shadow(0 -2px 0 var(--cs)) drop-shadow(0 3px 5px rgba(0,0,0,.18))}
 .chip.done{background:color-mix(in srgb,var(--c) 6%,var(--chip));border-left-color:color-mix(in srgb,var(--c) 40%,var(--chip));color:var(--muted)}
 .chip.done input{opacity:.7}
 .chip.done .tt{text-decoration:line-through}
-.chip.hl{box-shadow:0 0 0 2px var(--cs),0 3px 10px rgba(0,0,0,.15)}
 .task.hl,.drun.hl{background:color-mix(in srgb,var(--cs) 20%,transparent)}
 .add.ins{margin-left:24px;width:calc(100% - 28px);background:var(--hover);border:1px solid var(--accent)}
 .grp{display:flex;flex-direction:column;gap:0;border-radius:5px}   /* same-day group: chips stacked flush into one bubble */
@@ -59,7 +61,7 @@ main{position:relative}
   filter:drop-shadow(1.5px 0 0 var(--accent)) drop-shadow(-1.5px 0 0 var(--accent)) drop-shadow(0 1.5px 0 var(--accent)) drop-shadow(0 -1.5px 0 var(--accent))}
 #grid .selrun>.chip{border-left-color:var(--accent)}
 .unrun{display:flex;flex-direction:column}
-.selrun>.chip.hl{box-shadow:none}
+.selrun>.chip.hl{filter:none}
 .grp.hl>.selrun{filter:drop-shadow(2.5px 0 0 var(--accent)) drop-shadow(-2.5px 0 0 var(--accent)) drop-shadow(0 2.5px 0 var(--accent)) drop-shadow(0 -2.5px 0 var(--accent))}
 .selrun:has(>.chip.hl){filter:drop-shadow(2.5px 0 0 var(--accent)) drop-shadow(-2.5px 0 0 var(--accent)) drop-shadow(0 2.5px 0 var(--accent)) drop-shadow(0 -2.5px 0 var(--accent)) drop-shadow(0 3px 5px rgba(0,0,0,.18))}
 .grp.hl>.unrun{filter:drop-shadow(2px 0 0 var(--cs)) drop-shadow(-2px 0 0 var(--cs)) drop-shadow(0 2px 0 var(--cs)) drop-shadow(0 -2px 0 var(--cs))}

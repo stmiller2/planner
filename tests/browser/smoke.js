@@ -50,6 +50,28 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.strictEqual((await task('a6')).date, '2026-11-10');
     });
     await check('undo', async () => { await page.keyboard.press('Control+z'); assert.strictEqual((await task('a6')).date, '2026-11-02'); });
+    await check('sidebar: dragging inside linked chains (reorder a same-day group, join one, split a next-day link)', async () => {
+      const order = () => page.evaluate(() => findThread('t1').t.tasks.map(k => [k.id, k.linkToPrev]));
+      const dragRow = async (id, onto, half) => {
+        const s = await page.locator(`.task[data-id="${id}"] .title`).boundingBox(), d = await page.locator(`.task[data-id="${onto}"]`).boundingBox();
+        const y = d.y + (half === 'top' ? d.height * .25 : d.height * .75);
+        await page.mouse.move(s.x + 10, s.y + s.height / 2); await page.mouse.down();
+        for (let i = 1; i <= 10; i++) { await page.mouse.move(s.x + 10 + (d.x + 40 - s.x - 10) * i / 10, s.y + s.height / 2 + (y - s.y - s.height / 2) * i / 10); await sleep(20); }
+        await page.mouse.up(); await sleep(300);
+      };
+      const was = await order();   // a3 = a4 +1d a5
+      await dragRow('a4', 'a3', 'top');
+      assert.deepStrictEqual((await order()).slice(2, 5), [['a4', null], ['a3', 'sameDay'], ['a5', 'nextDay']]);
+      await page.keyboard.press('Control+z'); assert.deepStrictEqual(await order(), was);
+      await dragRow('a7', 'a3', 'bottom');   // between a3 and a4 (same day): joins them, on their day
+      assert.deepStrictEqual((await order()).slice(2, 6), [['a3', null], ['a7', 'sameDay'], ['a4', 'sameDay'], ['a5', 'nextDay']]);
+      assert.strictEqual((await task('a7')).date, '2026-10-28');
+      await page.keyboard.press('Control+z'); assert.deepStrictEqual(await order(), was);
+      await dragRow('a7', 'a5', 'top');      // between a4 and a5 (next day): unlinks them
+      assert.deepStrictEqual((await order()).slice(2, 6), [['a3', null], ['a4', 'sameDay'], ['a7', null], ['a5', null]]);
+      assert.strictEqual((await task('a5')).date, '2026-10-29');
+      await page.keyboard.press('Control+z'); assert.deepStrictEqual(await order(), was);
+    });
     await check('typing a date in the sidebar', async () => {
       await page.click('.task[data-id="l2"] .date'); await page.keyboard.type('nov 20'); await page.keyboard.press('Enter');
       assert.strictEqual((await task('l2')).date, '2026-11-20');
@@ -95,8 +117,31 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await check('timeline opens and draws', async () => {
       await page.click('.views [data-view="-"]'); await sleep(300);
       assert.ok(await page.locator('#admire .adm-dot').count() > 3);
+      // a dot's list opens after resting on it a second; once one has, the next dot's opens at once
+      const dots = page.locator('#admire .adm-dot[data-tip]'), tipped = () => page.evaluate(() => getComputedStyle(admTip).display === 'block' && admTipFor && admTipFor.dataset.tip);
+      const specs = await dots.evaluateAll(ds => ds.map(d => d.dataset.tip)), j = specs.findIndex(t => t !== specs[0]);
+      assert.ok(j > 0);
+      await dots.nth(0).hover(); await sleep(500); assert.strictEqual(await tipped(), false);
+      await sleep(800); assert.strictEqual(await tipped(), specs[0]);
+      await dots.nth(j).hover(); await sleep(150); assert.strictEqual(await tipped(), specs[j]);
+      await page.mouse.move(5, 5); await page.mouse.down(); await page.mouse.up();   // a press: back to waiting
+      await dots.nth(0).hover(); await sleep(500); assert.strictEqual(await tipped(), false);
+      await page.mouse.move(5, 5);
       await page.click('.views [data-view="c"]');
       assert.deepStrictEqual(await page.evaluate(() => [ui.dayView, admOpen]), [null, false]);
+    });
+    await check('timeline: resting on "+N finished tasks without a date" lists them', async () => {
+      await page.evaluate(() => mutate(() => { findTask('a1').task.date = null; }));
+      await page.click('.views [data-view="-"]'); await sleep(300);
+      const foot = page.locator('#admire .adm-foot [data-tip="undated"]');
+      assert.match(await foot.textContent(), /^\+\d+ finished tasks? without a date$/);
+      await foot.hover(); await sleep(1300);
+      assert.strictEqual(await page.evaluate(() => getComputedStyle(admTip).display), 'block');
+      const txt = await page.locator('#admtip').textContent();
+      assert.ok(/Without a date/.test(txt) && txt.includes((await task('a1')).title) && /Writing/.test(txt), txt);
+      await page.mouse.move(5, 5); await sleep(300);
+      await page.click('.views [data-view="c"]');
+      await page.keyboard.press('Control+z'); assert.strictEqual((await task('a1')).date, '2026-10-26');
     });
     await check('archive window', async () => {
       await page.click('#archBtn');
@@ -281,22 +326,25 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       const row = id => `#tree .task[data-id="${id}"]`, visible = sel => page.locator(sel).isVisible();
       assert.strictEqual(await visible(`${row('l3')} [data-act="del-k"]`), false);   // archive / delete live in the menu
       await page.hover(row('l3')); await page.click(`${row('l3')} [data-act="kmenu"]`);
-      await page.click('#menu [data-act="k-notes"]');
-      await page.keyboard.type('Freezer B, shelf 3'); await page.keyboard.press('Control+Enter');
+      await page.click('#menu [data-act="k-notes"]');   // opens the hover note beside the task, already editing
+      assert.ok(await visible('#ntip .nt-ed')); assert.strictEqual(await page.locator('#modal').isVisible(), false);
+      await page.keyboard.type('Freezer B, shelf 3'); await page.keyboard.press('Enter');
       assert.strictEqual((await task('l3')).notes, 'Freezer B, shelf 3');
       assert.ok(await visible(`${row('l3')} .nti`));
-      await page.mouse.move(5, 5); await page.hover(`${row('l3')} .title`);
+      await page.mouse.move(5, 5); await sleep(400); assert.strictEqual(await visible('#ntip'), false);
+      await page.hover(`${row('l3')} .title`);
       await sleep(600); assert.strictEqual(await visible('#ntip'), false);
       await sleep(700); assert.ok(await visible('#ntip')); assert.match(await page.locator('#ntip').textContent(), /Freezer B, shelf 3/);
-      // the note stays while the pointer moves onto it, and can be edited there (double-click; Ctrl+Enter saves)
+      // the note stays while the pointer moves onto it, and can be edited there (double-click; Enter saves, Shift+Enter is a new line)
       const nb = await page.locator('#ntip .nt-b').boundingBox();
       await page.mouse.move(nb.x + 5, nb.y + nb.height / 2, { steps: 8 }); await sleep(400); assert.ok(await visible('#ntip'));
       await page.dblclick('#ntip .nt-b'); assert.ok(await visible('#ntip .nt-ed'));
-      await page.keyboard.press('End'); await page.keyboard.type(', left'); await page.keyboard.press('Control+Enter');
+      await page.keyboard.press('End'); await page.keyboard.type(', left'); await page.keyboard.press('Enter');
       assert.strictEqual((await task('l3')).notes, 'Freezer B, shelf 3, left');
       assert.ok(await visible('#ntip .nt-b')); assert.match(await page.locator('#ntip').textContent(), /shelf 3, left/);
-      await page.dblclick('#ntip .nt-b'); await page.keyboard.type(' (moved)'); await page.mouse.click(5, 300);   // a press elsewhere saves and closes
-      assert.strictEqual((await task('l3')).notes, 'Freezer B, shelf 3, left (moved)'); assert.strictEqual(await visible('#ntip'), false);
+      await page.dblclick('#ntip .nt-b'); await page.keyboard.type(' (moved)'); await page.keyboard.press('Shift+Enter'); await page.keyboard.type('top');
+      await page.mouse.click(5, 300);   // a press elsewhere saves and closes
+      assert.strictEqual((await task('l3')).notes, 'Freezer B, shelf 3, left (moved)\ntop'); assert.strictEqual(await visible('#ntip'), false);
       await page.hover(`${row('l3')} .title`); await sleep(1200); assert.ok(await visible('#ntip'));
       // web addresses are links (trailing punctuation left out); text around them stays plain and escaped
       await page.evaluate(() => setTaskNotes('l3', 'See https://example.com/a_(b). Or www.example.org, <b>x</b>'));
@@ -305,6 +353,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         [['https://example.com/a_(b)', 'https://example.com/a_(b)', '_blank'], ['https://www.example.org', 'www.example.org', '_blank']]);
       assert.strictEqual(await page.locator('#ntip .nt-b b').count(), 0);
       await page.mouse.move(5, 5); await sleep(400); assert.strictEqual(await visible('#ntip'), false);
+      // once a note has shown, another task's opens at once, for 2 s after the last one went
+      await page.evaluate(() => setTaskNotes('l2', 'Second note'));
+      await page.hover(`${row('l2')} .title`); await sleep(150); assert.match(await page.locator('#ntip').textContent(), /Second note/);
+      await page.mouse.move(5, 5); await sleep(2400);
+      await page.hover(`${row('l3')} .title`); await sleep(500); assert.strictEqual(await visible('#ntip'), false);
+      await sleep(700); assert.ok(await visible('#ntip'));
+      await page.mouse.move(5, 5); await page.evaluate(() => setTaskNotes('l2', '')); await sleep(400);
       await page.hover(row('l4')); await page.click(`${row('l4')} [data-act="kmenu"]`); await page.click('#menu [data-act="del-k"]');
       assert.ok(!(await task('l4')));
       await page.hover(row('l1')); assert.ok(await visible(`${row('l1')} [data-act="del-k"]`));
@@ -324,6 +379,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       await page.keyboard.press('Control+z'); assert.ok(await task('a5'));
       await page.click('#tree .task[data-id="a5"] .title', { button: 'right' }); assert.ok(await shown());
       await page.keyboard.press('Escape'); assert.strictEqual(await shown(), false);
+      // Add notes from a chip's menu: the note opens beside that chip, editing; Esc on an empty one leaves no notes
+      await page.click('#grid .chip[data-id="a5"] .tt', { button: 'right' }); await page.click('#menu [data-act="k-notes"]');
+      assert.ok(await page.locator('#ntip .nt-ed').isVisible());
+      const [cr, tr] = await page.evaluate(() => [document.querySelector('#grid .chip[data-id="a5"]').getBoundingClientRect(), document.querySelector('#ntip').getBoundingClientRect()].map(r => ({ l: r.left, t: r.top, b: r.bottom })));
+      assert.ok(Math.abs(tr.l - cr.l - 10) <= 2 && (Math.abs(tr.t - cr.b - 4) <= 2 || tr.b <= cr.t), JSON.stringify([cr, tr]));
+      await page.keyboard.type('x'); await page.keyboard.press('Escape');
+      assert.strictEqual((await task('a5')).notes, undefined); assert.strictEqual(await page.locator('#ntip').isVisible(), false);
       // the thread menu stays open while its switch redraws everything
       await page.hover('.trow[data-tdrag="t1"]'); await page.click('.trow[data-tdrag="t1"] [data-act="tmenu"]');
       await page.click('#menu .mtog'); await sleep(200); assert.ok(await shown());

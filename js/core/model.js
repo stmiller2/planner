@@ -119,6 +119,13 @@ function runOf(t, i) {
   while (e + 1 < t.tasks.length && t.tasks[e + 1].linkToPrev) e++;
   return [s, e];
 }
+// a same-day group: the tasks around task i joined to each other by same-day links (part of a chain)
+function dayRunOf(t, i) {
+  let s = i, e = i;
+  while (s > 0 && t.tasks[s].linkToPrev === 'sameDay') s--;
+  while (e + 1 < t.tasks.length && t.tasks[e + 1].linkToPrev === 'sameDay') e++;
+  return [s, e];
+}
 function offsets(t, s, e) {
   const off = [0];
   for (let k = s + 1; k <= e; k++) off.push(off[off.length - 1] + (t.tasks[k].linkToPrev === 'nextDay' ? 1 : 0));

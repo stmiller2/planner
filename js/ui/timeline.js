@@ -61,7 +61,7 @@ function renderAdmire() {
   el.style.setProperty('--g1', g[0]); el.style.setProperty('--g2', g[1]); el.style.setProperty('--g3', g[2]);
   const top = `<div class="adm-top"><div class="adm-ctl"><label class="switch"><input type="checkbox" id="admPlan" ${ui.admPlanned ? 'checked' : ''}><span class="track"></span><span>Future tasks</span></label>
     <div class="seg" id="admRange">${[['all', 'All time'], [12, '12 weeks'], [4, '4 weeks']].map(([v, l]) => `<button data-v="${v}" class="${String(admRange) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div></div></div>`;
-  const foot = D.undated ? `<p class="adm-foot">+${plural(D.undated, 'finished task')} without a date</p>` : '';
+  const foot = D.undated ? `<p class="adm-foot"><span data-tip="undated">+${plural(D.undated, 'finished task')} without a date</span></p>` : '';
   if (!D.total && !D.planned) {
     el.innerHTML = `<div class="adm-wrap">${top}<div class="adm-empty">${D.everTotal ? 'Nothing finished in this stretch. Try a longer range.' : 'Nothing finished yet. Tick off a task and it will show up here, on its day.'}</div>${foot}</div>`;
     return;
@@ -423,11 +423,13 @@ function renderAdmire() {
   el.scrollTop = anim ? 0 : keepTop;
 }
 
-/* the list that drops down from a dot (or a day in the wave), after hovering a moment */
+/* the list that drops down from a dot (or a day in the wave), after hovering a moment (once one has shown, the next
+   opens at once: hoverDelay, dom.js) */
 const admTip = $('#admtip');
 let admTipFor = null, admTipWant = null, admTipTimer = null, admTipHide = null;
 function admTipHTML(spec) {
   const [kind, a, b] = spec.split('|'), D = admD; if (!D) return '';
+  if (kind === 'undated') return admTipList('Without a date', D.undatedG || []);
   let groups = [], day;
   const grpOf = (L, withProj) => { const o = L.own.get(day) || { done: [], plan: [] };
     return { name: L.name, up: (withProj ? [(D.projs.find(p => p.key === L.pkey) || {}).name] : []).concat(L.path.slice(0, -1)).join(' › '), color: L.color, done: o.done, plan: o.plan }; };
@@ -437,17 +439,21 @@ function admTipHTML(spec) {
   else if (kind === 'fold') { day = b; const R = D.lanes.get(a), p = R && D.projs.find(x => x.key === R.pkey);
     if (p) groups = p.lanes.filter(L => laneUnder(L, a, D.lanes) && L.own.has(day)).map(L => grpOf(L, true)); }
   else { day = a; D.projs.forEach(p => p.lanes.filter(L => L.own.has(day)).forEach(L => groups.push(grpOf(L, true)))); }
+  const head = kind === 'proj' && groups.length ? `<div class="at-g" style="--c:${groups[0].color};padding-top:2px"><span class="nm">${esc((D.projs.find(x => x.key === a) || {}).name || '')}</span></div>` : '';
+  return admTipList(fmtLong(day), groups, head);
+}
+// the list itself: a heading (the day), then each lane's done and planned tasks
+function admTipList(title, groups, head = '') {
   const nd = groups.reduce((s, g) => s + g.done.length, 0), np = groups.reduce((s, g) => s + g.plan.length, 0); if (!nd && !np) return '';
-  const head = kind === 'proj' ? `<div class="at-g" style="--c:${groups[0].color};padding-top:2px"><span class="nm">${esc((D.projs.find(x => x.key === a) || {}).name || '')}</span></div>` : '';
   const item = (g, k, pl) => `<div class="at-i ${pl ? 'pl' : ''}" style="--c:${g.color}"><span class="ck">${pl ? '' : '✓'}</span><span>${esc(k.title || '(untitled)')}</span></div>`;
-  return `<div class="at-h"><b>${fmtLong(day)}</b><span>${[nd ? nd + ' done' : '', np ? np + ' planned' : ''].filter(Boolean).join(' · ')}</span></div>${head}` + groups.map(g => `
+  return `<div class="at-h"><b>${esc(title)}</b><span>${[nd ? nd + ' done' : '', np ? np + ' planned' : ''].filter(Boolean).join(' · ')}</span></div>${head}` + groups.map(g => `
     <div class="at-g" style="--c:${g.color}"><span class="sw"></span><span class="nm">${esc(g.name)}</span>${g.up ? `<span class="up">${esc(g.up)}</span>` : ''}</div>
     ${g.done.map(k => item(g, k, false)).join('')}${g.plan.map(k => item(g, k, true)).join('')}`).join('');
 }
 function admPlaceTip(anchor) {
   const html = admTipHTML(anchor.dataset.tip); if (!html) return admHideTip(true);
   $$('#admire .tipon').forEach(x => x.classList.remove('tipon'));
-  admTipFor = anchor; anchor.classList.add('tipon');
+  admTipFor = anchor; anchor.classList.add('tipon'); hoverShown('adm');
   admTip.innerHTML = html; admTip.classList.remove('up');
   admTip.style.display = 'block'; admTip.style.animation = 'none'; void admTip.offsetWidth; admTip.style.animation = '';
   const r = anchor.getBoundingClientRect(), w = admTip.offsetWidth, h = admTip.offsetHeight;
@@ -463,11 +469,11 @@ function admShowTip(anchor) {
   if (anchor === admTipFor || anchor === admTipWant) return;
   if (admTipFor) admHideTip(true);
   clearTimeout(admTipTimer); admTipWant = anchor;
-  admTipTimer = setTimeout(() => { admTipWant = null; if (anchor.isConnected && admOpen) admPlaceTip(anchor); }, ADM_TIP_DELAY);
+  admTipTimer = setTimeout(() => { admTipWant = null; if (anchor.isConnected && admOpen) admPlaceTip(anchor); }, hoverDelay('adm', ADM_TIP_DELAY));
 }
 function admHideTip(now) {
   clearTimeout(admTipHide);
-  const go = () => { clearTimeout(admTipTimer); admTipWant = null; admTipFor = null; admTip.style.display = 'none'; $$('#admire .tipon').forEach(x => x.classList.remove('tipon')); };
+  const go = () => { clearTimeout(admTipTimer); admTipWant = null; if (admTipFor) hoverGone('adm'); admTipFor = null; admTip.style.display = 'none'; $$('#admire .tipon').forEach(x => x.classList.remove('tipon')); };
   if (now) go(); else { clearTimeout(admTipTimer); admTipWant = null; admTipHide = setTimeout(go, 160); }
 }
 $('#admire').addEventListener('mouseover', e => { const a = e.target.closest('[data-tip]'); if (a) admShowTip(a); });

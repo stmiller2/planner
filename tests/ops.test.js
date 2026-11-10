@@ -32,6 +32,41 @@ test('dragging a task in the sidebar moves its whole chain; with Option just the
   assert.deepStrictEqual(links(P, 't'), [null, null]);
 });
 
+test('sidebar drops inside chains: reorder a same-day group, join one, split a next-day link', () => {
+  const D1 = '2026-11-02', D2 = '2026-11-03';
+  const chain = () => [T('a', D1), T('b', D1, { link: 'sameDay' }), T('c', D1, { link: 'sameDay' }), T('d', D2, { link: 'nextDay' }), T('e', D2, { link: 'sameDay' }), T('x', '2026-11-09')];
+  const row = P => j(P.findThread('t').t.tasks.map(k => [k.id, k.linkToPrev, k.date]));
+  // within a same-day group: only that task moves, the group keeps its links and its place in the chain
+  let P = load(plan([TH('t', chain())]));
+  assert.ok(P.dropSingle('c', false, { tid: 't', refId: 'a', side: 'before' }));
+  P.moveTasksTo('c', false, { tid: 't', refId: 'a', side: 'before' }, true);
+  assert.deepStrictEqual(row(P), [['c', null, D1], ['a', 'sameDay', D1], ['b', 'sameDay', D1], ['d', 'nextDay', D2], ['e', 'sameDay', D2], ['x', null, '2026-11-09']]);
+  P.moveTasksTo('e', false, { tid: 't', refId: 'd', side: 'before' }, true);       // front of a group that follows a next-day link
+  assert.deepStrictEqual(links(P, 't'), [null, 'sameDay', 'sameDay', 'nextDay', 'sameDay', null]);
+  assert.deepStrictEqual(ids(P, 't'), ['c', 'a', 'b', 'e', 'd', 'x']);
+  P.moveTasksTo('a', false, { tid: 't', refId: 'b', side: 'after' }, true);         // last in its group (before the next-day step)
+  assert.deepStrictEqual(ids(P, 't'), ['c', 'b', 'a', 'e', 'd', 'x']);
+  assert.deepStrictEqual(links(P, 't'), [null, 'sameDay', 'sameDay', 'nextDay', 'sameDay', null]);
+  // an unlinked task dropped inside a same-day group joins it (and takes its day)
+  P = load(plan([TH('t', chain())]));
+  P.moveTasksTo('x', false, { tid: 't', refId: 'b', side: 'after' }, true);
+  assert.deepStrictEqual(row(P).slice(0, 4), [['a', null, D1], ['b', 'sameDay', D1], ['x', 'sameDay', D1], ['c', 'sameDay', D1]]);
+  // ... and dropped between next-day-linked tasks it unlinks them; everything keeps its date
+  P = load(plan([TH('t', chain())]));
+  P.moveTasksTo('x', false, { tid: 't', refId: 'd', side: 'before' }, true);
+  assert.deepStrictEqual(row(P), [['a', null, D1], ['b', 'sameDay', D1], ['c', 'sameDay', D1], ['x', null, '2026-11-09'], ['d', null, D2], ['e', 'sameDay', D2]]);
+  // a linked task dropped outside its chain still takes the whole chain along
+  P = load(plan([TH('t', chain()), TH('u', [T('y')])]));
+  assert.ok(!P.dropSingle('b', false, { tid: 'u', refId: 'y', side: 'after' }));
+  P.moveTasksTo('b', false, { tid: 'u', refId: 'y', side: 'after' }, true);
+  assert.deepStrictEqual(ids(P, 'u'), ['y', 'a', 'b', 'c', 'd', 'e']);
+  // where it already is: nothing to do
+  P = load(plan([TH('t', chain())]));
+  assert.ok(P.isNoopTasks('b', false, { tid: 't', refId: 'b', side: 'after' }, true));
+  assert.ok(P.isNoopTasks('b', false, { tid: 't', refId: 'a', side: 'after' }, true));
+  assert.ok(!P.isNoopTasks('b', false, { tid: 't', refId: 'c', side: 'after' }, true));
+});
+
 test('dropping a task where it already is changes nothing', () => {
   const P = load(plan([TH('t', [T('a'), T('b'), T('c')])]));
   assert.ok(P.isNoopTasks('b', false, { tid: 't', refId: 'b', side: 'before' }));
