@@ -4,28 +4,26 @@ function showHelp() {
   const ui_ = l => `<span class="hui">${l}</span>`;   // a button's label, as it appears in the app
   const body = framedModal('How it works', `
   <h4>Projects, (sub)threads, and tasks</h4>
-  <p><b>Tasks</b> (e.g., “purify GoldenGate reaction”) are organized into <b>threads</b> (e.g., “cloning”), which are organized into <b>projects</b> (e.g., “build library”). To get started, create a project with ${ui_('+ Project')} and make a thread with ${ui_('+ thread')}. You can then add tasks to your thread, or create subthreads to any depth from the thread’s settings menu <span class="hic">${ICON.gear}</span>.</p>
+  <p><b>Tasks</b> (e.g., “purify GoldenGate reaction”) are organized into <b>threads</b> (e.g., “cloning”), which are organized into <b>projects</b> (e.g., “build library”). To get started, create a project with ${ui_('+ Project')} and make a thread with ${ui_('+ thread')}. You can then add tasks to your thread, or create subthreads to any depth <span class="nw">through <span class="hic">${ICON.gear}</span>.</span></p>
   <p>Tasks, threads, projects, and the planner itself can be renamed by double-clicking the title in calendar or day view.</p>
-  <h4>Notes</h4>
-  <p>To add notes to a task (e.g., a protocol tweak or where a sample is stored), choose <b>Add notes</b> from the task’s settings menu <span class="hic">${ICON.gear}</span> in the sidebar or the day view list, or right-click the task anywhere (sidebar, calendar or day view) for the same menu. Tasks with notes get a small mark <span class="hic">${ICON.notes}</span>; rest the pointer on one for a second (in the sidebar, the calendar or day view) to read them. The note stays open while the pointer is on the task or on the note, web addresses in it are clickable links, and double-clicking its text edits it right there (<kbd>↩</kbd> saves, <kbd>Esc</kbd> cancels, clicking elsewhere saves). <b>Add notes</b> opens the same note, ready to type in.</p>
+  <p>To add additional notes to a task, choose <b>Add notes</b> from the task’s settings menu <span class="hic">${ICON.gear}</span> in the sidebar or by right-clicking. Hover to read notes and double-click to edit the text.</p>
   <h4>Scheduling</h4>
-  <p>To schedule a task, drag it onto the calendar, or click the date box and type e.g. “fri”, “11/26”, “+3”, “td” (today) or “tm” (tomorrow). Tasks can also be scheduled relative to one another: click the link icon <span class="hic">${ICON.link}</span> to link two tasks to the <b>same day</b> (e.g., “do transformation” and “plate cells”) or <b>next day</b> (e.g., “start overnights” and “miniprep plasmids”).</p>
-  <p>Tasks are expected to be ordered based on their number in the sidebar. If scheduled out of order, a warning will display. This can be turned off in Settings, or for a thread or whole project whose tasks have no set order (e.g., “mentoring”) by switching off <b>Ordered tasks</b> in its settings menu <span class="hic">${ICON.gear}</span>.</p>
+  <p>To schedule a task, drag it onto the calendar, or click the date box and type e.g. “fri”, “11/26”, “td”, "tm". Tasks can also be scheduled relative to one another: click the link icon <span class="hic">${ICON.link}</span> to link two tasks to the <b>same day</b> (e.g., “do transformation” and “plate cells”) or <b>next day</b> (e.g., “start overnights” and “miniprep plasmids”).</p>
+  <p>Tasks are expected to be ordered based on their number in the sidebar. If scheduled out of order, a warning will display. This can be turned off in Settings, or for a specific thread/project by switching off <b>Ordered tasks</b> in its settings <span class="nw">menu <span class="hic">${ICON.gear}</span>.</span></p>
   <h4>Rescheduling</h4>
-  <p>When rescheduling tasks, linked tasks move too, unless holding <kbd>⌥ Option</kbd> while dropping the task (this breaks links and moves only the dragged task). In the sidebar, dragging a task within its same-day group reorders the group; dropping a task between two same-day-linked tasks links it to them, and dropping it between two next-day-linked tasks unlinks them.</p>
-  <p>By default, all tasks within a thread get shifted relative to each other when rescheduling. This can be turned off in Settings, or bypassed by holding <kbd>⌥ Option</kbd>. Tasks in unordered threads never shift.</p>
-  <h4>Several tasks at once</h4>
-  <p><kbd>⌘</kbd>-click tasks in the sidebar or on the calendar to select several (<kbd>⇧ Shift</kbd>-click selects every task between the last one clicked and this one). Drag any of them onto a calendar day to give them all that date, or to another spot in the sidebar to move them together. A bar at the bottom of the sidebar acts on the whole selection: set a date, link them to the <b>same day</b> <span class="hic">=</span> or <b>next day</b> <span class="hic">+1d</span> (tasks in one thread are gathered under the first one, in order), unlink, mark done, archive or delete. <kbd>Esc</kbd>, or clicking anywhere off the selected tasks, clears the selection.</p>
+  <p>When rescheduling tasks, linked tasks move too, unless holding <kbd>⌥ Option</kbd> while dropping the task (this breaks links and moves only the dragged task).</p>
+  <p>By default, all tasks within a thread get shifted relative to each other when rescheduling. This can be turned off in Settings, or bypassed by holding <kbd>⌥ Option</kbd>.</p>
   <h4>Day view</h4>
-  <p>To plan the timing of tasks within a single day, enter day view with the view switcher, pressing <kbd>d</kbd>, or by clicking the date number from calendar view. Drag tasks onto the timeline, then drag or click blocks to set their times. Swipe sideways or use the arrow keys to move between days.</p>
+  <p>To plan the timing of tasks within a single day, enter day view with the view switcher, pressing <kbd>d</kbd>, or by clicking the date number from calendar view. Drag tasks onto the timeline, then drag or click blocks to set their times.</p>
   <h4>Timeline</h4>
-  <p>Press <kbd>-</kbd> or use the view switcher to enter timeline view, where you can view everything you’ve finished over time. Unordered threads and projects show as loose dots, without lines. No functionality here, it just looks nice.</p>
+  <p>Press <kbd>-</kbd> or use the view switcher to enter timeline view, where you can view everything you’ve finished over time. No functionality here, it just looks nice.</p>
   <h4>Conflicts</h4>
   <p>Add holidays or travel with ${ui_('+ Conflict')} in the <b>Conflicts</b> section of the sidebar. Tasks can still be scheduled over conflicts but will display a warning, which can be turned off in Settings.</p>
   <h4>Scratch board</h4>
-  <p>One-off tasks that don’t deserve their own project or scheduling (e.g., “clean tubes”) can be added to the scratch board, on the right of the calendar and day view. These tasks can’t be scheduled; they stay on the board until you delete them. Add them with ${ui_('+ Add task')} (or click between two tasks to add one there), check them off as you go, and remove all finished ones at once with the <span class="hic">${ICON.clearDone}</span> button at the top. Press <kbd>x</kbd> to open or close the board, or drag its edge to resize it. The board is off until you turn it on in Settings; it then stays open or closed the way you left it, or can open and close by itself for calendar and day view.</p>
+  <p>One-off tasks that don’t deserve their own project or scheduling (e.g., “clean tubes”) can be added to the scratch board, on the right of the calendar and day view. These tasks can’t be scheduled; they stay on the board until you delete them. All finished scratch tasks can be deleted at once with the <span class="hic">${ICON.clearDone}</span> button.</p>
+  <p>Off by default for simplicity but can be turned on in settings.</p>
   <h4>Archive</h4>
-  <p>To remove a task, thread, or project from the sidebar without deleting it, choose <b>Archive</b> from its settings menu <span class="hic">${ICON.gear}</span> (<b>Delete</b> is there too). After archiving or deleting a task, that button shows on the other tasks for 2 seconds, so you can archive or delete several in a row without opening the menu each time. Archived tasks still appear in the timeline and calendar.</p>
+  <p>To remove a task, thread, or project from the sidebar without deleting it, choose <b>Archive</b> from its settings menu <span class="hic">${ICON.gear}</span> (<b>Delete</b> is there too). Archived tasks still appear in the timeline and calendar.</p>
   <h4>Your data</h4>
   <p>Your plan is saved to ${dataWhereHTML()}${MODE === 'fallback' ? '' : ' as you go, with a dated copy each day in <code>backups/</code> next to it (last 14 days)'}. You can change where in Settings, under <b>Data file</b>.</p>
   <div class="hkeys"><h4>Keyboard shortcuts</h4><div class="keys">${shortcutsHTML()}</div></div>
@@ -38,20 +36,17 @@ function showHelp() {
 function shortcutsHTML() {
   return [
     ['<kbd>⌥ Option</kbd> + drop', 'Move only the task you dragged, unlinking from other tasks if applicable'],
-    ['<kbd>⌘</kbd>-click / <kbd>⇧</kbd>-click', 'Select several tasks, in the sidebar or on the calendar (a range with <kbd>⇧</kbd>)'],
+    ['<kbd>⌘</kbd>-click / <kbd>⇧</kbd>-click', 'Select multiple tasks for bulk actions (a range with <kbd>⇧</kbd>)'],
     ['<kbd>←</kbd> / <kbd>→</kbd> or <kbd>↑</kbd> / <kbd>↓</kbd>', 'Previous / next week (previous / next day in day view)'],
     ['<kbd>T</kbd>', 'Jump to today'],
     ['<kbd>C</kbd> / <kbd>D</kbd> / <kbd>-</kbd>', 'Switch to the calendar / day view / timeline (<kbd>-</kbd> again: back)'],
     ['<kbd>⌘Z</kbd>', 'Undo'],
     ['<kbd>⇧⌘Z</kbd> or <kbd>⌘Y</kbd>', 'Redo'],
-    ['<kbd>S</kbd> or <kbd>⌃⇧,</kbd>', 'Open Settings'],
+    ['<kbd>S</kbd>', 'Open Settings'],
     ['<kbd>H</kbd>', 'Open Help'],
-    ['<kbd>1</kbd> – <kbd>5</kbd>', 'Show that many weeks (days in day view)'],
-    ['<kbd>X</kbd>', 'Open / close the scratch board (if it’s turned on)'],
-    ['<kbd>N</kbd>', 'New task on the scratch board (while it’s open)'],
-    ['<kbd>Esc</kbd>', 'Close day view, a menu, or a window; clear a selection of tasks'],
-    ['<kbd>Enter</kbd> / <kbd>Esc</kbd>', 'In a new-task box: add the task / stop adding'],
-    ['Double-click', 'Rename a project, thread, task or the planner'],
+    ['<kbd>1</kbd> – <kbd>5</kbd>', 'Set number of weeks shown (days in day view)'],
+    ['<kbd>X</kbd>', 'Open / close the scratch board (must be turned on in settings first)'],
+    ['<kbd>N</kbd>', 'New task on the scratch board'],
   ].map(([k, d]) => `<div class="kd">${k}</div><div>${d}</div>`).join('');
 }
 

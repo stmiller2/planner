@@ -237,8 +237,6 @@ function switchView(k, toggle) {
 }
 document.addEventListener('keydown', e => {
   const modalOpen = $('#modal').style.display === 'grid', mod = e.metaKey || e.ctrlKey;
-  // ⌘, / Ctrl+, / Ctrl+Shift+, (e.code: Shift turns the key into '<')
-  if (mod && e.code === 'Comma') { e.preventDefault(); if (!modalOpen) showSettings(); return; }
   if (e.key === 'Escape') {
     if (menu.style.display === 'block') { closeMenu(); return; }   // just the menu (not day view / the timeline under it)
     if (tpop) { closeTimePop(false); return; }
