@@ -588,6 +588,30 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.strictEqual((await task('l2')).date, d0);
       await page.evaluate(v => { clearSel(); ui.viewStart = v[0]; ui.weeks = v[1]; render(); }, view0);
     });
+    await check('dragging opens a gap where the task would land (sidebar, calendar day); dropping on the gap works', async () => {
+      const c = async sel => { const r = await page.locator(sel).first().boundingBox(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, r }; };
+      const was = await page.evaluate(() => findThread('t2').t.tasks.map(k => k.id));
+      let s = await c('.task[data-id="m5"] .title'), t = await c('.task[data-id="m3"]');
+      await page.mouse.move(s.x, s.y); await page.mouse.down();
+      for (let i = 1; i <= 10; i++) { await page.mouse.move(s.x, s.y + (t.r.y + 6 - s.y) * i / 10); await sleep(30); }
+      await sleep(250);
+      const g = await page.locator('#tree .dgap:not(.closing)').boundingBox(); assert.ok(g && g.height > 20, 'sidebar gap');
+      await page.mouse.move(s.x, g.y + g.height / 2); await sleep(100); await page.mouse.up(); await sleep(300);
+      const now = await page.evaluate(() => findThread('t2').t.tasks.map(k => k.id));
+      assert.strictEqual(now.indexOf('m5'), now.indexOf('m3') - 1, 'dropped on the gap: before m3');
+      await page.keyboard.press('Control+z');
+      assert.deepStrictEqual(await page.evaluate(() => findThread('t2').t.tasks.map(k => k.id)), was);
+      // a chip over another day: a gap in that day's list; dropped on it
+      const d0 = (await task('m3')).date, d1 = await page.evaluate(d => addDays(d, -1), d0);
+      s = await c('.chip[data-id="m3"] .tt'); t = await c(`#grid .day[data-date="${d1}"]`);
+      await page.mouse.move(s.x, s.y); await page.mouse.down();
+      for (let i = 1; i <= 10; i++) { await page.mouse.move(s.x + (t.x - s.x) * i / 10, s.y + (t.r.y + 40 - s.y) * i / 10); await sleep(30); }
+      await sleep(250);
+      const cg = await page.locator(`#grid .day[data-date="${d1}"] .dgap:not(.closing)`).boundingBox(); assert.ok(cg, 'calendar gap');
+      await page.mouse.move(cg.x + cg.width / 2, cg.y + cg.height / 2); await sleep(100); await page.mouse.up(); await sleep(300);
+      assert.strictEqual((await task('m3')).date, d1);
+      await page.keyboard.press('Control+z'); assert.strictEqual((await task('m3')).date, d0);
+    });
     await check('Help shows where the data is; Settings > Data file moves it to another folder', async () => {
       await page.keyboard.press('h');
       assert.ok((await page.textContent('#modal .mbody')).includes(DATA), 'full path in Help');

@@ -316,15 +316,66 @@ function treeTarget(e) {
   tg.type = isTask ? 'tasks' : 'thread';
   return tg;
 }
+/* While dragging, a gap opens where the task / thread would land (treeGap; the plain guide line where there's no
+   element to open it next to), and the rows slide to their new places on the drop (flipTo). Over the open gap
+   itself, the target it stands for (treeLast) holds. */
+const treeGap = makeGap();
+let treeLast = null;
+// where a gap for drop spot `spot` goes: { el, side: 'before' | 'after', key } (null: nowhere to put one)
+function gapPlace(spot) {
+  const thEl = id => $(`#tree .thread[data-tid="${id}"]`);
+  const lead = el => el && el.parentElement.classList.contains('subs') && el.parentElement.firstElementChild === el ? el.parentElement : el;
+  let el, side, at;
+  if (spot.pid) {
+    const p = state.projects.find(x => x.id === spot.pid); if (!p || !p.threads.length) return null;
+    const a = p.threads; at = spot.refId ? a.findIndex(x => x.id === spot.refId) + (spot.side === 'after' ? 1 : 0) : a.length;
+    [el, side] = at < a.length ? [thEl(a[at].id), 'before'] : [thEl(a[a.length - 1].id), 'after'];
+  } else {
+    const x = findThread(spot.tid); if (!x) return null;
+    const L = layout(x.t), elOf = it => it.kind === 'task' ? taskEl(it.obj.id) : thEl(it.obj.id);
+    at = layoutIndex(L, spot.refId, spot.side); if (!L.length) return null;
+    if (at < L.length) [el, side] = [lead(elOf(L[at])), 'before'];
+    else { el = elOf(L[L.length - 1]); if (el && el.parentElement.classList.contains('subs')) el = el.parentElement; side = 'after'; }
+  }
+  return el ? { el, side, key: (spot.tid || spot.pid) + ':' + at } : null;
+}
 tree.addEventListener('dragover', e => {
+  if (drag && treeLast && treeGap.over(e)) {   // (still fit the gap to what lands: Option may have changed)
+    e.preventDefault(); e.dataTransfer.dropEffect = splitHeld(e) ? 'copy' : 'move';   // (an effect the system allows, or no drop)
+    if (drag.kind === 'task') treeGap.size(gapH(treeMoving(e, treeLast).map(taskEl)));
+    return;
+  }
   const tg = treeTarget(e); clearTdrop();
+  const g = tg && tg.line && MOTION() && gapPlace(tg.spot);
+  if (!g) { treeGap.hide(); treeLast = null; }
   if (!tg) { tree.classList.remove('drop'); return; }
-  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  e.preventDefault(); e.dataTransfer.dropEffect = splitHeld(e) ? 'copy' : 'move';   // (an effect the system allows, or no drop)
   if (tg.type === 'unsched') tree.classList.add('drop');
+  else if (g) { treeGap.show(g.key, el => g.el.insertAdjacentElement(g.side === 'before' ? 'beforebegin' : 'afterend', el), drag.kind === 'thread' ? drag.h : gapH(treeMoving(e, tg).map(taskEl))); treeLast = tg; }
   else if (tg.line) showLine(tg.line[0], tg.line[1]);
   else if (tg.el) tg.el.classList.add('tdrop');
 });
-tree.addEventListener('dragleave', e => { if (!tree.contains(e.relatedTarget)) { tree.classList.remove('drop'); clearTdrop(); } });
+tree.addEventListener('dragleave', e => { if (!tree.contains(e.relatedTarget)) { tree.classList.remove('drop'); clearTdrop(); treeGap.hide(); treeLast = null; } });
+// the task ids a drop at tg moves: a dragged selection, the one task (dropSingle: Option, or within its own chain),
+// or its whole chain
+const treeMoving = (e, tg) => drag.ids ? movingMany(drag.ids, splitHeld(e)) : dropSingle(drag.id, splitHeld(e), tg.spot) ? [drag.id] : movingIds(drag.id, false);
+// sidebar rows, for sliding them to their new places after a drop
+const TREE_ROWS = '#tree .task[data-id], #tree .trow[data-tdrag], #tree .prow[data-pdrop], #tree .drun';
+const treeKey = el => el.dataset.id ? 'k:' + el.dataset.id : el.dataset.tdrag ? 't:' + el.dataset.tdrag : el.dataset.pdrop ? 'p:' + el.dataset.pdrop : el.dataset.has ? 'r:' + el.dataset.has : null;
+// the rows' rects now, with what's being dropped (task ids, or a thread) moved to the open gap: they slide out of it
+function treeRectsFor(ids, thread) {
+  const m = snapRects(TREE_ROWS, treeKey), gr = treeGap.el && treeGap.el.getBoundingClientRect(); if (!gr) return m;
+  const at = (r, top) => ({ left: r.left, top, height: r.height });
+  if (thread) {
+    const th = $(`#tree .thread[data-tid="${thread}"]`); if (!th) return m;
+    const dy = gr.top - th.getBoundingClientRect().top;
+    $$('.task[data-id], .trow[data-tdrag], .drun', th).forEach(el => { const k = treeKey(el), r = m.get(k); if (r) m.set(k, at(r, r.top + dy)); });
+  } else {
+    let y = gr.top;
+    ids.forEach(id => { const r = m.get('k:' + id); if (r) { m.set('k:' + id, at(r, y)); y += r.height; } });
+  }
+  return m;
+}
 /* click-to-insert: hovering the seam between two items (or just under a thread's name, or in the gap under a
    sub-thread) shows a "+" line; clicking there opens a new-task box at exactly that spot */
 const EDGE = 5;
@@ -386,12 +437,16 @@ tree.addEventListener('mousedown', e => {
   render();
 });
 tree.addEventListener('drop', e => {
-  const tg = treeTarget(e); if (!tg) return;
+  const tg = treeTarget(e) || (treeGap.over(e) ? treeLast : null); if (!tg) return;
   e.preventDefault(); tree.classList.remove('drop'); clearTdrop();
-  const id = drag.id, many = drag.ids; drag = null;
+  const id = drag.id, many = drag.ids, split = splitHeld(e);
+  const moving = tg.type !== 'tasks' ? [] : treeMoving(e, tg);
+  const before = treeRectsFor(moving, tg.type === 'thread' && id);
+  drag = null; treeGap.hide(); treeLast = null;
   if (tg.type === 'unsched') many ? selDate(many, null) : moveTask(id, null);
-  else if (tg.type === 'tasks') many ? moveManyTo(many, splitHeld(e), tg.spot) : moveTasksTo(id, splitHeld(e), tg.spot, true);
+  else if (tg.type === 'tasks') many ? moveManyTo(many, split, tg.spot) : moveTasksTo(id, split, tg.spot, true);
   else moveThreadTo(id, tg.spot);
+  flipTo(TREE_ROWS, treeKey, before);
 });
 
 /* ---------- selecting several tasks ----------

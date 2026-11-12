@@ -120,7 +120,7 @@
 .dv-blk:hover .x{display:grid}
 .dv-now{position:absolute;left:-5px;right:0;border-top:2px solid var(--danger);z-index:3;pointer-events:none}
 .dv-now::before{content:'';position:absolute;left:0;top:-5px;width:8px;height:8px;border-radius:50%;background:var(--danger)}
-.dv-ghost{position:fixed;pointer-events:none;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:.95}
+.dv-ghost{position:fixed;pointer-events:none;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:.9}
 body.dv-dragging,body.dv-dragging *{cursor:grabbing !important;user-select:none}
 body.dv-resizing,body.dv-resizing *{cursor:ns-resize !important;user-select:none}
 /* failed attempts (see css/calendar.css for their look): not draggable; a list item's ✕ sits where the checkbox does */
@@ -128,3 +128,6 @@ body.dv-resizing,body.dv-resizing *{cursor:ns-resize !important;user-select:none
 .dv-blk.failed{box-shadow:0 0 0 1px var(--bg)}
 .dv-blk.failed .bi .fx{margin-top:1px}
 .dv-blk.failed.short .bi .fx{margin-top:0}
+/* while dragging on the timeline, once the pointer pauses, blocks ease into the lanes they'll take (dvReflow) */
+body:is(.dv-dragging,.dv-resizing) .dv-blk:not(.dv-ghost){transition:left .32s cubic-bezier(.25,.6,.3,1),width .32s cubic-bezier(.25,.6,.3,1),opacity .15s}
+@media (prefers-reduced-motion: reduce){body:is(.dv-dragging,.dv-resizing) .dv-blk{transition:none}}

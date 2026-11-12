@@ -234,17 +234,48 @@ grid.addEventListener('click', e => {
   e.stopPropagation(); clearTimeout(revealTimer); closeMenu();
   selClick(c.dataset.id, e.shiftKey, $$('#grid .chip[data-id]').map(x => x.dataset.id));
 });
+/* Dragging a task over a day opens a gap in its list where the task would land (calGap; tasks sit in sidebar order),
+   and on the drop the chips slide into place: within a day from where they were, onto it from the gap; chips that
+   changed day fade in where they land (flipTo). */
+const calGap = makeGap('cgap');
+// task id -> its place in the order days list their tasks (index order: thread by thread)
+const taskOrder = memo(() => { const m = new Map(); allThreads().forEach(x => x.t.tasks.forEach(k => m.set(k.id, m.size))); return m; });
+// the chips that land on the day itself: the dragged task with its same-day group (just it with Option), or a selection
+function calLanding(split) {
+  if (drag.ids) return drag.ids;
+  const f = findTask(drag.id); if (split || !f) return [drag.id];
+  const [s, e] = dayRunOf(f.t, f.i); return f.t.tasks.slice(s, e + 1).map(k => k.id);
+}
+function calGapAt(day, split) {
+  const f = findTask(drag.id); if (!f || !MOTION() || (!drag.ids && f.task.date === day.dataset.date)) return calGap.hide();
+  const ord = taskOrder(), me = ord.get((drag.ids || [drag.id])[0]), items = day.querySelector('.items');
+  const rank = c => { const x = c.matches('.chip') ? c : c.querySelector('.chip[data-id], .chip[data-kid]'); if (!x || x.classList.contains('arch')) return Infinity;
+    return x.dataset.id ? ord.get(x.dataset.id) : ord.get(x.dataset.kid) + .5; };
+  const kids = [...items.children].filter(c => !c.classList.contains('dgap')), at = kids.findIndex(c => rank(c) > me);
+  const n = calLanding(split).slice(0, 3), h = n.reduce((a, id) => a + (($(`#grid .chip[data-id="${id}"]`) || {}).offsetHeight || drag.ch), 0) + 4 * (n.length - 1);
+  calGap.show(day.dataset.date + ':' + at, el => at < 0 ? items.appendChild(el) : items.insertBefore(el, kids[at]), h);
+}
+const CAL_CHIPS = '#grid .chip[data-id], #grid .chip[data-fid]';
+const chipKey = el => el.dataset.id ? 'c:' + el.dataset.id : 'f:' + el.dataset.fid;
+const dropDay = e => e.target.closest('.day') || (e.target.closest('.cfb') && $(`#grid .day[data-date="${calDayAt(e.clientX, e.clientY)}"]`));
 grid.addEventListener('dragover', e => {
-  if (!drag || drag.kind !== 'task') return; const day = e.target.closest('.day') || (e.target.closest('.cfb') && $(`#grid .day[data-date="${calDayAt(e.clientX, e.clientY)}"]`)); if (!day) return;
+  if (!drag || drag.kind !== 'task') return; const day = dropDay(e); if (!day) return;
   e.preventDefault(); e.dataTransfer.dropEffect = splitHeld(e) ? 'copy' : 'move';
   if (!day.classList.contains('over')) { $$('.day.over').forEach(x => x.classList.remove('over')); day.classList.add('over'); }
+  calGapAt(day, splitHeld(e));
 });
-grid.addEventListener('dragleave', e => { if (!grid.contains(e.relatedTarget)) $$('.day.over').forEach(x => x.classList.remove('over')); });
+grid.addEventListener('dragleave', e => { if (!grid.contains(e.relatedTarget)) { $$('.day.over').forEach(x => x.classList.remove('over')); calGap.hide(); } });
 grid.addEventListener('drop', e => {
-  const day = e.target.closest('.day') || (e.target.closest('.cfb') && $(`#grid .day[data-date="${calDayAt(e.clientX, e.clientY)}"]`)); if (!drag || drag.kind !== 'task' || !day) return;
-  e.preventDefault(); const id = drag.id, many = drag.ids; drag = null;
-  if (many) selDate(many, day.dataset.date, splitHeld(e));   // a selection from the sidebar: every task to that day
-  else moveTask(id, day.dataset.date, splitHeld(e));
+  const day = dropDay(e); if (!drag || drag.kind !== 'task' || !day) return;
+  e.preventDefault(); const id = drag.id, many = drag.ids, split = splitHeld(e), date = day.dataset.date; drag = null;
+  // chips now (the dropped ones at the gap), and which day each was on
+  const before = snapRects(CAL_CHIPS, chipKey), dayOf = new Map($$(CAL_CHIPS).map(c => [chipKey(c), c.closest('.day').dataset.date]));
+  const gr = calGap.el && calGap.el.getBoundingClientRect();
+  if (gr) { let y = gr.top; (many ? movingMany(many, split) : movingIds(id, split)).forEach(k => { before.set('c:' + k, { left: gr.left, top: y, height: gr.height }); dayOf.set('c:' + k, date); y += gr.height + 4; }); }
+  calGap.hide();
+  if (many) selDate(many, date, split);   // a selection from the sidebar: every task to that day
+  else moveTask(id, date, split);
+  flipTo(CAL_CHIPS, chipKey, before, { fade: true, same: (el, k) => dayOf.get(k) === el.closest('.day').dataset.date });
 });
 
 /* Next-day links: resting on a chip that's linked to the task before or after it (on another day) for LINK_HOVER_MS

@@ -252,3 +252,59 @@ function wheelSteps(o) {
   return handler;
 }
 const wheelPx = (e, d) => e.deltaMode === 1 ? d * 16 : e.deltaMode === 2 ? d * 400 : d;   // lines / pages → px
+
+/* ---------- drag motion ----------
+   While something is dragged, the planner makes room for it: a gap opens where it would land (sidebar, day list,
+   calendar day) and closes behind it as it moves on. When it's dropped, everything slides from where it was to where
+   it is now (FLIP), so a drop settles instead of jumping. Day-view blocks snap softly (softSnap). All of it is off
+   when the system asks for reduced motion. */
+const MOTION = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
+const EASE_OUT = 'cubic-bezier(.2,.75,.3,1)';
+// a gap that opens where the dragged item would land: a spacer whose height grows from 0 (css .dgap). One per list.
+// show(key, place, h): place(el) puts the spacer in the DOM; the same key leaves the open gap where it is (easing to
+// height h if that changed: what lands there can depend on where, and on Option).
+function makeGap(cls = '') {
+  let cur = null, key = null;
+  const close = el => { el.classList.add('closing'); el.style.height = '0px'; setTimeout(() => el.remove(), MOTION() ? 200 : 0); };
+  return {
+    show(k, place, h) {
+      if (k === key && cur && cur.isConnected) { if (cur.style.height !== h + 'px') cur.style.height = h + 'px'; return; }
+      if (cur) close(cur);
+      key = k; cur = document.createElement('div'); cur.className = 'dgap ' + cls; cur.style.height = '0px';
+      place(cur); void cur.offsetHeight; cur.style.height = h + 'px';
+    },
+    hide() { if (cur) close(cur); cur = null; key = null; },
+    size(h) { if (cur && cur.isConnected && cur.style.height !== h + 'px') cur.style.height = h + 'px'; },
+    get el() { return cur && cur.isConnected ? cur : null; },
+    // the pointer is on the open gap (so the target it stands for still holds)
+    over: e => !!(cur && cur.isConnected && e.target && e.target.closest && e.target.closest('.dgap') === cur),
+  };
+}
+// where elements are now: key -> rect, for flipTo after a redraw
+function snapRects(sel, keyOf) {
+  const m = new Map();
+  $$(sel).forEach(el => { const k = keyOf(el); if (k && !m.has(k)) m.set(k, el.getBoundingClientRect()); });
+  return m;
+}
+/* after a redraw, slide each element matching sel from its old rect (before.get(key)) to where it is now. Ones that
+   weren't there before (or moved further than max px) fade in instead when `fade`; size: also animate the height
+   (day-view blocks). same(el, key): false = don't slide this one (fade it instead). */
+function flipTo(sel, keyOf, before, { ms = 260, max = 900, fade = false, size = false, same } = {}) {
+  if (!MOTION()) return;
+  $$(sel).forEach(el => {
+    const k = keyOf(el), r0 = k && before.get(k), r = el.getBoundingClientRect();
+    const appear = () => { if (fade) el.animate([{ opacity: .25, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: ms, easing: EASE_OUT }); };
+    if (!r0 || (same && !same(el, k))) return appear();
+    const dx = r0.left - r.left, dy = r0.top - r.top, dh = size ? r0.height - r.height : 0;
+    if (Math.abs(dx) < .5 && Math.abs(dy) < .5 && Math.abs(dh) < .5) return;
+    if (Math.hypot(dx, dy) > max) return appear();
+    const from = { transform: `translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)` }, to = { transform: 'none' };
+    if (dh) { from.height = r0.height + 'px'; to.height = r.height + 'px'; }
+    el.animate([from, to], { duration: ms, easing: EASE_OUT });
+  });
+}
+/* soft snapping: a value that follows x smoothly but lingers near each multiple of step (a firm pull toward the grid
+   rather than a jump from one step to the next). The pull is applied twice for wider, flatter rests; k < 1 keeps it
+   moving forward the whole way. */
+const softPull = (x, step, k) => x - k * step / (2 * Math.PI) * Math.sin(2 * Math.PI * x / step);
+const softSnap = (x, step, k = .7) => softPull(softPull(x, step, k), step, k);

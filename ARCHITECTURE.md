@@ -45,9 +45,11 @@ js/core/  (no DOM; also loaded by the unit tests)
 
 js/ui/  (each view draws its part of the page and handles its own events)
   dom.js                $ / $$, icons, menus, inline text + date boxes, rename, warning bar, toast, modals, guide
-                        lines, tween, wheelSteps, hover-tip warm-up (hoverDelay / hoverShown / hoverGone, HOVER_WARM)
+                        lines, tween, wheelSteps, hover-tip warm-up (hoverDelay / hoverShown / hoverGone, HOVER_WARM);
+                        drag motion: makeGap (a gap opening where a dragged item would land), snapRects + flipTo
+                        (slide elements to their new places after a redraw), softSnap, MOTION (reduced-motion check)
   dragdrop.js           HTML5 drag state `drag` (drag.ids = a dragged selection), shared by sidebar and calendar;
-                        Option-drop
+                        Option-drop; gapH, drag.h / drag.ch (gap heights), dragSrc (dimmed source rows / chips)
   archive.js            Archive window
   sidebar.js            tree, gear menus (task / thread / project / failed attempt), link menu, new-task boxes,
                         click-to-insert, drag and drop, quickAct; markFailed + its follow-up prompt (#ask, hideAsk); multi-select `sel` (⌘ / Shift-click, revealChips) and #selbar
@@ -132,6 +134,7 @@ for live preview) must call `touch()`.
 | Timeline | `admireData` (ui/timeline-data.js), `renderAdmire`, `admTipHTML` (ui/timeline.js) |
 | multi-select, selection bar | end of ui/sidebar.js; ops under "several tasks at once" in core/ops.js |
 | task notes | ui/notes.js, `setTaskNotes`, task menu `openTaskMenu` (ui/sidebar.js) |
+| drag motion | sidebar: `treeGap` / `gapPlace`, drop → `treeRectsFor` + `flipTo` (ui/sidebar.js); calendar: `calGap` / `calGapAt`, drop → `flipTo` (ui/calendar.js); day view: `dvAim` / `dvFrame` (eased ghost), `dvLane` (its lane while moving), `dvRest` → `dvReflow` (columns make room once the pointer pauses), `dvGap`, `dvUp` → `flipTo` (ui/dayview-edit.js); gap heights: `gapH` (what lands at that spot: `treeMoving`, `calLanding`, listTarget.ids); helpers in ui/dom.js |
 | failed attempts | `failTasks` / `failLater` / `unscheduleLater` / `unfailTask` / `removeFail` (core/ops.js), `markFailed`, `openFailMenu` (ui/sidebar.js), `failChip` (ui/calendar.js), `renderDayList` / `renderDayTimeline`, `admireData` (`fail` kind) |
 | header, date range, 1–5 weeks / days | Planner.html; `renderHeader`, `setRange`, `navStep` / `navToday` (ui/app.js) |
 | keyboard shortcuts | keydown handler at end of ui/app.js, `switchView`; list them in `shortcutsHTML` (ui/dialogs.js) |
@@ -202,6 +205,13 @@ Four places can need text when something changes. Update them only where the cha
 - Non-passive `wheel` listeners only on the calendar (`main`) and day-view timeline (`.dv-main`); keep natively
   scrolling lists free of them.
 - Redraws preserve each calendar day's and list's scroll position (renderCal).
+- A drag gap (`.dgap`) sits under the pointer: the `dragenter` on it must be accepted (dragdrop.js) or the drop never
+  fires, and each list's dragover keeps the target the gap stands for while the pointer is on it (`gap.over(e)`).
+  Code that walks a list's children skips `.dgap`. Day-view blocks carry `data-s` / `data-d` (start / duration) for
+  `dvReflow`.
+- Animations after a drop (flipTo) run after the op's synchronous render; take the "before" rects first.
+- Option during an HTML5 drag: read it with `splitHeld(e)`, never `e.altKey` (stale mid-drag in Chrome on macOS), and set
+  `dropEffect` to 'copy' while it's held: an effect outside effectAllowed cancels the drop.
 - Don't change ids or saved-data shape without handling the old shape in `migrate`.
 - Don't edit planner.json while the app has unsaved changes.
 

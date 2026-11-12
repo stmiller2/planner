@@ -2,11 +2,16 @@
 /* HTML5 drag & drop shared by the sidebar and the calendar: what is being dragged (`drag`) and Option-drop.
    drag = { kind: 'task' | 'thread', id, from: 'side' | 'cal' | 'fail', ids? }: ids = a sidebar selection dragged together;
    'fail' = a failed attempt's chip (id = its task), which can only be dropped on a day. */
-// holding Option while dropping moves just that one task (unlinked; nothing else shifts)
-const splitHeld = e => !!(e && e.altKey);
+// how tall a gap to open for rows `els` (what will actually land there), at most 3 rows' worth
+const gapH = (els, one = 27) => Math.min(84, [...new Set(els.filter(Boolean))].reduce((a, x) => a + x.offsetHeight, 0) || one);
+/* holding Option while dropping moves just that one task (unlinked; nothing else shifts). In an HTML5 drag, Chrome on
+   macOS keeps the drag events' altKey as it was when the drag began, but Option pressed or let go mid-drag does change
+   what the system offers the page: effectAllowed (set to 'copyMove' in dragstart) reads 'copy' while Option is down.
+   Day-view drags are pointer events, whose altKey is current. */
+const splitHeld = e => !!(e && (e.altKey || (drag && e.dataTransfer && e.dataTransfer.effectAllowed === 'copy')));
 
 // drag & drop
-let drag = null;
+let drag = null, dragSrc = [];   // dragSrc: the dragged item's rows / chips (dimmed while it's out)
 document.addEventListener('dragstart', e => {
   const el = e.target.closest && e.target.closest('[draggable="true"]'); if (!el) return;
   closeMenu();
@@ -26,11 +31,23 @@ document.addEventListener('dragstart', e => {
     document.body.appendChild(g); e.dataTransfer.setDragImage(g, 14, 14); setTimeout(() => g.remove(), 0);
     document.body.classList.add('drag-many');
   }
-  document.body.classList.add('dragging');
+  document.body.classList.add('dragging'); hideInsline();
+  // what's being dragged: how tall a gap to open for it (sidebar rows, a calendar chip), and its rows / chips dim
+  // where they are (once Chrome has taken the drag image)
+  const src = drag.kind === 'thread' ? [$(`#tree .thread[data-tid="${drag.id}"]`)]
+    : drag.from === 'fail' ? [el] : (drag.ids || movingIds(drag.id, false)).flatMap(id => [taskEl(id), ...$$(`#grid .chip[data-id="${id}"]`)]);
+  drag.h = drag.kind === 'thread' ? Math.min(64, (src[0] && src[0].offsetHeight) || 27) : 0;   // tasks: per spot (gapH)
+  drag.ch = el.classList.contains('chip') ? el.offsetHeight : 38;
+  dragSrc = src.filter(Boolean);
+  setTimeout(() => { if (drag) dragSrc.forEach(x => x.classList.add('dragsrc')); }, 0);
   // open a small drop zone under each thread block (deferred so Chrome has taken the drag image first)
   if (drag.from === 'side') { const k = drag.kind; setTimeout(() => { if (drag) document.body.classList.add('drag-' + k); }, 0); }
 });
+// (a gap opened under the pointer: accept the drag entering it, so the drop still reaches the list it's in)
+document.addEventListener('dragenter', e => { if (drag && e.target.closest && e.target.closest('.dgap')) e.preventDefault(); });
 document.addEventListener('dragend', () => {
+  dragSrc.forEach(x => x.classList.remove('dragsrc')); dragSrc = [];
+  treeGap.hide(); calGap.hide();
   drag = null; document.body.classList.remove('dragging', 'drag-task', 'drag-thread', 'drag-many');
   $$('.day.over').forEach(x => x.classList.remove('over')); $('#tree').classList.remove('drop'); clearTdrop();
 });

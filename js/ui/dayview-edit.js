@@ -228,6 +228,11 @@ $('#dayview').addEventListener('pointerdown', e => {
   window.addEventListener('pointerup', dvUp, { once: true });
 });
 function dvCancel() { if (dv) dvUp(null, true); }
+// pressing or letting go of Option mid-drag (without moving) updates what would move, and the gap for it
+['keydown', 'keyup'].forEach(t => window.addEventListener(t, e => {
+  if (e.key !== 'Alt' || !dv || !dv.started || !dvLastE) return;
+  const p = dvLastE; dvMove({ clientX: p.clientX, clientY: p.clientY, target: p.target, altKey: e.type === 'keydown' });
+}));
 window.addEventListener('pointercancel', dvCancel);
 // the day column a drag is aimed at: the one under the pointer (x given), otherwise the task's own day.
 // Dropping a task in another visible day's column moves it to that day.
@@ -241,7 +246,7 @@ function dvCol(x) {
   const r = col.getBoundingClientRect(), sr = $('#dayview .dv-scroll').getBoundingClientRect();
   return { r, sr, sH: +col.dataset.sh, eH: +col.dataset.eh, date: col.dataset.date };
 }
-function dvMove(e) {
+function dvMove(e, rested) {   // rested: called by dvRest once the pointer has paused
   if (!dv) return;
   if (!dv.started) {
     if (Math.hypot(e.clientX - dv.x0, e.clientY - dv.y0) < 4) return;
@@ -253,20 +258,22 @@ function dvMove(e) {
       dvGhost.style.setProperty('--c', dv.color);
       dvGhost.innerHTML = `<div class="bi"><span class="tt">${esc(dv.title)}</span></div><div class="tm"></div>`;
       document.body.appendChild(dvGhost);
-      if (dv.mode === 'move') dv.el.style.opacity = '.25';
     }
+    if (dv.mode === 'place') dv.el.classList.add('dragsrc');
   }
   dvLastE = e; if (!dvAuto) dvAuto = requestAnimationFrame(dvAutoScroll);
   const resizing = dv.mode === 'top' || dv.mode === 'bottom';
   const c = dvCol(resizing ? undefined : e.clientX), lo = c.sH * 60, hi = c.eH * 60;
   const toMin = y => lo + (y - c.r.top) / PPM;
   if (resizing) {
-    const p = dv.p0, m = snapMin(toMin(e.clientY));
-    dv.res = dv.mode === 'bottom'
+    // the edge follows the pointer with a gentle pull toward each time step (softSnap); it lands on the nearest one
+    const p = dv.p0, raw = toMin(e.clientY);
+    const span = m => dv.mode === 'bottom'
       ? { start: p.start, dur: clamp(m, p.start + ui.snap, hi) - p.start }
       : (() => { const s = clamp(m, lo, p.start + p.dur - ui.snap); return { start: s, dur: p.start + p.dur - s }; })();
-    dv.el.style.top = (dv.res.start - lo) * PPM + 'px';
-    dv.el.style.height = Math.max(14, dv.res.dur * PPM - 2) + 'px';
+    dv.res = span(snapMin(raw)); const soft = span(softSnap(raw, ui.snap));
+    dvAim(dv.el, { top: (soft.start - lo) * PPM, height: Math.max(14, soft.dur * PPM - 2) });
+    dvRest(e, rested, dv.date, dv.res);
     const tm = dv.el.querySelector('.tm'); if (tm) tm.textContent = fmtSpan(dv.res.start, dv.res.dur);
     dv.el.title = fmtSpan(dv.res.start, dv.res.dur);
     return;
@@ -274,29 +281,94 @@ function dvMove(e) {
   const dur = dv.p0 ? dv.p0.dur : DEFAULT_DUR;
   const side = $('#dayview .dv-side').getBoundingClientRect();
   const overSide = e.clientX < side.right;
-  // a list item dragged within the list: reorder (a line shows where it will go)
-  dv.listTarget = dv.mode === 'place' && overSide ? dvListTarget(e) : null;
-  if (dv.listTarget) {
-    const L = dv.listTarget.line;
-    showGuide(dropline, L.y, L.x, L.right);
-  } else dropline.style.display = 'none';
+  // a list item dragged within the list: reorder (a gap opens where it will go; over the gap, its target holds)
+  if (!(dv.listTarget && dvGap.over(e))) dv.listTarget = dv.mode === 'place' && overSide ? dvListTarget(e) : null;
+  else dv.listTarget.ids = movingIds(dv.id, splitHeld(e));   // (over its gap: Option may have changed what moves)
+  dvListGap();
   const grid = $('#dayview .dv-grid').getBoundingClientRect();
   const overCol = !overSide && e.clientX >= grid.left && e.clientX <= grid.right + 20 && e.clientY >= c.sr.top && e.clientY <= c.sr.bottom;
   $('#dayview .dv-side').classList.toggle('rm', dv.mode === 'move' && overSide);
   dv.overSide = overSide;
   if (overCol) {
-    const topMin = toMin(e.clientY - (dv.mode === 'move' ? dv.offY : 12));
-    const start = clamp(snapMin(topMin), lo, Math.max(lo, hi - dur));
+    // the ghost glides up and down with a pull toward each time step (softSnap) and lands on the nearest; it keeps its
+    // lane across the column while it moves, and the day makes room for it only once the pointer pauses (dvRest)
+    const topMin = toMin(e.clientY - (dv.mode === 'move' ? dv.offY : 12)), fit = m => clamp(m, lo, Math.max(lo, hi - dur));
+    const start = fit(snapMin(topMin)), soft = fit(softSnap(topMin, ui.snap));
     dv.res = { start, dur }; dv.target = c.date;
-    Object.assign(dvGhost.style, { left: c.r.left + 3 + 'px', width: c.r.width - 6 + 'px', top: c.r.top + (start - lo) * PPM + 'px', height: Math.max(14, dur * PPM - 2) + 'px' });
+    dvRest(e, rested, c.date, dv.res);
+    const ln = dvLane(c), W = c.r.width;
+    dvAim(dvGhost, { left: c.r.left + ln.fl * W + 3, width: ln.fw * W - 6, top: c.r.top + (soft - lo) * PPM, height: Math.max(14, dur * PPM - 2) });
+    if (dv.mode === 'move') dv.el.style.opacity = '0';
     const other = c.date !== dv.date ? ` · moves${splitHeld(e) ? ' just this task' : ''} to ${DOW[parseD(c.date).getDay()]}` : '';
     dvGhost.querySelector('.tm').textContent = fmtSpan(start, dur) + other;
   } else {
-    dv.res = null;
-    Object.assign(dvGhost.style, { left: e.clientX - 16 + 'px', width: '220px', top: e.clientY - 12 + 'px', height: Math.max(14, Math.min(dur, 60) * PPM - 2) + 'px' });
+    dv.res = null; dvRest(e, rested, null, null);
+    if (dv.mode === 'move') dv.el.style.opacity = '.25';
+    dvAim(dvGhost, { left: e.clientX - 16, width: 220, top: e.clientY - 12, height: Math.max(14, Math.min(dur, 60) * PPM - 2) });
     dvGhost.querySelector('.tm').textContent = dv.mode === 'move' && overSide ? 'Remove from timeline'
       : dv.listTarget ? (splitHeld(e) ? 'Move just this task here' : 'Move here') : '';
   }
+}
+/* Motion while dragging on the timeline, kept calm on a busy day: dvAim sets where the dragged ghost (or the block
+   being resized) should be, in px; each frame it eases part of the way there (dvFrame), so it glides rather than
+   jumps. While the pointer moves, only that happens: nothing else on the timeline moves, and the ghost keeps its lane
+   across the column (dvLane: full width, or the block's own lane). Once the pointer has rested DV_REST ms, dvReflow
+   lays the columns out as they'd be after the drop (the dragged block at res in column `date`; null: not on the
+   timeline, a moved block back in its old place), the others ease into their lanes (css) and the ghost into its own. */
+const DV_REST = 260;
+function dvRest(e, rested, date, res) {
+  if (rested) { const sl = dvReflow(date, res); if (date && dv.mode !== 'top' && dv.mode !== 'bottom') dv.lane = { date, fl: sl.col / sl.ncol, fw: 1 / sl.ncol }; return; }
+  clearTimeout(dv.restT);
+  dv.restT = setTimeout(() => { if (dv && dv.started) dvMove(dvLastE || e, true); }, DV_REST);
+}
+function dvLane(c) {
+  if (!dv.lane || dv.lane.date !== c.date) {
+    let fl = 0, fw = 1;
+    if (dv.mode === 'move' && !dv.lane && c.date === dv.date) { const r = dv.el.getBoundingClientRect(); fl = (r.left - 3 - c.r.left) / c.r.width; fw = (r.width + 6) / c.r.width; }
+    dv.lane = { date: c.date, fl, fw };
+  }
+  return dv.lane;
+}
+let dvRaf = null;
+function dvAim(el, box) {
+  if (!dv.goal || dv.goal.el !== el) dv.disp = null;
+  dv.goal = { el, box };
+  if (!dvRaf) dvRaf = requestAnimationFrame(dvFrame);
+}
+function dvFrame() {
+  dvRaf = null; if (!dv || !dv.goal) return;
+  const { el, box } = dv.goal, d = dv.disp || (dv.disp = { ...box }), m = MOTION();
+  let more = false;
+  for (const p in box) {   // (sideways more slowly than up and down: a change of lane is a calmer move)
+    const t = box[p], v = d[p] ?? t, k = !m ? 1 : p === 'left' || p === 'width' ? .17 : .34;
+    d[p] = Math.abs(t - v) < .3 ? t : v + (t - v) * k; if (d[p] !== t) more = true; el.style[p] = d[p].toFixed(1) + 'px';
+  }
+  if (more) dvRaf = requestAnimationFrame(dvFrame);
+}
+function dvReflow(date, res) {
+  const key = date + '|' + (res ? res.start + '|' + res.dur : '');
+  if (dv.flow && dv.flow.key === key) return dv.flow.slot;
+  let slot = { col: 0, ncol: 1 };
+  $$('#dayview .dv-col').forEach(col => {
+    const bs = $$('.dv-blk[data-s]', col).filter(el => el !== dv.el || (!res && dv.mode === 'move')).map(el => ({ el, start: +el.dataset.s, end: +el.dataset.s + +el.dataset.d }));
+    const me = res && col.dataset.date === date ? { el: dv.mode === 'top' || dv.mode === 'bottom' ? dv.el : null, start: res.start, end: res.start + res.dur } : null;
+    if (me) bs.push(me);
+    layoutBlocks(bs).forEach(b => {
+      if (b === me) slot = { col: b.col, ncol: b.ncol };
+      if (b.el) { b.el.style.left = `calc(${b.col} * 100% / ${b.ncol} + 3px)`; b.el.style.width = `calc(100% / ${b.ncol} - 6px)`; }
+    });
+  });
+  dv.flow = { key, slot };
+  return slot;
+}
+// the gap in the day list where a list item would land (dvListTarget)
+const dvGap = makeGap();
+function dvListGap() {
+  const t = dv && dv.listTarget; if (!t || !MOTION()) { dvGap.hide(); if (t) showGuide(dropline, t.line.y, t.line.x, t.line.right); else dropline.style.display = 'none'; return; }
+  dropline.style.display = 'none';
+  const x = findThread(t.spot.tid), it = $(`#dayview .dv-item[data-id="${t.spot.refId}"]`); if (!x || !it) return dvGap.hide();
+  dvGap.show(t.spot.tid + ':' + layoutIndex(layout(x.t), t.spot.refId, t.spot.side), el => it.insertAdjacentElement(t.spot.side === 'before' ? 'beforebegin' : 'afterend', el),
+    gapH(t.ids.map(id => $(`#dayview .dv-item[data-id="${id}"]`)), dv.el.offsetHeight));
 }
 // Where a list item being dragged would land in the list: the nearest gap (before a task, or after the last task
 // under a thread heading) among the tasks of its own day. Like the main sidebar, it snaps to the edges of a linked
@@ -322,7 +394,7 @@ function dvListTarget(e) {
   const spot = { tid: best.tid, refId: anchor.id, side: best.side };
   if (isNoopTasks(dv.id, split, spot)) return null;
   const r = best.it.getBoundingClientRect();
-  return { spot, line: { y: best.y, x: r.left, right: lr.right } };
+  return { spot, ids: movingIds(dv.id, split), line: { y: best.y, x: r.left, right: lr.right } };
 }
 // while dragging a block (or a task from the list) near the top or bottom edge of the timeline, scroll it,
 // faster the closer the pointer is to the edge (and the same for the list while reordering in it)
@@ -344,23 +416,33 @@ function dvAutoScroll() {
   dvMove(e);
 }
 // cancel: the drag ends without changing anything (a right-click / context menu, or the pointer was lost)
+// After a drop, the blocks and list items slide from where they were shown to where they land (flipTo): the dropped
+// one from the ghost (or the gap in the list), the rest from where dvReflow had them.
+const DV_BLKS = '#dayview .dv-blk[data-id], #dayview .dv-blk[data-fid], #dayview .dv-item[data-id], #dayview .dv-item[data-fid]';
+const dvKey = el => (el.classList.contains('dv-blk') ? 'b:' : 'i:') + (el.dataset.id || 'f' + el.dataset.fid);
 function dvUp(e, cancel) {
   if (dvAuto) { cancelAnimationFrame(dvAuto); dvAuto = null; } dvLastE = null;
+  if (dvRaf) { cancelAnimationFrame(dvRaf); dvRaf = null; }
   window.removeEventListener('pointermove', dvMove); window.removeEventListener('pointerup', dvUp);
-  const d = dv; dv = null;
+  const d = dv; dv = null; if (d) clearTimeout(d.restT);
+  const before = d && d.started ? snapRects(DV_BLKS, dvKey) : null;
+  if (before && dvGhost && d.res) before.set('b:' + d.id, dvGhost.getBoundingClientRect());
+  const gr = dvGap.el && dvGap.el.getBoundingClientRect(); if (before && gr && d.listTarget) before.set('i:' + d.id, gr);
   document.body.classList.remove('dv-dragging', 'dv-resizing');
   if (dvGhost) { dvGhost.remove(); dvGhost = null; }
+  dvGap.hide();
   const side = $('#dayview .dv-side'); if (side) side.classList.remove('rm');
   dropline.style.display = 'none';
-  if (d && d.el) d.el.style.opacity = '';   // (dimmed while its ghost was out; a drop that changes nothing doesn't redraw)
+  if (d && d.el) { d.el.style.opacity = ''; d.el.classList.remove('dragsrc'); }   // (a drop that changes nothing doesn't redraw)
   if (!d || !d.started) return;
   if (cancel) return render();
   dvNoClick = Date.now();   // the click that follows a drag isn't a click on the block
   dvtip.style.display = 'none';
   const f = findTask(d.id); if (!f) return render();
-  if (d.mode === 'move' && d.overSide) return void mutate(() => { delete f.task.plan; });
-  if (d.mode === 'place' && d.listTarget) return void moveTasksTo(d.id, splitHeld(e), d.listTarget.spot);
-  if (!d.res) return render();
+  const settle = () => flipTo(DV_BLKS, dvKey, before, { size: true, ms: 220 });
+  if (d.mode === 'move' && d.overSide) { mutate(() => { delete f.task.plan; }); return settle(); }
+  if (d.mode === 'place' && d.listTarget) { moveTasksTo(d.id, splitHeld(e), d.listTarget.spot); return settle(); }
+  if (!d.res) { render(); return settle(); }
   const target = d.target || f.task.date;
   mutate(() => {
     // another day's column: move the task to that day, like dragging it on the calendar
@@ -368,4 +450,5 @@ function dvUp(e, cancel) {
     if (target !== f.task.date) applyMove(f.t, f.i, target, splitHeld(e));
     f.task.plan = { date: target, start: d.res.start, dur: d.res.dur };
   });
+  settle();
 }

@@ -87,3 +87,10 @@ select{border:1px solid var(--line);background:var(--panel);border-radius:7px;pa
 #status.ok::before{background:var(--ok)}
 #status.busy::before{background:#d6a21e}
 #status.err{color:var(--danger)} #status.err::before{background:var(--danger)}
+/* drag motion (dom.js): the gap that opens where a dragged item would land, and what's being dragged */
+.dgap{flex:none;box-sizing:border-box;border-radius:6px;margin:1px 0;pointer-events:auto;
+  background:color-mix(in srgb,var(--accent) 7%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--accent) 40%,transparent);
+  transition:height .18s cubic-bezier(.2,.75,.3,1),opacity .18s,margin .18s}
+.dgap.closing{opacity:0;margin:0}
+.dragsrc{opacity:.4;transition:opacity .15s}
+@media (prefers-reduced-motion: reduce){.dgap{transition:none}}

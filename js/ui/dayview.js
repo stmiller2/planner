@@ -186,13 +186,13 @@ function renderDayTimeline(box) {
     const blk = layoutBlocks(placed).map(b => {
       if (b.it.fl) {
         const top = (b.start - lo) * PPM, h = Math.max(12, b.dur * PPM - 2), k = b.it.k, short = h < 38, tiny = h < 22;
-        return `<div class="dv-blk failed ${short ? 'short' : ''} ${tiny ? 'tiny' : ''}" data-fid="${b.it.fl.id}" data-kid="${k.id}" title="Failed attempt ${b.it.a + 1}"
+        return `<div class="dv-blk failed ${short ? 'short' : ''} ${tiny ? 'tiny' : ''}" data-fid="${b.it.fl.id}" data-kid="${k.id}" data-s="${b.start}" data-d="${b.dur}" title="Failed attempt ${b.it.a + 1}"
             style="--c:${esc(colorOf(b.it.t))};top:${top}px;height:${h}px;left:calc(${b.col} * 100% / ${b.ncol} + 3px);width:calc(100% / ${b.ncol} - 6px)">
           <div class="bi"><span class="fx">${ICON.x}</span><span class="tt">${esc(k.title)}</span><span class="tmi">${fmtTime(b.start)}</span></div>
           <div class="tm">failed · ${fmtSpan(b.start, b.dur)} · ${esc(b.it.t.name)}</div></div>`;
       }
       const top = (b.start - lo) * PPM, h = Math.max(12, b.dur * PPM - 2), k = b.it.k, short = h < 38, tiny = h < 22;
-      return `<div class="dv-blk ${k.done ? 'done' : ''} ${short ? 'short' : ''} ${tiny ? 'tiny' : ''}" data-id="${k.id}"
+      return `<div class="dv-blk ${k.done ? 'done' : ''} ${short ? 'short' : ''} ${tiny ? 'tiny' : ''}" data-id="${k.id}" data-s="${b.start}" data-d="${b.dur}"
           style="--c:${esc(colorOf(b.it.t))};top:${top}px;height:${h}px;left:calc(${b.col} * 100% / ${b.ncol} + 3px);width:calc(100% / ${b.ncol} - 6px)">
         <div class="h t"></div>
         <div class="bi"><input type="checkbox" data-act="done" data-id="${k.id}" ${k.done ? 'checked' : ''}><span class="tt">${esc(k.title)}</span>${noteMark(k)}<span class="tmi">${fmtTime(b.start)}</span></div>
