@@ -13,6 +13,7 @@ function showHelp() {
   <h4>Rescheduling</h4>
   <p>When rescheduling tasks, linked tasks move too, unless holding <kbd>⌥ Option</kbd> while dropping the task (this breaks links and moves only the dragged task).</p>
   <p>By default, all tasks within a thread get shifted relative to each other when rescheduling. This can be turned off in Settings, or bypassed by holding <kbd>⌥ Option</kbd>.</p>
+  <p>If an experiment fails and needs to be rescheduled, you can also choose <b>Mark failed</b> from the task’s settings menu <span class="hic">${ICON.gear}</span> or by right-clicking. This allows the task to be rescheduled without removing the original attempt from calendar or timeline views.</p>
   <h4>Day view</h4>
   <p>To plan the timing of tasks within a single day, enter day view with the view switcher, pressing <kbd>d</kbd>, or by clicking the date number from calendar view. Drag tasks onto the timeline, then drag or click blocks to set their times.</p>
   <h4>Timeline</h4>
@@ -99,6 +100,7 @@ function renderSettings() {
     ${row('Shift later tasks', `<p>When you drag a scheduled task to a different day, every scheduled task <i>after</i> it in the same thread (unless the thread is unordered) moves by the same number of days, so the rest of the thread keeps its spacing. That includes later sub-threads and everything in them.</p>
       <p>Fully completed chains never move. Hold <b>⌥ Option</b> while dropping to just move that task.</p>
       <div>Dragging task 2 from Tue to Thu (+2 days):</div>${example}`, sw('shiftLater'))}
+    ${row('Keep day-view times', 'When a task moves to another day, its time on the day-view timeline moves with it.', sw('keepTimes'))}
     <h4>Calendar view</h4>
     ${row('Narrow weekends', 'Make the Saturday and Sunday columns narrower, leaving more room for weekdays.', sw('narrowWe'))}
     ${row('Week starts on', 'The first column of the calendar.', seg('weekStart', [[1, 'Monday'], [0, 'Sunday']]))}

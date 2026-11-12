@@ -62,7 +62,7 @@ function renderAdmire() {
   const top = `<div class="adm-top"><div class="adm-ctl"><label class="switch"><input type="checkbox" id="admPlan" ${ui.admPlanned ? 'checked' : ''}><span class="track"></span><span>Future tasks</span></label>
     <div class="seg" id="admRange">${[['all', 'All time'], [12, '12 weeks'], [4, '4 weeks']].map(([v, l]) => `<button data-v="${v}" class="${String(admRange) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div></div></div>`;
   const foot = D.undated ? `<p class="adm-foot"><span data-tip="undated">+${plural(D.undated, 'finished task')} without a date</span></p>` : '';
-  if (!D.total && !D.planned) {
+  if (!D.total && !D.planned && !D.failed) {
     el.innerHTML = `<div class="adm-wrap">${top}<div class="adm-empty">${D.everTotal ? 'Nothing finished in this stretch. Try a longer range.' : 'Nothing finished yet. Tick off a task and it will show up here, on its day.'}</div>${foot}</div>`;
     return;
   }
@@ -205,9 +205,10 @@ function renderAdmire() {
       return mixBg(col, a);
     };
     const inkOn = c => { const [r_, g_, b_] = hex(c).map(v => v / 255); return .2126 * r_ + .7152 * g_ + .0722 * b_ > .62 ? 'rgba(0,0,0,.72)' : '#fff'; };
-    const dotHTML = (tip, color, c, q, i, pie) => {
-      const sz = dotSize(c + q), cls = [c ? '' : 'plan', pie ? 'pie' : ''].join(' ');
-      return `<div class="adm-dot ${cls}" data-tip="${tip}" style="--c:${color};--tc:${inkOn(color)};${pie ? `--pie:${pie};` : ''}left:${xc(i)}px;--s:${sz.toFixed(1)}px;--d:${dl(i, .4, .9)}s">${c + q > 1 && sz >= 15 ? `<span>${c + q}</span>` : ''}</div>`;
+    // c done, q planned, f failed attempts (only failed: a hollow dot with a ✕; some failed among others: a red mark)
+    const dotHTML = (tip, color, c, q, i, pie, f = 0) => {
+      const n = c + q + f, sz = dotSize(n), cls = [c || !q ? '' : 'plan', pie ? 'pie' : '', f && !c && !q ? 'fail' : f ? 'hasfail' : ''].join(' ');
+      return `<div class="adm-dot ${cls}" data-tip="${tip}" style="--c:${color};--tc:${inkOn(color)};${pie ? `--pie:${pie};` : ''}left:${xc(i)}px;--s:${sz.toFixed(1)}px;--d:${dl(i, .4, .9)}s">${n > 1 && sz >= 15 ? `<span>${n}</span>` : ''}</div>`;
     };
     const blks = [];   // each project's block in this row: { h, x0, x1 (the stretch it takes up), html(y) }
     D.projs.forEach(p => {
@@ -222,9 +223,9 @@ function renderAdmire() {
       vis.forEach(L => {
         const lf = hasKids.has(L.key) && admCollapsed.has(L.key);
         const parts = lf ? p.lanes.filter(x => laneUnder(x, L.key, D.lanes)) : [L, ...hosted(L.key)];
-        const cells = new Map();   // day -> { done, plan }
-        parts.forEach(x => x.own.forEach((o, d) => { if (d < r0 || d > rEnd) return; const c = cells.get(d) || { done: 0, plan: 0 }; c.done += o.done.length; c.plan += o.plan.length; cells.set(d, c); }));
-        const half = d => { const c = cells.get(d); return c ? dotSize(c.done + c.plan) / 2 : 0; };
+        const cells = new Map();   // day -> { done, plan, fail }
+        parts.forEach(x => x.own.forEach((o, d) => { if (d < r0 || d > rEnd) return; const c = cells.get(d) || { done: 0, plan: 0, fail: 0 }; c.done += o.done.length; c.plan += o.plan.length; c.fail += o.fail.length; cells.set(d, c); }));
+        const half = d => { const c = cells.get(d); return c ? dotSize(c.done + c.plan + c.fail) / 2 : 0; };
         // its core: its own line (or, with none in this row, its first dot), named beside it; any other dots (the
         // unordered threads it hosts) only take up their own spot, so other lanes and projects can fill around them
         const days = [...cells.keys()].sort(), line = L.s && L.s <= rEnd && L.e >= r0;
@@ -297,15 +298,15 @@ function renderAdmire() {
       const hd = new Map();   // the ribbon row's dots: day -> how many
       if (folded) p.days.forEach((cnt, d) => {
         if (d < r0 || d > rEnd) return;
-        const parts = p.lanes.filter(L => L.own.has(d)), tot = cnt.done + cnt.plan;
-        pdots += dotHTML(`proj|${p.key}|${d}`, parts[0].color, cnt.done, cnt.plan, ix(d), pieOf(parts, d, tot)); hd.set(d, tot);
+        const parts = p.lanes.filter(L => L.own.has(d)), tot = cnt.done + cnt.plan + cnt.fail;
+        pdots += dotHTML(`proj|${p.key}|${d}`, parts[0].color, cnt.done, cnt.plan, ix(d), pieOf(parts, d, tot), cnt.fail); hd.set(d, tot);
       });
       else {   // the loose lanes it hosts (unordered threads with no ordered thread above them)
         const own = hosted(null), days = new Set(own.flatMap(L => [...L.own.keys()]));
         days.forEach(d => {
           if (d < r0 || d > rEnd) return;
-          const parts = own.filter(L => L.own.has(d)), c = parts.reduce((a, L) => a + L.own.get(d).done.length, 0), q = parts.reduce((a, L) => a + L.own.get(d).plan.length, 0);
-          pdots += dotHTML(`set|${parts.map(L => L.key).join(',')}|${d}`, parts[0].color, c, q, ix(d), pieOf(parts, d, c + q)); hd.set(d, c + q);
+          const parts = own.filter(L => L.own.has(d)), c = parts.reduce((a, L) => a + L.own.get(d).done.length, 0), q = parts.reduce((a, L) => a + L.own.get(d).plan.length, 0), f = parts.reduce((a, L) => a + L.own.get(d).fail.length, 0);
+          pdots += dotHTML(`set|${parts.map(L => L.key).join(',')}|${d}`, parts[0].color, c, q, ix(d), pieOf(parts, d, c + q + f), f); hd.set(d, c + q + f);
         });
       }
       let lanesH = '', links = '';
@@ -316,8 +317,8 @@ function renderAdmire() {
           const { lf, parts, cells, ext } = G.get(L.key), [side, tx] = tagOf.get(L.key), kids = hasKids.has(L.key);
           let dots = '';
           cells.forEach((c, d) => {
-            const ps = parts.filter(x => x.own.has(d)), tot = c.done + c.plan;
-            dots += dotHTML(lf ? `fold|${L.key}|${d}` : `set|${ps.map(x => x.key).join(',')}|${d}`, ps[0].color, c.done, c.plan, ix(d), pieOf(ps, d, tot));
+            const ps = parts.filter(x => x.own.has(d)), tot = c.done + c.plan + c.fail;
+            dots += dotHTML(lf ? `fold|${L.key}|${d}` : `set|${ps.map(x => x.key).join(',')}|${d}`, ps[0].color, c.done, c.plan, ix(d), pieOf(ps, d, tot), c.fail);
           });
           // its name, quietly, beside its line
           dots += `<span class="adm-tag" data-side="${side}" style="left:${tx.toFixed(1)}px;--d:${dl(ext[0] / DW, .6, .6)}s">${esc(L.name)}</span>`;
@@ -414,7 +415,7 @@ function renderAdmire() {
         <span class="ind" style="width:${10 + L.depth * 12}px"></span><span class="tw">${kids ? (lf ? '▶' : '▼') : ''}</span><span class="sw"></span><span class="nm">${esc(L.name)}</span><span class="cnt">${L.sub || ''}${L.subp ? `<em>+${L.subp}</em>` : ''}</span></div>`;
     }).join(''));
   }).join('');
-  const sum = [D.total ? `${D.total} done` : '', D.planned ? `${D.planned} planned` : ''].filter(Boolean).join(' · ');
+  const sum = [D.total ? `${D.total} done` : '', D.planned ? `${D.planned} planned` : '', D.failed ? `${D.failed} failed` : ''].filter(Boolean).join(' · ');
   tl.innerHTML = `<div class="adm-side"><div class="adm-list">${list}</div><div class="adm-sum">${sum}</div></div><div class="adm-main" style="--lw:0px">${rowsHTML.join('')}</div>
     <div class="adm-sres" style="left:${(parseFloat(cs.paddingLeft) + LW + GAP / 2 - 4.5).toFixed(1)}px"></div>`;
   // the list never runs taller than the timeline beside it (or the window); past that it scrolls
@@ -431,8 +432,8 @@ function admTipHTML(spec) {
   const [kind, a, b] = spec.split('|'), D = admD; if (!D) return '';
   if (kind === 'undated') return admTipList('Without a date', D.undatedG || []);
   let groups = [], day;
-  const grpOf = (L, withProj) => { const o = L.own.get(day) || { done: [], plan: [] };
-    return { name: L.name, up: (withProj ? [(D.projs.find(p => p.key === L.pkey) || {}).name] : []).concat(L.path.slice(0, -1)).join(' › '), color: L.color, done: o.done, plan: o.plan }; };
+  const grpOf = (L, withProj) => { const o = L.own.get(day) || { done: [], plan: [], fail: [] };
+    return { name: L.name, up: (withProj ? [(D.projs.find(p => p.key === L.pkey) || {}).name] : []).concat(L.path.slice(0, -1)).join(' › '), color: L.color, done: o.done, plan: o.plan, fail: o.fail }; };
   if (kind === 'lane') { day = b; const L = D.lanes.get(a); if (L) groups = [grpOf(L, true)]; }
   else if (kind === 'set') { day = b; groups = a.split(',').map(k => D.lanes.get(k)).filter(L => L && L.own.has(day)).map(L => grpOf(L, true)); }   // a lane with the loose dots it hosts
   else if (kind === 'proj') { day = b; const p = D.projs.find(x => x.key === a); if (p) groups = p.lanes.filter(L => L.own.has(day)).map(L => grpOf(L, false)); }
@@ -442,13 +443,13 @@ function admTipHTML(spec) {
   const head = kind === 'proj' && groups.length ? `<div class="at-g" style="--c:${groups[0].color};padding-top:2px"><span class="nm">${esc((D.projs.find(x => x.key === a) || {}).name || '')}</span></div>` : '';
   return admTipList(fmtLong(day), groups, head);
 }
-// the list itself: a heading (the day), then each lane's done and planned tasks
+// the list itself: a heading (the day), then each lane's done, planned and failed tasks
 function admTipList(title, groups, head = '') {
-  const nd = groups.reduce((s, g) => s + g.done.length, 0), np = groups.reduce((s, g) => s + g.plan.length, 0); if (!nd && !np) return '';
-  const item = (g, k, pl) => `<div class="at-i ${pl ? 'pl' : ''}" style="--c:${g.color}"><span class="ck">${pl ? '' : '✓'}</span><span>${esc(k.title || '(untitled)')}</span></div>`;
-  return `<div class="at-h"><b>${esc(title)}</b><span>${[nd ? nd + ' done' : '', np ? np + ' planned' : ''].filter(Boolean).join(' · ')}</span></div>${head}` + groups.map(g => `
+  const cnt = key => groups.reduce((s, g) => s + (g[key] || []).length, 0), nd = cnt('done'), np = cnt('plan'), nf = cnt('fail'); if (!nd && !np && !nf) return '';
+  const item = (g, k, kind) => `<div class="at-i ${kind}" style="--c:${g.color}"><span class="ck">${kind === 'pl' ? '' : kind === 'fl' ? '✕' : '✓'}</span><span>${esc(k.title || '(untitled)')}</span></div>`;
+  return `<div class="at-h"><b>${esc(title)}</b><span>${[nd ? nd + ' done' : '', np ? np + ' planned' : '', nf ? nf + ' failed' : ''].filter(Boolean).join(' · ')}</span></div>${head}` + groups.map(g => `
     <div class="at-g" style="--c:${g.color}"><span class="sw"></span><span class="nm">${esc(g.name)}</span>${g.up ? `<span class="up">${esc(g.up)}</span>` : ''}</div>
-    ${g.done.map(k => item(g, k, false)).join('')}${g.plan.map(k => item(g, k, true)).join('')}`).join('');
+    ${g.done.map(k => item(g, k, '')).join('')}${g.plan.map(k => item(g, k, 'pl')).join('')}${(g.fail || []).map(k => item(g, k, 'fl')).join('')}`).join('');
 }
 function admPlaceTip(anchor) {
   const html = admTipHTML(anchor.dataset.tip); if (!html) return admHideTip(true);

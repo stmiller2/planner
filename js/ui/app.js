@@ -89,6 +89,10 @@ document.addEventListener('click', e => {
     case 'k-notes': closeMenu(); editNotes(id, menuTask); break;
     case 'del-k': closeMenu(); delTask(id); quickAct('del'); break;
     case 'arch-k': closeMenu(); archiveTask(id); quickAct('arch'); break;
+    case 'k-fail': closeMenu(); markFailed([id]); break;
+    case 'fail-rm': closeMenu(); removeFail(a.dataset.fid); break;
+    case 'k-unfail': closeMenu(); unfailTask(id); break;
+    case 'reveal-k': closeMenu(); reveal(id); break;
     case 'date': { const f = findTask(id); if (f) editDateIn(a, { value: f.task.date, allowEmpty: true, emptyText: 'no date (unscheduled)', commit: v => moveTask(id, v), clear: f.task.date ? () => moveTask(id, null) : null }); break; }
     case 'reveal': clearTimeout(revealTimer); if (e.detail === 1) revealTimer = setTimeout(() => reveal(id), 250); break;
     case 'openday': openDay(a.dataset.date); break;
@@ -101,7 +105,7 @@ document.addEventListener('click', e => {
       const ids = a.dataset.has.split(' '), open = ids.some(x => drOpen.has(x));
       ids.forEach(x => open ? drOpen.delete(x) : drOpen.add(x)); render(); break;
     }
-    case 'sel-clear': case 'sel-date': case 'sel-link': case 'sel-unlink': case 'sel-done': case 'sel-arch': case 'sel-del': selAct(act, a); break;
+    case 'sel-clear': case 'sel-date': case 'sel-link': case 'sel-unlink': case 'sel-done': case 'sel-fail': case 'sel-arch': case 'sel-del': selAct(act, a); break;
     case 'unplan': { const f = findTask(id); if (f) mutate(() => { delete f.task.plan; }); break; }
   }
 });
@@ -113,6 +117,8 @@ const TASK_EL = '#tree .task[data-id], #grid .chip[data-id], #dayview .dv-item[d
 let ctxEat = false;
 document.addEventListener('contextmenu', e => {
   closeMenu();
+  const fe = e.target.closest && e.target.closest('#grid .chip[data-fid], #dayview [data-fid]');   // a failed attempt
+  if (fe) { e.preventDefault(); closeTimePop(true); hideTip(); hideNotesTip(); openFailMenu(fe.dataset.fid, { x: e.clientX, y: e.clientY }); ctxEat = true; return; }
   const el = e.target.closest && e.target.closest(TASK_EL); if (!el || e.target.closest('.inl')) return;
   e.preventDefault(); closeTimePop(true); hideTip(); hideNotesTip();
   openTaskMenu(el.dataset.id, null, { x: e.clientX, y: e.clientY }, el);
@@ -141,7 +147,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('dblclick', e => {
   // a task's title on the calendar (week view chip, day-view block or list item)
-  const tt = e.target.closest('.chip .tt, .dv-blk .tt, .dv-item .tt');
+  const tt = e.target.closest(':is(.chip, .dv-blk, .dv-item):not(.failed) .tt');
   if (tt) {
     if (tt.querySelector('input')) return;
     clearTimeout(revealTimer); closeTimePop(false); hideTip();

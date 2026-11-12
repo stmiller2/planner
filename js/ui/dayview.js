@@ -107,19 +107,27 @@ function renderDayList(box, only, cur = ui.dayView) {
   const addBox = tid => `<input class="add dvadd" data-tid="${tid}" placeholder="New task (Enter to add, Esc to stop)">`;
   let html = '';
   days.forEach(day => {
-    const items = dayTasks(day);
+    const items = dayTasks(day), all = items.concat(dayFails(day)).sort((a, b) => a.n - b.n);   // failed attempts among them, in sidebar order
     let sec = '', lastT = null;
-    items.forEach(it => {
+    all.forEach(it => {
       if (it.t !== lastT) {
         if (lastT) sec += '</div>';
         lastT = it.t;
         sec += `<div class="dv-grp" data-tid="${it.t.id}"><div class="dv-th" style="--c:${esc(colorOf(it.t))}"><span class="dot"></span><span class="nm">${esc(it.path[it.path.length - 1])}</span></div>`;
       }
+      if (it.fl) {   // a failed attempt (see failChip, ui/calendar.js)
+        const fp = it.fl.dur ? `${fmtSpan(it.fl.start, it.fl.dur)} · ` : '';
+        sec += `<div class="dv-item failed" data-fid="${it.fl.id}" data-kid="${it.k.id}" style="--c:${esc(colorOf(it.t))}" title="Failed attempt ${it.a + 1}">
+          <span class="fx">${ICON.x}</span>
+          <div class="bd"><div class="tt">${esc(it.k.title)}</div><div class="tm">${fp}failed · attempt ${it.a + 1}</div></div>
+          <span class="acts"><button class="ic" data-act="fail-rm" data-fid="${it.fl.id}" title="Remove failed attempt">${ICON.trash}</button></span></div>`;
+        return;
+      }
       const p = planOf(it.k);
       if (dvAdd && dvAdd.beforeId === it.k.id) sec += addBox(it.t.id);
       sec += `<div class="dv-item ${p ? 'placed' : ''} ${it.k.done ? 'done' : ''}" data-id="${it.k.id}" style="--c:${esc(colorOf(it.t))}">
         <input type="checkbox" data-act="done" data-id="${it.k.id}" ${it.k.done ? 'checked' : ''}>
-        <div class="bd"><div class="tt">${esc(it.k.title)}${noteMark(it.k)}</div>${p ? `<div class="tm">${fmtSpan(p.start, p.dur)}</div>` : ''}</div>
+        <div class="bd"><div class="tt">${esc(it.k.title)}${noteMark(it.k)}${tryBadge(it.k)}</div>${p ? `<div class="tm">${fmtSpan(p.start, p.dur)}</div>` : ''}</div>
         <span class="acts"><button class="ic" data-act="kmenu" data-id="${it.k.id}" title="Task settings">${ICON.gear}</button><button class="ic qk qk-arch" data-act="arch-k" data-id="${it.k.id}" title="Archive">${ICON.archive}</button><button class="ic qk qk-del" data-act="del-k" data-id="${it.k.id}" title="Delete">${ICON.trash}</button></span></div>`;
       if (dvAdd && dvAdd.afterId === it.k.id) sec += addBox(it.t.id);
     });
@@ -173,8 +181,16 @@ function renderDayTimeline(box) {
     if (h < eH) lines += `<div class="dv-line half" style="top:${y + 30 * PPM}px"></div>`;
   }
   const col = d => {
-    const placed = dayTasks(d).filter(it => planOf(it.k)).map(it => { const p = planOf(it.k); return { it, start: p.start, end: p.start + p.dur, dur: p.dur }; });
+    const placed = dayTasks(d).filter(it => planOf(it.k)).map(it => { const p = planOf(it.k); return { it, start: p.start, end: p.start + p.dur, dur: p.dur }; })
+      .concat(dayFails(d).filter(it => it.fl.dur).map(it => ({ it, start: it.fl.start, end: it.fl.start + it.fl.dur, dur: it.fl.dur })));   // failed attempts keep their slot
     const blk = layoutBlocks(placed).map(b => {
+      if (b.it.fl) {
+        const top = (b.start - lo) * PPM, h = Math.max(12, b.dur * PPM - 2), k = b.it.k, short = h < 38, tiny = h < 22;
+        return `<div class="dv-blk failed ${short ? 'short' : ''} ${tiny ? 'tiny' : ''}" data-fid="${b.it.fl.id}" data-kid="${k.id}" title="Failed attempt ${b.it.a + 1}"
+            style="--c:${esc(colorOf(b.it.t))};top:${top}px;height:${h}px;left:calc(${b.col} * 100% / ${b.ncol} + 3px);width:calc(100% / ${b.ncol} - 6px)">
+          <div class="bi"><span class="fx">${ICON.x}</span><span class="tt">${esc(k.title)}</span><span class="tmi">${fmtTime(b.start)}</span></div>
+          <div class="tm">failed · ${fmtSpan(b.start, b.dur)} · ${esc(b.it.t.name)}</div></div>`;
+      }
       const top = (b.start - lo) * PPM, h = Math.max(12, b.dur * PPM - 2), k = b.it.k, short = h < 38, tiny = h < 22;
       return `<div class="dv-blk ${k.done ? 'done' : ''} ${short ? 'short' : ''} ${tiny ? 'tiny' : ''}" data-id="${k.id}"
           style="--c:${esc(colorOf(b.it.t))};top:${top}px;height:${h}px;left:calc(${b.col} * 100% / ${b.ncol} + 3px);width:calc(100% / ${b.ncol} - 6px)">

@@ -84,3 +84,25 @@ body.dragging .chip, body.dragging .task{cursor:grabbing}
 :root[data-theme="dark"] :is(.chip,.dv-item,.dv-blk) :is(.tt,.ts .nd){color:var(--on)}
 :root[data-theme="dark"] :is(.chip,.dv-item,.dv-blk) :is(.ts,.tm,.tmi,.nti){color:color-mix(in srgb,var(--on) 72%,transparent)}
 :root[data-theme="dark"] :is(.chip .cx,.dv-blk .x){background:var(--fill);color:var(--on)}
+
+/* failed attempts (failChip in calendar.js; also day-view items and blocks, css/dayview.css): hatched in the thread's
+   color with a dashed edge, a ✕ in the thread's color where the checkbox would be, the title struck through in red,
+   "failed" in red */
+.chip.failed,.dv-item.failed,.dv-blk.failed{
+  --fail-a:color-mix(in srgb,var(--c) 16%,var(--chip));--fail-b:color-mix(in srgb,var(--c) 5%,var(--chip));
+  background:repeating-linear-gradient(135deg,var(--fail-a) 0 5px,var(--fail-b) 5px 10px);
+  border-left:3px dashed color-mix(in srgb,var(--cs) 70%,var(--chip));color:var(--muted)}
+:root[data-theme="dark"] :is(.chip,.dv-item,.dv-blk).failed{--on:var(--muted);--cs:color-mix(in srgb,var(--c) 70%,#fff);color-scheme:dark;
+  --fail-a:color-mix(in srgb,var(--c) 26%,var(--chip));--fail-b:color-mix(in srgb,var(--c) 9%,var(--chip));
+  background:repeating-linear-gradient(135deg,var(--fail-a) 0 5px,var(--fail-b) 5px 10px);border-left-color:color-mix(in srgb,var(--c) 55%,var(--chip))}
+:is(.chip,.dv-item,.dv-blk).failed .tt{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--fail) 70%,transparent);font-weight:500}
+.fx{flex:none;width:13px;height:13px;margin-top:2px;color:color-mix(in srgb,var(--cs) 80%,var(--ink));display:inline-flex}
+.fx svg{width:13px;height:13px;stroke-width:2.6}
+.ts .fl,.tm .fl{color:var(--fail);font-weight:600}
+.chip.failed.arch{cursor:default;opacity:.8}
+/* a task that failed before: which attempt this one is */
+.try{display:inline-block;font-size:9.5px;font-weight:650;line-height:14px;padding:0 4px;border-radius:7px;margin-left:5px;vertical-align:1px;white-space:nowrap;
+  color:var(--fail);background:color-mix(in srgb,var(--fail) 12%,transparent);text-decoration:none}
+.ts .try{margin-left:0}
+:root[data-theme="dark"] :is(.chip,.dv-item) .try{color:#8c1d16;background:rgba(255,255,255,.45)}
+.task>.try{flex:none;margin-left:0}

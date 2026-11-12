@@ -9,7 +9,10 @@ const CF_TOP = 28, CF_PITCH = 21;   // a conflict bar's offset from the top of a
 const archivedByDate = memo(() => {
   const archOn = {};
   (state.archive || []).forEach(e => {
-    const fr = e.from || {}, add = (k, color, name, path) => { if (k.date) (archOn[k.date] = archOn[k.date] || []).push({ k, color, name, path }); };
+    const fr = e.from || {}, add = (k, color, name, path) => {
+      if (k.date) (archOn[k.date] = archOn[k.date] || []).push({ k, color, name, path });
+      (k.fails || []).forEach((fl, a) => (archOn[fl.date] = archOn[fl.date] || []).push({ k, color, name, path, fl, a }));   // its failed attempts too
+    };
     if (e.kind === 'task') { const live = fr.tid && findThread(fr.tid); add(e.item, live ? colorOf(live.t) : fr.color || PALETTE[0], (fr.path || []).slice(-1)[0] || '', (fr.path || []).join(' › ')); return; }
     const cm = new Map(), threads = e.kind === 'project' ? (e.item.threads || []) : [e.item];
     if (e.kind === 'thread') { const c0 = e.item.color || fr.color || PALETTE[0]; cm.set(e.item.id, c0); colorTree(e.item.threads, c0, cm); } else colorTree(threads, null, cm);
@@ -38,7 +41,9 @@ function renderCal(strip) {
     }
   }
   const archOn = archivedByDate();
-  const archChip = x => `<div class="chip arch ${x.k.done ? 'done' : ''}" style="--c:${esc(x.color)}" title="${esc(x.path)} · archived">
+  const archChip = x => x.fl ? `<div class="chip arch failed" style="--c:${esc(x.color)}" title="${esc(x.path)} · failed attempt ${x.a + 1} · archived">
+    <span class="fx">${ICON.x}</span><div class="cb"><div class="tt">${esc(x.k.title)}</div><div class="ts"><span class="fl">failed</span><span class="tn">${esc(x.name)} · archived</span></div></div></div>`
+    : `<div class="chip arch ${x.k.done ? 'done' : ''}" style="--c:${esc(x.color)}" title="${esc(x.path)} · archived">
     <input type="checkbox" ${x.k.done ? 'checked' : ''} disabled tabindex="-1"><div class="cb"><div class="tt">${esc(x.k.title)}</div><div class="ts"><span class="tn">${esc(x.name)} · archived</span></div></div></div>`;
   const grid = $('#grid');
   grid.style.gridTemplateColumns = cols;
@@ -53,10 +58,12 @@ function renderCal(strip) {
     const d = addDays(start, n), dd = parseD(d), wd = dd.getDay(), w = Math.floor(n / 7);
     const cls = ['day', (wd === 0 || wd === 6) && 'we', d === today && 'today', d < today && 'past', cs.some(c => c.start <= d && d <= c.end) && 'cf'].filter(Boolean).join(' ');
     const label = (n === 0 || dd.getDate() === 1) ? `${MON[dd.getMonth()]} ${dd.getDate()}` : dd.getDate();
+    // runs and failed attempts in sidebar order (index order n), so a failed attempt stays where its task was
+    const nOf = new Map(dayTasks(d).map(it => [it.k.id, it.n]));
     const items = (byDate[d] || []).map(r => {
       const chips = []; for (let k = r.s; k <= r.e; k++) chips.push([r.t.tasks[k].id, chip(r, k)]);
-      return r.e > r.s ? `<div class="grp" style="--c:${esc(colorOf(r.t))}">${selRuns(chips)}</div>` : selRuns(chips);
-    }).join('') + (archOn[d] || []).map(archChip).join('');
+      return [nOf.get(r.t.tasks[r.s].id), r.e > r.s ? `<div class="grp" style="--c:${esc(colorOf(r.t))}">${selRuns(chips)}</div>` : selRuns(chips)];
+    }).concat(dayFails(d).map(e => [e.n, failChip(e)])).sort((a, b) => a[0] - b[0]).map(x => x[1]).join('') + (archOn[d] || []).map(archChip).join('');
     const gap = wkSlots[w] ? `<div class="cf-gap" style="height:${wkSlots[w] * CF_PITCH + 4}px"></div>` : '';
     html += `<div class="${cls}" data-date="${d}" style="grid-row:${w + 1};grid-column:${n % 7 + 1}"><div class="dn"><span class="n" data-act="openday" data-date="${d}">${label}</span></div>${gap}<div class="items">${items}</div></div>`;
   }
@@ -185,10 +192,22 @@ function chip({ p, t, path }, i) {
   return `<div class="chip ${k.done ? 'done' : ''}${sel.has(k.id) ? ' sel' : ''}" draggable="true" data-id="${k.id}" data-thread="${t.id}" ${links ? `data-links="${links}"` : ''} style="--c:${esc(colorOf(t))}"
       ${k.notes ? '' : `title="${esc([p.name, ...path].join(' › '))}${isLoose(p, t) ? '' : ` #${i + 1}`}"`}>
     <input type="checkbox" data-act="done" data-id="${k.id}" ${k.done ? 'checked' : ''}>
-    <div class="cb" data-act="reveal" data-id="${k.id}"><div class="tt">${esc(k.title)}${noteMark(k)}</div><div class="ts"><span class="tn">${esc(t.name)}${isLoose(p, t) ? '' : ` · ${i + 1}/${t.tasks.length}`}</span>${nd}</div></div>
+    <div class="cb" data-act="reveal" data-id="${k.id}"><div class="tt">${esc(k.title)}${noteMark(k)}</div><div class="ts"><span class="tn">${esc(t.name)}${isLoose(p, t) ? '' : ` · ${i + 1}/${t.tasks.length}`}</span>${tryBadge(k)}${nd}</div></div>
     <button class="ic cx" data-act="unsched" data-id="${k.id}" title="Unschedule" draggable="false">${ICON.x}</button>
   </div>`;
 }
+/* A failed attempt (task.fails, see failTasks): a struck, hatched chip on the day it happened. It isn't the task
+   itself (no data-id: no checkbox, selection or notes), but hovering it picks out the task, clicking shows it in the
+   sidebar, dragging it to a day reschedules the task (the failed attempt stays), and right-clicking opens openFailMenu. */
+function failChip(e) {
+  const tip = `Failed attempt ${e.a + 1} · ${[e.p.name, ...e.path].join(' › ')}`;
+  return `<div class="chip failed" draggable="true" data-fid="${e.fl.id}" data-kid="${e.k.id}" style="--c:${esc(colorOf(e.t))}" title="${esc(tip)}">
+    <span class="fx">${ICON.x}</span>
+    <div class="cb" data-act="reveal" data-id="${e.k.id}"><div class="tt">${esc(e.k.title)}</div><div class="ts"><span class="fl">failed</span><span class="tn">${esc(e.t.name)}</span></div></div>
+  </div>`;
+}
+// on a task that has failed before: which attempt this is ("try 2"), with the earlier dates on hover
+const tryBadge = k => k.fails ? `<span class="try" title="Failed ${k.fails.map(x => fmtShort(x.date)).join(', ')}">try ${attemptNo(k)}</span>` : '';
 let hl = null;
 // highlight one task in both the sidebar and the calendar
 function setHL(id, force) {
@@ -198,11 +217,12 @@ function setHL(id, force) {
   if (!id) return;
   $$(`.task[data-id="${id}"], #tree .drun[data-has~="${id}"]`).forEach(x => x.classList.add('hl'));   // sidebar: just that task (or its folded line)
   $$(`.chip[data-id="${id}"]`).forEach(c => (c.closest('.grp') || c).classList.add('hl'));  // calendar: its whole same-day group
+  $$(`.chip[data-kid="${id}"]`).forEach(c => c.classList.add('hl'));                       // ... and its failed attempts
 }
 
 // hover a task in one place -> highlight it in the other
 const grid = $('#grid');
-grid.addEventListener('mouseover', e => { if (drag) return; const c = e.target.closest('.chip'); setHL(c ? c.dataset.id : null); });
+grid.addEventListener('mouseover', e => { if (drag) return; const c = e.target.closest('.chip'); setHL(c ? c.dataset.id || c.dataset.kid || null : null); });
 grid.addEventListener('mouseleave', () => setHL(null));
 // ⌘ / Ctrl / Shift-click a chip: select it, as in the sidebar (Shift: every chip between, day by day; selClick in sidebar.js)
 grid.addEventListener('mousedown', e => {   // (Shift-click would otherwise select the text in between)

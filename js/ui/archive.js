@@ -23,7 +23,7 @@ function showArchive() {
 }
 // read-only outline of what an archived thread / project contained
 function archOutline(threads) {
-  const taskLine = k => `<li class="${k.done ? 'done' : ''}"><span class="ck">${k.done ? '✓' : ''}</span>${esc(k.title)}${k.date ? `<span class="d">${fmtShort(k.date)}</span>` : ''}</li>`;
+  const taskLine = k => `<li class="${k.done ? 'done' : ''}"><span class="ck">${k.done ? '✓' : ''}</span>${esc(k.title)}${k.date ? `<span class="d">${fmtShort(k.date)}</span>` : ''}${k.fails ? `<span class="d">failed ${plural(k.fails.length, 'time')}</span>` : ''}</li>`;
   const th = t => `<li class="th"><b>${esc(t.name)}</b><ul>${layout(t).map(x => x.kind === 'task' ? taskLine(x.obj) : th(x.obj)).join('') || '<li class="none">(empty)</li>'}</ul></li>`;
   return `<ul class="ao">${threads.map(th).join('')}</ul>`;
 }
@@ -37,7 +37,7 @@ function renderArchive(first) {
   const rows = shown.map(e => {
     const tg = restoreTarget(e), open = archOpen.has(e.id);
     let info = '';
-    if (e.kind === 'task') info = [e.item.done ? 'done' : 'not done', e.item.date ? fmtShort(e.item.date) : 'no date'].join(' · ');
+    if (e.kind === 'task') info = [e.item.done ? 'done' : 'not done', e.item.date ? fmtShort(e.item.date) : 'no date', e.item.fails ? `failed ${plural(e.item.fails.length, 'time')}` : ''].filter(Boolean).join(' · ');
     else {
       const all = e.kind === 'project' ? e.item.threads.flatMap(subtreeTasks) : subtreeTasks(e.item);
       info = `${plural(all.length, 'task')}, ${all.filter(k => k.done).length} done`;

@@ -123,3 +123,8 @@
 .dv-ghost{position:fixed;pointer-events:none;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:.95}
 body.dv-dragging,body.dv-dragging *{cursor:grabbing !important;user-select:none}
 body.dv-resizing,body.dv-resizing *{cursor:ns-resize !important;user-select:none}
+/* failed attempts (see css/calendar.css for their look): not draggable; a list item's ✕ sits where the checkbox does */
+.dv-item.failed,.dv-blk.failed{cursor:default}
+.dv-blk.failed{box-shadow:0 0 0 1px var(--bg)}
+.dv-blk.failed .bi .fx{margin-top:1px}
+.dv-blk.failed.short .bi .fx{margin-top:0}

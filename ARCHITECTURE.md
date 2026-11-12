@@ -36,10 +36,11 @@ js/core/  (no DOM; also loaded by the unit tests)
   util.js               esc, ids, date strings, formatting, colors, plural, clamp
   parse.js              typed dates ("fri", "11/26", "+3", "td" / "tm") and times ("2pm", "930")
   prefs.js              `ui`: per-browser prefs (UI_PREFS) + new-task-box state
-  model.js              `state`, migrate, the index (findTask / findThread / dayTasks), chains and links, sub-thread
+  model.js              `state`, migrate, the index (findTask / findThread / dayTasks / dayFails / findFail), chains and links, sub-thread
                         layout, order + conflict warnings, memo, mutate / undo / redo
   ops.js                every edit (tasks, threads, projects, conflicts, scratch), archive / restore; multi-task ops
                         (dateTasks, linkTasks, unlinkTasks, setTasksDone, archiveTasks, delTasks, moveManyTo);
+                        failed attempts (failTasks, failLater, unscheduleLater, unfailTask, removeFail);
                         sidebar drops into a chain (moveTasksTo(…, inChain), dropSingle)
 
 js/ui/  (each view draws its part of the page and handles its own events)
@@ -48,10 +49,10 @@ js/ui/  (each view draws its part of the page and handles its own events)
   dragdrop.js           HTML5 drag state `drag` (drag.ids = a dragged selection), shared by sidebar and calendar;
                         Option-drop
   archive.js            Archive window
-  sidebar.js            tree, gear menus (task / thread / project), link menu, new-task boxes, click-to-insert, drag
-                        and drop, quickAct; multi-select `sel` (⌘ / Shift-click, revealChips) and #selbar
+  sidebar.js            tree, gear menus (task / thread / project / failed attempt), link menu, new-task boxes,
+                        click-to-insert, drag and drop, quickAct; markFailed + its follow-up prompt (#ask, hideAsk); multi-select `sel` (⌘ / Shift-click, revealChips) and #selbar
                         (renderSelBar / selAct)
-  calendar.js           renderCal, fitRows, week scrolling, day drops, selRuns, next-day link lines
+  calendar.js           renderCal, fitRows, week scrolling, day drops, selRuns, next-day link lines; failChip, tryBadge
   conflicts.js          sidebar conflicts + form, dragging conflict bars, conflict hover
   dialogs.js            Help and Settings
   timeline-data.js      admireData(): lanes, spans, per-day counts. Unordered threads are `loose` lanes drawn on
@@ -77,7 +78,9 @@ js/main.js              calls start(); loaded last
 state    = { version: 4, title?, projects: [project], archive: [entry], conflicts: [conflict], scratch: [scratch] }
 project  = { id, name, threads: [thread], unordered? }
 thread   = { id, name, color, tasks: [task], threads: [sub-thread], afterTask, unordered? }
-task     = { id, title, date: 'YYYY-MM-DD' | null, done, linkToPrev: null | 'sameDay' | 'nextDay', plan?, notes? }
+task     = { id, title, date: 'YYYY-MM-DD' | null, done, linkToPrev: null | 'sameDay' | 'nextDay', plan?, notes?, fails? }
+fail     = { id, date, start?, dur?, done?, prev?, next? }   a failed attempt: the date (and day-view slot) the task had
+           when marked failed; done / prev / next (it was done, links cut from it) let unfailTask undo it
 entry    = { id, kind: 'task' | 'thread' | 'project', at, item, from }   at = date archived, from = where it was
 conflict = { id, title, start, end }   end inclusive; start null = undated
 scratch  = { id, title, done }         one-off to-dos outside projects; no dates
@@ -91,8 +94,13 @@ scratch  = { id, title, done }         one-off to-dos outside projects; no dates
   numbers, loose dots on the Timeline.
 - `linkToPrev` ties a task to the previous one; a run of linked tasks is a chain and moves together.
 - `plan = { date, start, dur }` (minutes from midnight): day-view slot, valid only while plan.date === date
-  (`planOf`).
+  (`planOf`). With the "Keep day-view times" setting (`ui.keepTimes`), `mutate` calls `keepTimes` (core/model.js)
+  after every change to move the slot with a task that changed day (or give a rescheduled failed task its attempt's).
 - `notes`: non-empty when present; set with `setTaskNotes`.
+- `fails`: non-empty when present, oldest first. `failTasks` moves the task's date into it and unschedules the task;
+  each one is drawn on its day (calendar `failChip`, day-view `.dv-item.failed` / `.dv-blk.failed`, Timeline `fail`
+  dots) as an element with `data-fid` / `data-kid` and no `data-id`, so the task handlers (selection, notes, day-view
+  drags, TASK_EL) skip it. `attemptNo(k)` = fails + 1.
 
 `ui` (js/core/prefs.js, localStorage `planner.ui`) holds view state and settings, never plan data.
 
@@ -124,6 +132,7 @@ for live preview) must call `touch()`.
 | Timeline | `admireData` (ui/timeline-data.js), `renderAdmire`, `admTipHTML` (ui/timeline.js) |
 | multi-select, selection bar | end of ui/sidebar.js; ops under "several tasks at once" in core/ops.js |
 | task notes | ui/notes.js, `setTaskNotes`, task menu `openTaskMenu` (ui/sidebar.js) |
+| failed attempts | `failTasks` / `failLater` / `unscheduleLater` / `unfailTask` / `removeFail` (core/ops.js), `markFailed`, `openFailMenu` (ui/sidebar.js), `failChip` (ui/calendar.js), `renderDayList` / `renderDayTimeline`, `admireData` (`fail` kind) |
 | header, date range, 1–5 weeks / days | Planner.html; `renderHeader`, `setRange`, `navStep` / `navToday` (ui/app.js) |
 | keyboard shortcuts | keydown handler at end of ui/app.js, `switchView`; list them in `shortcutsHTML` (ui/dialogs.js) |
 | a button's action | its `data-act` case (ui/app.js) |
@@ -157,6 +166,22 @@ Add to `UI_PREFS` (default, allowed values, `setting: true`), a row in `renderSe
 
 Add its tag to `Planner.html` in order: code that runs at load can only use files above it (calls made later can
 reach any file). New js/core/ files also go in `CORE` in tests/load.js. The server already serves js/ and css/.
+
+## Docs
+
+Four places can need text when something changes. Update them only where the change calls for it.
+
+1. **ARCHITECTURE.md** (this file): for future editors (Claude sessions), so they find what to change quickly. Say how
+   the project works and where to go for a given change: files, functions, data shape, rules, gotchas. No
+   descriptions of how a feature looks or feels to use, and no repeated or padded prose.
+2. **Help** (`showHelp`, js/ui/dialogs.js): match how short the existing entries are. Most features are intuitive and
+   need no help text at all. Say how to reach a feature and what it's for, not what it looks like or which options
+   it then presents. Add or change help only when how the app is used has meaningfully changed.
+3. **Settings** (`renderSettings`, js/ui/dialogs.js; settings themselves in `UI_PREFS`, js/core/prefs.js): the same
+   rules as Help, for each setting's label and note.
+4. **Hover hints** (`title`, `data-hint` (dom.js), `data-tip` (header)): a short label for what the thing is or does,
+   not a description. E.g. a mark-as-failed button: "Mark failed", not "Mark failed (unschedules them; their dates
+   stay as failed attempts)". (A disabled button's hint may say briefly why it's off.)
 
 ## Naming
 

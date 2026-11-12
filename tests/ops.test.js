@@ -257,3 +257,108 @@ test('dragging several tasks in the sidebar: they land together in sidebar order
   assert.deepStrictEqual(ids(P, 'u'), ['a', 'd', 'y']);
   assert.deepStrictEqual(links(P, 't'), [null, null, null]);
 });
+
+test('marking a task failed: its date becomes a failed attempt, it is unscheduled, links to others are cut', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02'), T('b', '2026-11-03', { link: 'nextDay', plan: { date: '2026-11-03', start: 600, dur: 90 } }),
+    T('c', '2026-11-04', { link: 'nextDay' }), T('d', '2026-11-06', { done: true }), T('e', '2026-11-09')], { threads: [TH('s', [T('x', '2026-11-10')], { after: 'c' })] })]));
+  const r = P.failTasks(['b']);
+  const b = P.findTask('b').task;
+  assert.strictEqual(b.date, null);
+  assert.deepStrictEqual(j(b.fails.map(f => [f.date, f.start, f.dur])), [['2026-11-03', 600, 90]]);
+  assert.ok(!b.plan);
+  assert.deepStrictEqual(links(P, 't'), [null, null, null, null, null]);
+  assert.deepStrictEqual(dates(P, 'a', 'c'), { a: '2026-11-02', c: '2026-11-04' });   // neighbours keep their dates
+  assert.strictEqual(P.attemptNo(b), 2);
+  // later tasks: not-done, scheduled, after it in the thread (a sub-thread after it too)
+  assert.deepStrictEqual(j(r.later), ['c', 'x', 'e']);
+  assert.deepStrictEqual(j(r.laterDone), ['d']);
+  assert.deepStrictEqual(j(r.relink), [['c', 'nextDay', 'b']]);
+  assert.strictEqual(P.dayFails('2026-11-03').length, 1);
+  P.unscheduleLater(r.later, r.relink);
+  assert.deepStrictEqual(dates(P, 'a', 'c', 'd', 'e', 'x'), { a: '2026-11-02', c: null, d: '2026-11-06', e: null, x: null });
+  assert.deepStrictEqual(links(P, 't'), [null, null, 'nextDay', null, null]);   // b → c restored (both undated)
+  // rescheduling keeps the failed attempt where it was
+  P.moveTask('b', '2026-11-12');
+  assert.strictEqual(P.findTask('b').task.date, '2026-11-12');
+  assert.strictEqual(P.dayFails('2026-11-03')[0].k.id, 'b');
+});
+
+test('failing several tasks: links among them stay, later = after the last one; undated tasks are skipped', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02', { done: true }), T('b', '2026-11-03', { link: 'nextDay', done: true }), T('c', '2026-11-05'), T('n'), T('d', '2026-11-08')])]));
+  const r = P.failTasks(['b', 'a', 'n']);
+  assert.deepStrictEqual(j(r.failed), ['a', 'b']);
+  assert.deepStrictEqual(j(r.later), ['c', 'd']);
+  assert.deepStrictEqual(links(P, 't'), [null, 'nextDay', null, null, null]);
+  assert.deepStrictEqual(dates(P, 'a', 'b'), { a: null, b: null });
+  assert.ok(!P.findTask('a').task.done && !P.findTask('b').task.done);
+  assert.ok(!P.findTask('n').task.fails);
+  P.moveTask('a', '2026-11-16');                         // the failed chain is rescheduled as one
+  assert.deepStrictEqual(dates(P, 'a', 'b'), { a: '2026-11-16', b: '2026-11-17' });
+  assert.strictEqual(P.failTasks(['n']), null);
+});
+
+test('failed attempts: removing one, unordered threads ask nothing, migrate drops bad ones, undo', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02'), T('b', '2026-11-03')])]));
+  P.run(`state.projects[0].threads[0].unordered = true; touch();`);
+  const r = P.failTasks(['a']);
+  assert.deepStrictEqual(j(r.later), []);
+  P.moveTask('a', '2026-11-04'); P.failTasks(['a']);
+  const fs = P.findTask('a').task.fails;
+  assert.deepStrictEqual(j(fs.map(f => f.date)), ['2026-11-02', '2026-11-04']);
+  P.removeFail(fs[0].id);
+  assert.deepStrictEqual(j(P.findTask('a').task.fails.map(f => f.date)), ['2026-11-04']);
+  P.undo();
+  assert.strictEqual(P.findTask('a').task.fails.length, 2);
+  const M = load(plan([TH('t', [{ ...T('a'), fails: [{ date: 'bad' }, { id: 'f1', date: '2026-11-02', start: 'x' }] }, { ...T('b'), fails: [] }])]));
+  assert.deepStrictEqual(j(M.findTask('a').task.fails), [{ id: 'f1', date: '2026-11-02' }]);
+  assert.ok(!('fails' in M.findTask('b').task));
+});
+
+test('failing late: the later done tasks can be marked failed too, links among them put back', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02', { done: true }), T('b', '2026-11-03', { link: 'nextDay', done: true }), T('c', '2026-11-04', { link: 'nextDay', done: true }), T('d', '2026-11-09')])]));
+  const r = P.failTasks(['a']);
+  assert.deepStrictEqual(j(r.laterDone), ['b', 'c']);
+  assert.deepStrictEqual(j(r.later), ['d']);
+  P.failLater(r.laterDone, r.relink);
+  assert.deepStrictEqual(dates(P, 'a', 'b', 'c', 'd'), { a: null, b: null, c: null, d: '2026-11-09' });
+  assert.deepStrictEqual(links(P, 't'), [null, 'nextDay', 'nextDay', null]);
+  assert.ok(['a', 'b', 'c'].every(id => P.findTask(id).task.fails.length === 1 && !P.findTask(id).task.done));
+  P.undo();
+  assert.deepStrictEqual(dates(P, 'b', 'c'), { b: '2026-11-03', c: '2026-11-04' });
+});
+
+test('unmarking failed puts the task back on that day (slot, done, links), and its chain-mates that failed with it', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02'), T('b', '2026-11-03', { link: 'nextDay', done: true, plan: { date: '2026-11-03', start: 600, dur: 60 } }),
+    T('c', '2026-11-03', { link: 'sameDay' }), T('d', '2026-11-04', { link: 'nextDay' })])]));
+  P.failTasks(['b', 'c']);
+  assert.deepStrictEqual(links(P, 't'), [null, null, 'sameDay', null]);
+  P.moveTask('b', '2026-11-10');                         // rescheduled since: unmarking moves it back
+  P.unfailTask('c');
+  const b = P.findTask('b').task;
+  assert.deepStrictEqual(dates(P, 'a', 'b', 'c', 'd'), { a: '2026-11-02', b: '2026-11-03', c: '2026-11-03', d: '2026-11-04' });
+  assert.ok(b.done && !b.fails && !P.findTask('c').task.fails);
+  assert.deepStrictEqual(j(P.planOf(b)), { date: '2026-11-03', start: 600, dur: 60 });
+  assert.deepStrictEqual(links(P, 't'), [null, 'nextDay', 'sameDay', 'nextDay']);
+  // a neighbour that has moved on doesn't get linked back
+  const Q = load(plan([TH('t', [T('a', '2026-11-02'), T('b', '2026-11-03', { link: 'nextDay' })])]));
+  Q.failTasks(['b']); Q.moveTask('a', '2026-11-05'); Q.unfailTask('b');
+  assert.deepStrictEqual(links(Q, 't'), [null, null]);
+  assert.deepStrictEqual(dates(Q, 'a', 'b'), { a: '2026-11-05', b: '2026-11-03' });
+});
+
+test('"Keep day-view times": a rescheduled task (and the later ones it shifts) keeps its slot; a failed one takes its attempt\'s', () => {
+  const pl = (d, start) => ({ plan: { date: d, start, dur: 60 } });
+  const mk = prefs => load(plan([TH('t', [T('a', '2026-11-02', pl('2026-11-02', 540)), T('b', '2026-11-03', pl('2026-11-03', 600)), T('c', '2026-11-04')])]), { prefs });
+  let P = mk({});
+  P.moveTask('a', '2026-11-05');
+  assert.strictEqual(P.planOf(P.findTask('a').task), null);                  // off: the slot stays behind (dormant)
+  P = mk({ keepTimes: true });
+  P.moveTask('a', '2026-11-05');                                            // b shifts along (+3)
+  assert.deepStrictEqual(j(P.planOf(P.findTask('a').task)), { date: '2026-11-05', start: 540, dur: 60 });
+  assert.deepStrictEqual(j(P.planOf(P.findTask('b').task)), { date: '2026-11-06', start: 600, dur: 60 });
+  assert.strictEqual(P.planOf(P.findTask('c').task), null);
+  P.failTasks(['b']); P.moveTask('b', '2026-11-12');
+  assert.deepStrictEqual(j(P.planOf(P.findTask('b').task)), { date: '2026-11-12', start: 600, dur: 60 });
+  P.moveTask('a', null); P.moveTask('a', '2026-11-20');                     // unscheduled and back: its last slot
+  assert.deepStrictEqual(j(P.planOf(P.findTask('a').task)), { date: '2026-11-20', start: 540, dur: 60 });
+});

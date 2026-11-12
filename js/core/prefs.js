@@ -14,6 +14,7 @@ const UI_PREFS = {
   weekStart:     { def: 1, ok: oneOf(0, 1), setting: true },
   narrowWe:      { def: true, ok: isBool, setting: true },
   shiftLater:    { def: true, ok: isBool, setting: true },
+  keepTimes:     { def: false, ok: isBool, setting: true },                    // a task moved to another day keeps its day-view time (keepTimes, model.js)
   dayHours:      { def: 8, ok: oneOf(...DAY_HOURS), setting: true },
   snap:          { def: 15, ok: oneOf(5, 10, 15, 30), setting: true },
   clock:         { def: '12', ok: oneOf('12', '24'), setting: true },

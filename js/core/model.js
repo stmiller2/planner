@@ -2,7 +2,8 @@
 /* The planner's data and its rules (no DOM).
    state = { version, title?, projects: [{ id, name, threads, unordered? }], archive: [...], conflicts: [...], scratch: [...] }
      thread = { id, name, color (null = shade of its parent's), tasks: [...], threads: [sub-threads], afterTask, unordered? }
-     task   = { id, title, date (YYYY-MM-DD or null), done, linkToPrev (null | 'sameDay' | 'nextDay'), plan? }
+     task   = { id, title, date (YYYY-MM-DD or null), done, linkToPrev (null | 'sameDay' | 'nextDay'), plan?, notes?, fails? }
+       fails = earlier failed attempts [{ id, date, start?, dur?, done?, prev?, next? }]: drawn where they happened (see failTasks)
      scratch = day view's "Other to-do": [{ id, title, done }], small to-dos outside every project (no dates)
    Every change goes through mutate(), which normalizes, records undo, re-renders, saves and raises warnings. */
 
@@ -36,6 +37,18 @@ const liveColors = memo(() => { const m = new Map(); state.projects.forEach(p =>
 function computeColors() { colors = liveColors(); }
 const colorOf = t => colors.get(t.id) || t.color || PALETTE[0];
 
+// a task's failed attempts: [{ id, date, start?, dur?, done?, prev?, next? }] (start / dur: its day-view slot then,
+// minutes; done / prev / next: it was done, and the links cut from it, for unfailTask), oldest first
+function migFails(a) {
+  return (Array.isArray(a) ? a : []).filter(x => x && /^\d{4}-\d{2}-\d{2}$/.test(x.date || '')).map(x => {
+    const o = { id: x.id || uid(), date: x.date };
+    if (Number.isFinite(x.start) && Number.isFinite(x.dur) && x.dur > 0) { o.start = x.start; o.dur = x.dur; }
+    if (x.done === true) o.done = true;                        // done / prev / next: for unfailTask
+    if (x.prev in LINKS) o.prev = x.prev;
+    if (x.next in LINKS) o.next = x.next;
+    return o;
+  }).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+}
 function migThread(t, top, counter) {
   const T = { ...t, id: t.id || uid(), name: String(t.name ?? 'Thread'),
     color: /^#[0-9a-f]{6}$/i.test(t.color || '') ? t.color : (top ? PALETTE[counter.n % PALETTE.length] : null), tasks: [], threads: [] };
@@ -45,6 +58,7 @@ function migThread(t, top, counter) {
     const link = k.linkToPrev in LINKS ? k.linkToPrev : (k.sameDayAsPrev ? 'sameDay' : null);
     const K = { ...k, id: k.id || uid(), title: String(k.title ?? ''), date: /^\d{4}-\d{2}-\d{2}$/.test(k.date) ? k.date : null, done: !!k.done, linkToPrev: link };
     if (typeof K.notes !== 'string' || !K.notes.trim()) delete K.notes;   // notes: free text (see setTaskNotes)
+    const fl = migFails(k.fails); if (fl.length) K.fails = fl; else delete K.fails;   // fails: earlier failed attempts (see failTasks)
     delete K.sameDayAsPrev; delete K.doneOn;   // doneOn: briefly recorded by an earlier version, no longer used
     T.tasks.push(K);
   }
@@ -87,19 +101,25 @@ function migrate(d) {
    every thread at any depth, in display order, as { p (project), t (thread), parent (thread or null), siblings, path (names) },
    plus lookups by thread id, by task id and by date. */
 const index = memo(() => {
-  const threads = [], byThread = new Map(), byTask = new Map(), byDate = new Map();
+  const threads = [], byThread = new Map(), byTask = new Map(), byDate = new Map(), failDate = new Map(), byFail = new Map();
+  let n = 0;   // n: sidebar order, shared by live tasks and failed attempts (so a day's list can mix them in order)
   const rec = (list, p, parent, path) => list.forEach(t => {
     const pth = path.concat(t.name), x = { p, t, parent, siblings: list, path: pth };
     threads.push(x);
     if (!byThread.has(t.id)) byThread.set(t.id, x);
     t.tasks.forEach((k, i) => {
       if (!byTask.has(k.id)) byTask.set(k.id, [x, i]);
-      if (k.date) { if (!byDate.has(k.date)) byDate.set(k.date, []); byDate.get(k.date).push({ ...x, k, i }); }
+      if (k.date) { if (!byDate.has(k.date)) byDate.set(k.date, []); byDate.get(k.date).push({ ...x, k, i, n: n++ }); }
+      (k.fails || []).forEach((fl, a) => {
+        const e = { ...x, k, i, fl, a, n: n++ };   // a: which attempt this was - 1
+        if (!failDate.has(fl.date)) failDate.set(fl.date, []); failDate.get(fl.date).push(e);
+        byFail.set(fl.id, e);
+      });
     });
     rec(t.threads, p, t, pth);
   });
   state.projects.forEach(p => rec(p.threads, p, null, []));
-  return { threads, byThread, byTask, byDate };
+  return { threads, byThread, byTask, byDate, failDate, byFail };
 });
 const allThreads = () => index().threads;
 // a thread whose tasks have no set order: set on the thread itself or on its whole project (p). Its tasks give no
@@ -110,6 +130,11 @@ function findTask(id) { const f = index().byTask.get(id); return f ? { ...f[0], 
 function findThread(id) { return index().byThread.get(id) || null; }
 // the tasks dated d, as { ...thread entry, k (task), i (its number - 1) }, in sidebar order
 const dayTasks = d => (index().byDate.get(d) || []).slice();
+// failed attempts on day d, as { ...thread entry, k (the task), fl (the attempt), a (its number - 1), n }; findFail by id
+const dayFails = d => (index().failDate.get(d) || []).slice();
+const findFail = id => index().byFail.get(id) || null;
+// which attempt a task is on now (1 = never failed)
+const attemptNo = k => (k.fails ? k.fails.length : 0) + 1;
 function subtreeTasks(t) { return t.tasks.concat(...t.threads.map(subtreeTasks)); }
 function inSubtree(root, id) { return root.id === id || root.threads.some(c => inSubtree(c, id)); }
 // A chain = contiguous tasks joined by links (same day or next day). Chains always move together.
@@ -252,8 +277,10 @@ const stateJSON = memo(() => JSON.stringify(state));
 function mutate(fn, quiet) {   // quiet: don't raise warnings for this change
   const before = stateJSON();
   const vBefore = quiet ? null : new Set(warnings().map(v => v.key));
+  const dated = ui.keepTimes ? new Map(allThreads().flatMap(x => x.t.tasks.map(k => [k, [k.date, !!planOf(k)]]))) : null;
   fn(); touch();
   allThreads().forEach(x => normalize(x.t)); touch();
+  if (dated) { keepTimes(dated); touch(); }
   if (stateJSON() === before) { render(); return false; }
   undoStack.push(before); if (undoStack.length > 200) undoStack.shift();
   redoStack.length = 0;
@@ -272,3 +299,13 @@ function redo() { if (!redoStack.length) return; undoStack.push(stateJSON()); st
 /* A task's slot in day view: task.plan = { date, start, dur } (minutes from midnight). It only counts while plan.date
    matches the task's date, so moving a task to another day leaves its old slot dormant (it comes back if the task does). */
 const planOf = k => (k.plan && k.plan.date === k.date && Number.isFinite(k.plan.start)) ? k.plan : null;
+/* "Keep day-view times" (ui.keepTimes): after a change, a task now on another day keeps its time there. dated = task ->
+   [its date, whether its slot counted] before the change. A task coming back from no date takes its last slot, or,
+   having none (marking it failed moved its slot to the attempt), its latest failed attempt's. */
+function keepTimes(dated) {
+  allThreads().forEach(x => x.t.tasks.forEach(k => {
+    const b = dated.get(k); if (!b || !k.date || k.date === b[0] || planOf(k)) return;
+    if (b[0] ? b[1] && k.plan && k.plan.date === b[0] : k.plan) k.plan = { ...k.plan, date: k.date };
+    else if (!b[0] && !k.plan && k.fails) { const fl = k.fails[k.fails.length - 1]; if (fl.dur) k.plan = { date: k.date, start: fl.start, dur: fl.dur }; }
+  }));
+}

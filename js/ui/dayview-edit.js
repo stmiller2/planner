@@ -7,9 +7,9 @@ function dvSeam(e) {
   if (dv || e.target.closest('input, button, select, .dv-dh')) return null;
   const list = $('#dayview .dv-list'); if (!list || !list.contains(e.target)) return null;
   const right = list.getBoundingClientRect().right;
-  for (const it of $$('#dayview .dv-item')) {
+  for (const it of $$('#dayview .dv-item[data-id]')) {
     const r = it.getBoundingClientRect(), grp = it.closest('.dv-grp');
-    const at = grp.querySelector('.dv-item') === it && e.clientY >= r.top - 6 && e.clientY <= r.top + 4 ? { before: true, y: r.top - 2 }
+    const at = grp.querySelector('.dv-item[data-id]') === it && e.clientY >= r.top - 6 && e.clientY <= r.top + 4 ? { before: true, y: r.top - 2 }
       : e.clientY >= r.bottom - 5 && e.clientY <= r.bottom + 5 ? { y: r.bottom + 2 } : null;
     if (at) return { id: it.dataset.id, tid: grp.dataset.tid, day: (findTask(it.dataset.id) || {}).task?.date || ui.dayView, x: r.left, right, ...at };
   }
@@ -133,7 +133,7 @@ function syncTimePop() {
 }
 $('#dayview').addEventListener('click', e => {
   if (e.detail !== 1 || Date.now() - dvNoClick < 300 || e.target.closest('input, button, .inl')) return;
-  const el = e.target.closest('.dv-blk, .dv-item'); if (!el) return;
+  const el = e.target.closest('.dv-blk[data-id], .dv-item[data-id]'); if (!el) return;
   const id = el.dataset.id, x = e.clientX, y = e.clientY;
   clearTimeout(tpopTimer);
   // only the title can be double-clicked (to rename), so only a click there waits to see if a second one follows
@@ -216,7 +216,7 @@ $('#dayview').addEventListener('pointerdown', e => {
   if (seam) { e.preventDefault(); hideInsline(); dvNoClick = Date.now(); dvAdd = seam.before ? { tid: seam.tid, beforeId: seam.id, day: seam.day } : { tid: seam.tid, afterId: seam.id, day: seam.day }; renderDay(); return; }
   if (e.target.closest('input, button, select')) return;
   hideTip();
-  const blk = e.target.closest('.dv-blk'), item = e.target.closest('.dv-item');
+  const blk = e.target.closest('.dv-blk[data-id]'), item = e.target.closest('.dv-item[data-id]');
   if (!blk && !item) return;
   const f = findTask((blk || item).dataset.id); if (!f) return;
   const p = planOf(f.task);
@@ -310,7 +310,7 @@ function dvListTarget(e) {
   const split = splitHeld(e);
   let best = null;
   for (const grp of $$('.dv-grp', scope)) {
-    const items = $$('.dv-item', grp); if (!items.length) continue;
+    const items = $$('.dv-item[data-id]', grp); if (!items.length) continue;
     const gaps = items.map(it => ({ it, side: 'before', y: it.getBoundingClientRect().top - 2 }));
     gaps.push({ it: items[items.length - 1], side: 'after', y: items[items.length - 1].getBoundingClientRect().bottom + 2 });
     for (const g of gaps) { const d = Math.abs(e.clientY - g.y); if (!best || d < best.d) best = { ...g, d, tid: grp.dataset.tid }; }

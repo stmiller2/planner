@@ -265,6 +265,88 @@ function setTasksDone(ids, done) {
   const fs = inOrder(ids).map(findTask);
   return mutate(() => fs.forEach(f => { f.task.done = !!done; }));
 }
+/* ---------- failed attempts ----------
+   Marking a task failed files its current date (and day-view slot) under task.fails and unschedules the task, so it
+   can be rescheduled while the failed attempt keeps its place on the calendar, day view and Timeline. Links to tasks
+   that aren't failing with it are cut (they keep their dates); links among the failed ones stay, so a failed chain is
+   rescheduled as one. The attempt remembers what unfailTask needs to undo it (done, cut links). Undated tasks can't
+   fail. Returns { failed, laterDone, later, relink } for the follow-up prompt (markFailed, ui/sidebar.js), or null:
+     laterDone / later = per thread, the done / not-done scheduled tasks after its last failed one (in display order,
+                         sub-threads after it included; ordered threads only): offered to failLater / unscheduleLater
+     relink = [[id, link, failedId]]: links cut from a failed task to the task after it, put back by those two when
+              both end up undated */
+// (inside mutate) fail these task entries; links to tasks not in the set are cut, the forward ones noted in relink
+function failInto(fs, relink) {
+  const chosen = new Set(fs.map(f => f.task.id));
+  fs.forEach(f => {
+    const ts = f.t.tasks, i = ts.indexOf(f.task), k = f.task, nx = ts[i + 1], p = planOf(k);
+    const fl = { id: uid(), date: k.date }; if (p) { fl.start = p.start; fl.dur = p.dur; }
+    if (k.done) fl.done = true;
+    if (k.linkToPrev && !chosen.has(ts[i - 1].id)) { fl.prev = k.linkToPrev; k.linkToPrev = null; }
+    if (nx && nx.linkToPrev && !chosen.has(nx.id)) { fl.next = nx.linkToPrev; relink.push([nx.id, nx.linkToPrev, k.id]); nx.linkToPrev = null; }
+    k.fails = (k.fails || []).concat(fl);
+    k.date = null; k.done = false; delete k.plan;
+  });
+}
+// (inside mutate) put back cut links whose two tasks are both undated now
+function relinkUndated(relink) {
+  relink.forEach(([id, link, from]) => {
+    const f = findTask(id); if (!f || f.i === 0 || f.task.linkToPrev) return;
+    const pv = f.t.tasks[f.i - 1]; if (pv.id === from && !pv.date && !f.task.date) f.task.linkToPrev = link;
+  });
+}
+function failTasks(ids) {
+  const fs = inOrder(ids).map(findTask).filter(f => f.task.date); if (!fs.length) return null;
+  const chosen = new Set(fs.map(f => f.task.id)), relink = [];
+  mutate(() => failInto(fs, relink), true);
+  // the last failed task in each thread, and what comes after it there
+  const last = new Map(); fs.forEach(f => last.set(f.t, f.task));
+  const later = [], seen = new Set(), add = k => { if (k.date && !chosen.has(k.id) && !seen.has(k.id)) { seen.add(k.id); later.push(k); } };
+  last.forEach((k, t) => {
+    if (isLoose(findThread(t.id).p, t)) return;
+    const L = layout(t); L.slice(L.findIndex(x => x.obj === k) + 1).forEach(x => x.kind === 'task' ? add(x.obj) : subtreeTasks(x.obj).forEach(add));
+  });
+  return { failed: fs.map(f => f.task.id), laterDone: inOrder(later.filter(k => k.done).map(k => k.id)),
+    later: inOrder(later.filter(k => !k.done).map(k => k.id)), relink };
+}
+// follow-ups: mark the later done tasks failed too (one undo step) ...
+function failLater(ids, relink = []) {
+  const fs = inOrder(ids).map(findTask).filter(f => f.task.date); if (!fs.length) return false;
+  return mutate(() => { failInto(fs, relink); relinkUndated(relink); }, true);
+}
+// ... and unschedule the later not-done ones (each on its own: links to tasks keeping their dates are cut)
+function unscheduleLater(ids, relink = []) {
+  const fs = inOrder(ids).map(findTask).filter(f => f.task.date && !f.task.done); if (!fs.length) return false;
+  return mutate(() => {
+    fs.forEach(f => { f.task.date = null; });
+    fs.forEach(f => {
+      const ts = f.t.tasks, i = ts.indexOf(f.task), nx = ts[i + 1];
+      if (f.task.linkToPrev && ts[i - 1].date) f.task.linkToPrev = null;
+      if (nx && nx.linkToPrev && nx.date) nx.linkToPrev = null;
+    });
+    relinkUndated(relink);
+  });
+}
+/* undo a task's latest failed attempt: the task goes back to that date (and time slot, and done if it was), and the
+   attempt is gone. Tasks linked to it that failed with it come back with it. A link that was cut comes back if the
+   task on the other side still sits where the link puts it. */
+function unfailTask(id) {
+  const f = findTask(id); if (!f || !f.task.fails) return;
+  const [s, e] = runOf(f.t, f.i), ts = f.t.tasks, ks = ts.slice(s, e + 1).filter(k => k.fails);
+  mutate(() => ks.forEach(k => {
+    const fl = k.fails[k.fails.length - 1], i = ts.indexOf(k), pv = ts[i - 1], nx = ts[i + 1];
+    k.fails = k.fails.slice(0, -1); if (!k.fails.length) delete k.fails;
+    k.date = fl.date; k.done = !!fl.done;
+    if (fl.dur) k.plan = { date: fl.date, start: fl.start, dur: fl.dur }; else delete k.plan;
+    if (fl.prev && pv && !k.linkToPrev && pv.date === addDays(fl.date, fl.prev === 'nextDay' ? -1 : 0)) k.linkToPrev = fl.prev;
+    if (fl.next && nx && !nx.linkToPrev && nx.date === addDays(fl.date, fl.next === 'nextDay' ? 1 : 0)) nx.linkToPrev = fl.next;
+  }));
+}
+// take a failed attempt off the record (it no longer shows anywhere or counts as an attempt)
+function removeFail(fid) {
+  const e = findFail(fid); if (!e) return;
+  mutate(() => { e.k.fails = e.k.fails.filter(x => x.id !== fid); if (!e.k.fails.length) delete e.k.fails; });
+}
 function archiveTasks(ids) {
   const fs = inOrder(ids).map(findTask); if (!fs.length) return;
   mutate(() => fs.forEach(f => {

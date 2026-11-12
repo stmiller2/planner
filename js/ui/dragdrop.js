@@ -1,6 +1,7 @@
 'use strict';
 /* HTML5 drag & drop shared by the sidebar and the calendar: what is being dragged (`drag`) and Option-drop.
-   drag = { kind: 'task' | 'thread', id, from: 'side' | 'cal', ids? }: ids = a sidebar selection dragged together. */
+   drag = { kind: 'task' | 'thread', id, from: 'side' | 'cal' | 'fail', ids? }: ids = a sidebar selection dragged together;
+   'fail' = a failed attempt's chip (id = its task), which can only be dropped on a day. */
 // holding Option while dropping moves just that one task (unlinked; nothing else shifts)
 const splitHeld = e => !!(e && e.altKey);
 
@@ -11,12 +12,13 @@ document.addEventListener('dragstart', e => {
   closeMenu();
   if (el.dataset.tdrag) drag = { kind: 'thread', id: el.dataset.tdrag, from: 'side' };
   else if (el.dataset.id) drag = { kind: 'task', id: el.dataset.id, from: el.classList.contains('chip') ? 'cal' : 'side' };
+  else if (el.dataset.kid) drag = { kind: 'task', id: el.dataset.kid, from: 'fail' };   // a failed attempt: reschedules its task
   else return;
   e.dataTransfer.effectAllowed = 'copyMove';
-  e.dataTransfer.setData('text/plain', el.dataset.id);
+  e.dataTransfer.setData('text/plain', drag.id);
   // dragging one of several selected tasks (sidebar row or calendar chip): the whole selection goes, shown as a small
   // stack with a count
-  if (drag.kind === 'task' && sel.size > 1 && sel.has(drag.id)) {
+  if (drag.kind === 'task' && drag.from !== 'fail' && sel.size > 1 && sel.has(drag.id)) {
     drag.ids = selIds();
     const g = document.createElement('div'); g.id = 'dragstack';
     const f = findTask(drag.id);

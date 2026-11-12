@@ -127,7 +127,7 @@ function renderTaskRow(t, k, i, loose) {
   return `<div class="${cls}" draggable="true" data-id="${k.id}">
     <input type="checkbox" data-act="done" data-id="${k.id}" ${k.done ? 'checked' : ''}>
     <span class="${numCls}">${loose ? '' : i + 1}</span>
-    <span class="title" data-act="rename-k" data-id="${k.id}">${esc(k.title)}${noteMark(k)}</span>
+    <span class="title" data-act="rename-k" data-id="${k.id}">${esc(k.title)}${noteMark(k)}</span>${tryBadge(k)}
     <span class="rt">
       <span class="acts">
         ${i > 0 ? `<button class="ic" data-act="linkmenu" title="Link to previous task">${ICON.link}</button>` : ''}
@@ -152,13 +152,53 @@ function openLinkMenu(id, btn) {
 // task anywhere (sidebar row, calendar chip, day-view item or block: at = the pointer, el = the task; see app.js).
 // menuTask: the task's element it was opened on (its notes open beside it: editNotes)
 let menuTask = null;
+// Also: mark it failed (scheduled tasks only), unmark its latest failed attempt, and remove any of its failed attempts.
 function openTaskMenu(id, btn, at, el) {
   const f = findTask(id); if (!f) return;
   menuTask = el || (btn && btn.closest(TASK_EL)) || null;
+  const fails = (f.task.fails || []).slice().reverse();   // newest first
   menu.innerHTML = menuBtn('k-notes', id, ICON.notes, f.task.notes ? 'Edit notes' : 'Add notes')
+    + (f.task.date ? menuBtn('k-fail', id, ICON.failed, 'Mark failed') : '')
+    + (fails.length ? '<hr>' + unfailBtn(f.task, fails[0], true) + fails.map(x => failRmBtn(x, fails.length > 1)).join('') : '')
     + '<hr>' + menuBtn('arch-k', id, ICON.archive, 'Archive') + menuBtn('del-k', id, ICON.trash, 'Delete');
   placeMenu(btn, at);
 }
+const failRmBtn = (x, dated) => `<button data-act="fail-rm" data-fid="${x.id}"><span class="k">${ICON.x}</span>Remove failed attempt${dated ? ` · ${fmtShort(x.date)}` : ''}</button>`;
+// unmark the latest failed attempt (unfailTask): the task goes back to that day; dated = say which day when it isn't there
+const unfailBtn = (k, x, dated) => menuBtn('k-unfail', k.id, ICON.undone, `Unmark failed${dated && k.date !== x.date ? ` · back to ${fmtShort(x.date)}` : ''}`);
+// a failed attempt's menu (right-clicking its chip, day-view item or block)
+function openFailMenu(fid, at) {
+  const e = findFail(fid); if (!e) return;
+  const latest = e.a === e.k.fails.length - 1;
+  menu.innerHTML = `<div class="mhd">Failed attempt ${e.a + 1} · ${fmtShort(e.fl.date)}</div>` + (latest ? unfailBtn(e.k, e.fl, false) : '') + failRmBtn(e.fl, false)
+    + menuBtn('reveal-k', e.k.id, ICON.dright, e.k.date ? `Show task (now ${fmtShort(e.k.date)})` : 'Show task (unscheduled)');
+  placeMenu(null, at);
+}
+/* Marking tasks failed (task menu, selection bar): failTasks does it. When their threads have scheduled tasks after
+   them, a prompt (#ask, top centre) lists them and offers to mark the completed ones failed too (failLater) and to
+   unschedule the rest (unscheduleLater). It stays until closed (or the next tasks are marked failed). */
+function markFailed(ids) {
+  const r = failTasks(ids); if (!r) return false;
+  const one = r.failed.length === 1 ? `“${esc(findTask(r.failed[0]).task.title)}”` : plural(r.failed.length, 'task');
+  if (!r.laterDone.length && !r.later.length) { toast(`Marked ${r.failed.length === 1 ? `“${findTask(r.failed[0]).task.title}”` : plural(r.failed.length, 'task')} failed.`, 2500); return true; }
+  const fs = [...r.laterDone, ...r.later].map(findTask), many = new Set(fs.map(f => f.t)).size > 1;
+  const list = ids => `<ul>${ids.map(findTask).map(f => `<li style="--c:${esc(colorOf(f.t))}"><span class="sw"></span><span class="nm">${esc(f.task.title)}</span>${many ? `<span class="th">${esc(f.t.name)}</span>` : ''}<span class="d">${fmtShort(f.task.date)}</span></li>`).join('')}</ul>`;
+  const sec = (key, title, ids, btn) => ids.length ? `<div class="ak-s" data-s="${key}"><div class="ak-t">${title}</div>${list(ids)}<button class="ak-b">${btn}</button></div>` : '';
+  const el = $('#ask');
+  el.innerHTML = `<div class="ak-h"><b>Marked ${one} failed</b><button class="ic ak-x" title="Close">${ICON.x}</button></div>`
+    + sec('done', `Later completed ${r.laterDone.length === 1 ? 'task' : 'tasks'}`, r.laterDone, 'Mark failed too')
+    + sec('later', `Later scheduled ${r.later.length === 1 ? 'task' : 'tasks'}`, r.later, 'Unschedule');
+  el.onclick = e => {
+    if (e.target.closest('.ak-x')) return hideAsk();
+    const b = e.target.closest('.ak-b'); if (!b) return;
+    const k = b.closest('.ak-s').dataset.s;
+    if (k === 'done' ? failLater(r.laterDone, r.relink) : unscheduleLater(r.later, r.relink))
+      b.outerHTML = `<span class="ak-ok">${ICON.check}${k === 'done' ? 'Marked failed' : 'Unscheduled'}</span>`;
+  };
+  el.classList.add('on');
+  return true;
+}
+function hideAsk() { const el = $('#ask'); if (!el.classList.contains('on')) return false; el.classList.remove('on'); return true; }
 // After a task is deleted or archived (from its gear menu, or with this button), that one button joins every task's
 // hover buttons for 2 s, restarting with each use, so a run of tasks can go without opening the menu for each one.
 // (#tree[data-quick] / #dayview[data-quick] show it, in the sidebar and the day list: see css/sidebar.css; nothing is
@@ -226,6 +266,7 @@ function inBottomGap(el, y) {
 function treeTarget(e) {
   if (!drag) return null;
   if (drag.from === 'cal') return { type: 'unsched' };
+  if (drag.from === 'fail') return null;
   const isTask = drag.kind === 'task';
   const f = isTask ? findTask(drag.id) : findThread(drag.id); if (!f) return null;
   let tg = null;
@@ -358,7 +399,7 @@ tree.addEventListener('drop', e => {
    task row shown between the last one clicked and this one. Calendar chips select the same way (Shift: the chips between,
    day by day); selecting in the sidebar scrolls a chip hidden in its day's list into view. A click anywhere off the selection (not on a selected task,
    the bar, the header, a menu or a window), Esc, or the bar's × clears it. While anything is selected, a bar at the bottom of the sidebar acts on all of it (date, links,
-   done, archive, delete), and dragging any selected row carries the whole selection: onto a calendar day (dateTasks)
+   done, failed, archive, delete), and dragging any selected row carries the whole selection: onto a calendar day (dateTasks)
    or to a spot in the sidebar (moveManyTo). The selection is UI state only (until reload); it is never saved. */
 const sel = new Set();
 let selAnchor = null;
@@ -433,6 +474,7 @@ function renderSelBar() {
       </span>
       <span class="sb-sp"></span>
       ${b('sel-done', allDone ? 'Mark not done' : 'Mark done', allDone ? ICON.undone : ICON.check)}
+      ${b('sel-fail', 'Mark failed', ICON.failed, fs.some(f => f.task.date) ? '' : 'Only scheduled tasks can be marked failed')}
       ${b('sel-arch', 'Archive', ICON.archive)}
       ${b('sel-del', 'Delete', ICON.trash)}
     </div>`;
@@ -459,6 +501,7 @@ function selAct(act, a) {
   }
   if (act === 'sel-unlink') return unlinkTasks(ids);
   if (act === 'sel-done') return setTasksDone(ids, !ids.every(id => findTask(id).task.done));
+  if (act === 'sel-fail') { if (markFailed(ids)) clearSel(); return; }
   if (act === 'sel-arch') { archiveTasks(ids); return clearSel(); }
   if (act === 'sel-del') { if (delTasks(ids)) clearSel(); }
 }
@@ -477,7 +520,7 @@ tree.addEventListener('click', e => {
 document.addEventListener('click', e => {
   if (!sel.size || e.metaKey || e.ctrlKey || e.shiftKey) return;
   const t = e.target; if (!t.closest) return;
-  if (t.closest('#selbar, header, #menu, #modal, #toast, #warn, #resizer, .sc-rz, #dhint, .inl, .dwrap')) return;
+  if (t.closest('#selbar, header, #menu, #modal, #toast, #warn, #ask, #resizer, .sc-rz, #dhint, .inl, .dwrap')) return;
   const el = t.closest(TASK_EL); if (el && sel.has(el.dataset.id)) return;
   clearSel();
 });

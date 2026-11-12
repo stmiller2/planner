@@ -8,7 +8,8 @@
    on their host's row: the nearest ordered thread above them (L.host), or the project's ribbon row (host null),
    without stretching that line. A project with no ordered work (or set unordered as a whole) has no ribbon and
    is a single row of dots; those come after the projects that have one.
-   Optionally, tasks still on the calendar show too, a little transparent. Rows wrap a whole number of weeks to
+   Optionally, tasks still on the calendar show too, a little transparent. Failed attempts (task.fails) show as dots
+   marked failed on their days (not in the wave or the done counts). Rows wrap a whole number of weeks to
    fit the window. Read-only: nothing here changes the plan. */
 const ADM_PROJ = 32, ADM_LANE = 24, ADM_PULSE = 66, ADM_TIP_DELAY = 1000;
 // bar thickness (px) for the project ribbon, a thread, a sub-thread; and bar opacity at its left / right end
@@ -22,7 +23,7 @@ const laneUnder = (L, key, lanes, self = true) => { for (const x of laneUp(L, la
 function pieOf(parts, d, tot) {
   if (parts.length < 2) return '';
   let acc = 0;
-  return `conic-gradient(${parts.map(L => { const o = L.own.get(d), a = acc; acc += (o.done.length + o.plan.length) / tot * 360; return `${L.color} ${a.toFixed(1)}deg ${acc.toFixed(1)}deg`; }).join(',')})`;
+  return `conic-gradient(${parts.map(L => { const o = L.own.get(d), a = acc; acc += (o.done.length + o.plan.length + o.fail.length) / tot * 360; return `${L.color} ${a.toFixed(1)}deg ${acc.toFixed(1)}deg`; }).join(',')})`;
 }
 
 function admireData(range, withPlan) {
@@ -33,10 +34,11 @@ function admireData(range, withPlan) {
     const d = isoDate(k.date);
     if (k.done) { if (d) all.push({ d, k, L, plan: false }); else undatedL.push({ k, L }); }
     else if (d && withPlan && !arch) all.push({ d, k, L, plan: true });
+    (k.fails || []).forEach(fl => { if (isoDate(fl.date)) all.push({ d: fl.date, k, L, fail: true }); });   // failed attempts, on their days
   };
   // a thread and everything under it, as lanes in display order
   const sub = (P, t, depth, parentKey, path, cmap, arch) => {
-    const L = { key: t.id, name: t.name, path, depth, parentKey, color: cmap.get(t.id) || PALETTE[0], pkey: P.key, arch, loose: !!(t.unordered || P.loose), own: new Map(), n: 0, np: 0 };
+    const L = { key: t.id, name: t.name, path, depth, parentKey, color: cmap.get(t.id) || PALETTE[0], pkey: P.key, arch, loose: !!(t.unordered || P.loose), own: new Map(), n: 0, np: 0, nf: 0 };
     lanes.set(t.id, L);
     const out = [L];
     (t.tasks || []).forEach(k => addTask(L, k, arch));
@@ -61,7 +63,7 @@ function admireData(range, withPlan) {
     const fr = e.from || {}; let L = fr.tid && lanes.get(fr.tid);
     if (!L) {
       const path = (fr.path || ['Project', 'Thread']).slice(1), P = proj(fr.pid || 'p:' + (fr.path || ['Project'])[0], (fr.path || ['Project'])[0], true);
-      L = { key: fr.tid || 'o:' + e.id, name: path[path.length - 1] || 'Thread', path, depth: 0, parentKey: null, color: PALETTE[P.lanes.length % PALETTE.length], pkey: P.key, arch: true, loose: P.loose, own: new Map(), n: 0, np: 0 };
+      L = { key: fr.tid || 'o:' + e.id, name: path[path.length - 1] || 'Thread', path, depth: 0, parentKey: null, color: PALETTE[P.lanes.length % PALETTE.length], pkey: P.key, arch: true, loose: P.loose, own: new Map(), n: 0, np: 0, nf: 0 };
       lanes.set(L.key, L); P.lanes.push(L);
     }
     addTask(L, e.item, true);
@@ -70,25 +72,27 @@ function admireData(range, withPlan) {
   const undated = undatedL.length, undatedG = [];
   undatedL.forEach(({ k, L }) => {
     let g = undatedG.find(x => x.L === L);
-    if (!g) { const P = projs.get(L.pkey); g = { L, name: L.name, up: [P ? P.name : ''].concat(L.path.slice(0, -1)).filter(Boolean).join(' › '), color: L.color, done: [], plan: [] }; undatedG.push(g); }
+    if (!g) { const P = projs.get(L.pkey); g = { L, name: L.name, up: [P ? P.name : ''].concat(L.path.slice(0, -1)).filter(Boolean).join(' › '), color: L.color, done: [], plan: [], fail: [] }; undatedG.push(g); }
     g.done.push(k);
   });
-  const done = all.filter(x => !x.plan), plan = all.filter(x => x.plan);
-  if (!all.length) return { total: 0, everTotal: 0, undated, undatedG };
+  const done = all.filter(x => !x.plan && !x.fail), plan = all.filter(x => x.plan), fails = all.filter(x => x.fail);
+  if (!all.length) return { total: 0, failed: 0, everTotal: 0, undated, undatedG };
   // date range: whole weeks; planned tasks stretch it to the last one on the calendar
   const today = todayISO(), minOf = xs => xs.reduce((m, x) => x.d < m ? x.d : m, xs[0].d), maxOf = xs => xs.reduce((m, x) => x.d > m ? x.d : m, xs[0].d);
-  const first = range === 'all' ? minOf(done.length ? done : plan) : addDays(today, -7 * (range - 1));
+  const first = range === 'all' ? minOf(done.length ? done : plan.length ? plan : fails) : addDays(today, -7 * (range - 1));
   let last = today;
   if (done.length && maxOf(done) > last) last = maxOf(done);
   if (plan.length && maxOf(plan) > last) last = maxOf(plan);
+  if (fails.length && maxOf(fails) > last) last = maxOf(fails);
   const R0 = weekStartOf(first), R1 = addDays(weekStartOf(last), 6);
   const inR = all.filter(x => x.d >= R0 && x.d <= R1);
-  const days = new Map();   // day -> { done, plan }
+  const days = new Map();   // day -> { done, plan, fail } (the wave counts done + plan; failed attempts are only dots)
   inR.forEach(x => {
-    if (!x.L.own.has(x.d)) x.L.own.set(x.d, { done: [], plan: [] });
-    x.L.own.get(x.d)[x.plan ? 'plan' : 'done'].push(x.k); x.plan ? x.L.np++ : x.L.n++;
-    if (!days.has(x.d)) days.set(x.d, { done: 0, plan: 0 });
-    days.get(x.d)[x.plan ? 'plan' : 'done']++;
+    const kind = x.fail ? 'fail' : x.plan ? 'plan' : 'done';
+    if (!x.L.own.has(x.d)) x.L.own.set(x.d, { done: [], plan: [], fail: [] });
+    x.L.own.get(x.d)[kind].push(x.k); x.L[{ done: 'n', plan: 'np', fail: 'nf' }[kind]]++;
+    if (!days.has(x.d)) days.set(x.d, { done: 0, plan: 0, fail: 0 });
+    days.get(x.d)[kind]++;
   });
   // spans (s..e: everything shown; ds..de: finished only), each including everything underneath
   const lo = (a, b) => !a ? b : !b ? a : a < b ? a : b, hi = (a, b) => !a ? b : !b ? a : a > b ? a : b;
@@ -108,8 +112,8 @@ function admireData(range, withPlan) {
       if (!A || A.pkey !== p.key) continue;
       A.s = lo(A.s, L.s); A.e = hi(A.e, L.e); A.ds = lo(A.ds, L.ds); A.de = hi(A.de, L.de);
     }
-    p.lanes = p.lanes.filter(L => L.s || L.sub || L.subp);   // (a lane with nothing of its own still lists what's under it)
-    p.n = p.lanes.reduce((a, L) => a + L.n, 0); p.np = p.lanes.reduce((a, L) => a + L.np, 0);
+    p.lanes = p.lanes.filter(L => L.s || L.sub || L.subp || L.nf);   // (a lane with nothing of its own still lists what's under it)
+    p.n = p.lanes.reduce((a, L) => a + L.n, 0); p.np = p.lanes.reduce((a, L) => a + L.np, 0); p.nf = p.lanes.reduce((a, L) => a + L.nf, 0);
     // s..e / ds..de: the ribbon (ordered lanes only; none = no ribbon); as..ae: everything the project shows
     p.s = p.e = p.ds = p.de = p.as = p.ae = null;
     p.lanes.forEach(L => {
@@ -129,21 +133,21 @@ function admireData(range, withPlan) {
     });
     p.color = (p.lanes.find(L => L.depth === 0) || p.lanes[0] || {}).color;
     p.days = new Map();
-    p.lanes.forEach(L => L.own.forEach((o, d) => { const c = p.days.get(d) || { done: 0, plan: 0 }; c.done += o.done.length; c.plan += o.plan.length; p.days.set(d, c); }));
+    p.lanes.forEach(L => L.own.forEach((o, d) => { const c = p.days.get(d) || { done: 0, plan: 0, fail: 0 }; c.done += o.done.length; c.plan += o.plan.length; c.fail += o.fail.length; p.days.set(d, c); }));
     // ribbon colors: each lane's color at the middle of its span
     const span = Math.max(1, diffDays(p.e || R0, p.s || R0));
-    const stops = p.lanes.filter(L => (L.n || L.np) && !L.loose).map(L => [L.color, (diffDays(L.s, p.s) + diffDays(L.e, p.s)) / 2 / span]).sort((a, b) => a[1] - b[1]);
+    const stops = p.lanes.filter(L => (L.n || L.np || L.nf) && !L.loose).map(L => [L.color, (diffDays(L.s, p.s) + diffDays(L.e, p.s)) / 2 / span]).sort((a, b) => a[1] - b[1]);
     const pick = stops.length > 7 ? stops.filter((x, i) => i % Math.ceil(stops.length / 7) === 0) : stops;
     if (pick.length > 1) pick.forEach((x, i) => x[1] = .5 * x[1] + .5 * i / (pick.length - 1));   // keep stops apart: always a blend
     p.ribStops = pick.length > 1 ? pick : [[p.color, 0], [shade(p.color || PALETTE[0], 2), 1]];
     p.rib = pick.length > 1 ? `linear-gradient(90deg,${pick.map(([c, f]) => `${c} ${(f * 100).toFixed(1)}%`).join(',')})` : `linear-gradient(90deg,${p.color},${shade(p.color || PALETTE[0], 2)})`;
   });
   // projects with a ribbon by where it starts, then the ones without, by their first task
-  const projList = P.filter(p => p.n || p.np).sort((a, b) => (!a.s - !b.s) || ((a.s || a.as) < (b.s || b.as) ? -1 : (a.s || a.as) > (b.s || b.as) ? 1 : 0));
+  const projList = P.filter(p => p.n || p.np || p.nf).sort((a, b) => (!a.s - !b.s) || ((a.s || a.as) < (b.s || b.as) ? -1 : (a.s || a.as) > (b.s || b.as) ? 1 : 0));
   const laneList = projList.flatMap(p => p.lanes);
   const maxCell = laneList.reduce((m, L) => { L.own.forEach(o => m = Math.max(m, o.done.length)); return m; }, 0);
-  const total = inR.filter(x => !x.plan).length;
-  return { total, planned: inR.length - total, everTotal: all.length, undated, undatedG, R0, R1, days, projs: projList, lanes, maxCell,
+  const total = inR.filter(x => !x.plan && !x.fail).length, failed = inR.filter(x => x.fail).length;
+  return { total, failed, planned: inR.length - total - failed, everTotal: all.length, undated, undatedG, R0, R1, days, projs: projList, lanes, maxCell,
     nThreads: laneList.filter(L => L.n).length, nProjs: projList.filter(p => p.n).length, first: (() => { const f = done.filter(x => x.d >= R0 && x.d <= R1); return f.length ? minOf(f) : null; })() };
 }
 // the same, computed once per change to the plan (redraws for resizing, folding or hovering reuse it)

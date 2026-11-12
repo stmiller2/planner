@@ -1,7 +1,7 @@
 :root{
   --bg:#f6f5f2; --panel:#ffffff; --ink:#1d1d1f; --muted:#6e6e74; --line:#e2e0db; --line2:#ebe9e4;
   --weekend:#f0efea; --chip:#ffffff; --hover:#f1f0ec; --accent:#2f6fed; --today:#2f6fed;
-  --warn-bg:#fff5d9; --warn-line:#ecd48b; --warn-ink:#5e4600; --danger:#c43c3c; --ok:#2e9e6b;
+  --warn-bg:#fff5d9; --warn-line:#ecd48b; --warn-ink:#5e4600; --danger:#c43c3c; --ok:#2e9e6b; --fail:#c8423b;
   --cal-line:var(--line2); --cal-num:var(--ink);   /* calendar grid lines and day numbers */
   color-scheme: light;
 }
@@ -9,7 +9,7 @@
 :root[data-theme="dark"]{
   --bg:#16171a; --panel:#1e1f22; --ink:#d9d9dc; --muted:#94949b; --line:#2f3034; --line2:#26272b;
   --weekend:#1a1b1e; --chip:#25262a; --hover:#292a2e; --accent:#5b8cff; --today:#5b8cff;
-  --warn-bg:#3a3019; --warn-line:#5d4c1f; --warn-ink:#f1d690; --danger:#ff7676; --ok:#4cc38a;
+  --warn-bg:#3a3019; --warn-line:#5d4c1f; --warn-ink:#f1d690; --danger:#ff7676; --ok:#4cc38a; --fail:#ff7b72;
   --cal-line:#5e5f65; --cal-num:#c9c9cd;
   color-scheme: dark;
 }

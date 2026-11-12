@@ -116,3 +116,23 @@ code.path{word-break:break-all}
 /* editing in place (double-click the text, or Add notes in the task's menu): a box the note's width, growing with what's typed */
 #ntip .nt-ed{display:block;width:100%;box-sizing:border-box;min-height:60px;max-height:min(38vh,300px);resize:none;font:inherit;line-height:1.4;color:var(--ink);background:var(--bg);border:1px solid var(--accent);border-radius:6px;padding:4px 6px;margin:1px 0 0;outline:none}
 #ntip .nt-k{font-size:10.5px;color:var(--muted);margin-top:4px}
+/* after marking tasks failed (markFailed, ui/sidebar.js): the later tasks it could act on, top centre, until closed */
+#ask{position:fixed;left:50%;top:62px;z-index:41;width:min(400px,92vw);max-height:min(70vh,520px);overflow:auto;padding:8px 10px 10px 14px;border-radius:10px;
+  background:var(--panel);border:1px solid var(--line);box-shadow:0 6px 24px rgba(0,0,0,.18);font-size:12.5px;line-height:1.35;
+  opacity:0;transform:translate(-50%,-6px);pointer-events:none;transition:opacity .15s,transform .15s}
+#ask.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#ask .ak-h{display:flex;align-items:center;gap:8px;justify-content:space-between}
+#ask .ak-h b{min-width:0;overflow-wrap:break-word}
+#ask .ak-x{flex:none}
+#ask .ak-s{margin-top:8px;padding-top:8px;border-top:1px solid var(--line2)}
+#ask .ak-t{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+#ask ul{list-style:none;margin:4px 0 7px;padding:0}
+#ask li{display:flex;align-items:baseline;gap:7px;padding:1.5px 0}
+#ask li .sw{flex:none;width:7px;height:7px;border-radius:50%;background:var(--c);align-self:center}
+#ask li .nm{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ask li .th,#ask li .d{flex:none;color:var(--muted);font-size:11px}
+#ask .ak-b{border:1px solid var(--line);background:transparent;border-radius:6px;padding:3px 10px;cursor:pointer}
+#ask .ak-b:hover{background:var(--hover)}
+#ask .ak-ok{display:inline-flex;align-items:center;gap:5px;color:var(--muted);padding:3px 0}
+#ask .ak-ok svg{width:13px;height:13px;color:var(--ok)}
+#menu .mhd{font-size:11px;color:var(--muted);padding:5px 9px 4px;font-weight:600}

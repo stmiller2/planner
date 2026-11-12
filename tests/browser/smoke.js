@@ -211,7 +211,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       await page.keyboard.press('h'); assert.ok(/How it works/.test(await page.textContent('#modal .mhead'))); await page.click('#modal .mx');
       await page.keyboard.press('s'); assert.ok(await page.locator('#modal .srow').count() > 5); await page.click('#sClose');
     });
-    await check('↑ / ↓ step like ← / →, and Ctrl+Shift+, opens Settings', async () => {
+    await check('↑ / ↓ step like ← / →', async () => {
       const v0 = await page.evaluate(() => ui.viewStart);
       await page.keyboard.press('ArrowDown'); await sleep(400);
       assert.strictEqual(await page.evaluate(() => ui.viewStart), await page.evaluate(v => addDays(v, 7), v0));
@@ -220,7 +220,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       await page.keyboard.press('d'); await page.keyboard.press('ArrowDown'); await sleep(450);
       assert.strictEqual(await page.evaluate(() => ui.dayView), '2026-10-29');
       await page.keyboard.press('ArrowUp'); await sleep(450); await page.keyboard.press('c');
-      await page.keyboard.press('Control+Shift+Comma'); assert.ok(await page.locator('#modal .srow').count() > 5); await page.click('#sClose');
     });
     await check('a shortcut pressed in Help or Settings closes it and runs', async () => {
       await page.keyboard.press('h'); await page.keyboard.press('d');
@@ -452,7 +451,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       const id = await items.nth(0).getAttribute('data-id'), id2 = await items.nth(1).getAttribute('data-id');
       assert.strictEqual(await items.nth(0).locator('[data-act="kmenu"]').isVisible(), false);
       await items.nth(0).hover(); await items.nth(0).locator('[data-act="kmenu"]').click();
-      assert.deepStrictEqual(await page.$$eval('#menu button', bs => bs.map(b => b.dataset.act)), ['k-notes', 'arch-k', 'del-k']);
+      assert.deepStrictEqual(await page.$$eval('#menu button', bs => bs.map(b => b.dataset.act)), ['k-notes', 'k-fail', 'arch-k', 'del-k']);
       assert.strictEqual(await page.evaluate(() => tpop), null);   // (the gear doesn't open the time box)
       await page.click('#menu [data-act="del-k"]'); assert.ok(!(await task(id)));
       const it2 = page.locator(`#dayview .dv-item[data-id="${id2}"]`);
@@ -535,6 +534,59 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       for (let i = 0; i < 4; i++) await page.keyboard.press('Control+z');
       assert.strictEqual((await task('m3')).date, '2026-11-06');
       await page.keyboard.press('Escape');
+    });
+    await check('failed tasks: mark failed (right-click), unschedule later tasks, reschedule by dragging, remove', async () => {
+      const d0 = (await task('l2')).date, d1 = await page.evaluate(d => addDays(d, 1), d0);
+      const view0 = await page.evaluate(d => { const v = [ui.viewStart, ui.weeks]; if (admOpen) closeAdmire(); if (ui.dayView) closeDay(); clearSel(); ui.viewStart = weekStartOf(addDays(d, -7)); ui.weeks = 3; render(); return v; }, d0);
+      await page.click('.chip[data-id="l2"]', { button: 'right' });
+      await page.click('#menu [data-act="k-fail"]'); await sleep(200);
+      const l2 = await task('l2');
+      assert.strictEqual(l2.date, null);
+      assert.deepStrictEqual(l2.fails.map(f => f.date), [d0]);
+      assert.strictEqual(await page.locator(`#grid .day[data-date="${d0}"] .chip.failed[data-kid="l2"]`).count(), 1);
+      assert.ok(await page.locator('#ask.on').isVisible(), 'prompt shown');
+      const later = await page.$$eval('#ask .ak-s[data-s="later"] li .nm', ls => ls.map(l => l.textContent));
+      assert.deepStrictEqual(later, [(await task('l3')).title, (await task('l4')).title]);
+      await page.click('#ask .ak-s[data-s="later"] .ak-b'); await sleep(200);
+      assert.strictEqual((await task('l3')).date, null); assert.strictEqual((await task('l4')).date, null);
+      assert.ok(await page.locator('#ask.on').isVisible(), 'prompt stays open');
+      await page.click('#ask .ak-x'); await sleep(200);
+      assert.strictEqual(await page.locator('#ask.on').count(), 0);
+      assert.ok(/try 2/.test(await page.textContent('#tree .task[data-id="l2"]')));
+      // dragging the failed attempt reschedules the task; the attempt stays
+      const s = await page.locator('.chip.failed[data-kid="l2"]').boundingBox(), d = await page.locator(`#grid .day[data-date="${d1}"]`).boundingBox();
+      await page.mouse.move(s.x + s.width / 2, s.y + s.height / 2); await page.mouse.down();
+      for (let i = 1; i <= 10; i++) { await page.mouse.move(s.x + (d.x + 20 - s.x) * i / 10, s.y + (d.y + 30 - s.y) * i / 10); await sleep(20); }
+      await page.mouse.up(); await sleep(300);
+      assert.strictEqual((await task('l2')).date, d1);
+      assert.strictEqual(await page.locator(`#grid .day[data-date="${d0}"] .chip.failed`).count(), 1);
+      assert.ok(/try 2/.test(await page.textContent('.chip[data-id="l2"]')));
+      // day view and the Timeline show it; no errors
+      await page.evaluate(d => openDay(d), d0); await sleep(200);
+      assert.strictEqual(await page.locator('#dayview .dv-item.failed[data-kid="l2"]').count(), 1);
+      await page.evaluate(() => closeDay()); await page.keyboard.press('-'); await sleep(400);
+      assert.ok(await page.locator('#admire .adm-dot.fail').count() >= 1, 'timeline dot');
+      await page.keyboard.press('-'); await sleep(200);
+      // right-click the failed attempt: remove it
+      await page.click('.chip.failed[data-kid="l2"]', { button: 'right' });
+      await page.click('#menu [data-act="fail-rm"]'); await sleep(200);
+      assert.ok(!(await task('l2')).fails);
+      assert.strictEqual(await page.locator('#grid .chip.failed').count(), 0);
+      // several selected: later tasks are the ones after the last of them
+      await page.evaluate(d => { moveTask('l3', addDays(d, 2)); moveTask('l4', addDays(d, 3)); }, d0);
+      await page.click('#tree .task[data-id="l3"] .title', { modifiers: ['Meta'] });
+      await page.click('#tree .task[data-id="l4"] .title', { modifiers: ['Meta'] });
+      await page.click('#selbar [data-act="sel-fail"]'); await sleep(200);
+      assert.strictEqual((await task('l3')).fails.length, 1); assert.strictEqual((await task('l4')).fails.length, 1);
+      assert.ok(!(await page.locator('#ask.on').count()), 'no later tasks after l4: no prompt');
+      // right-click a failed attempt: unmark it (back on its day)
+      const d4 = (await task('l4')).fails[0].date;
+      await page.click('.chip.failed[data-kid="l4"]', { button: 'right' });
+      await page.click('#menu [data-act="k-unfail"]'); await sleep(200);
+      assert.strictEqual((await task('l4')).date, d4); assert.ok(!(await task('l4')).fails);
+      for (let i = 0; i < 8; i++) await page.keyboard.press('Control+z');   // (fail, unschedule, drag, remove, 2 moves, fail 2, unmark)
+      assert.strictEqual((await task('l2')).date, d0);
+      await page.evaluate(v => { clearSel(); ui.viewStart = v[0]; ui.weeks = v[1]; render(); }, view0);
     });
     await check('Help shows where the data is; Settings > Data file moves it to another folder', async () => {
       await page.keyboard.press('h');
