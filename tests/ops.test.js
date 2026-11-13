@@ -314,6 +314,68 @@ test('failed attempts: removing one, unordered threads ask nothing, migrate drop
   assert.ok(!('fails' in M.findTask('b').task));
 });
 
+// a day's list as [kind, id]: kind 'fail' for a failed attempt, else 'task'
+const dayList = (P, d) => j(P.dayItems(d).map(it => [it.fl ? 'fail' : 'task', it.k.id]));
+// prep 1, prep 2 and submit on Monday, review on Wednesday, all done; the review shows step 2 went wrong
+const SEQ = () => [T('s1', '2026-11-02', { done: true }), T('s2', '2026-11-02', { done: true }), T('sub', '2026-11-02', { done: true }), T('rev', '2026-11-04', { done: true }), T('rep', '2026-11-04')];
+const MON = '2026-11-02', WED = '2026-11-04', FRI = '2026-11-06';
+
+test('a day keeps a thread in order, with a failed attempt above the retries it led to', () => {
+  // rep: a later step nobody has tried yet, also on Wednesday - it stays after the retries
+  const want = P => {
+    assert.deepStrictEqual(dayList(P, MON), [['task', 's1'], ['fail', 's2'], ['fail', 'sub']]);
+    assert.deepStrictEqual(dayList(P, WED), [['fail', 'rev'], ['task', 's2'], ['task', 'sub'], ['task', 'rep']]);
+    assert.deepStrictEqual(dayList(P, FRI), [['task', 'rev']]);
+  };
+  // whichever order it's done in: fail everything, then reschedule ...
+  let P = load(plan([TH('t', SEQ())]));
+  P.failTasks(['s2', 'sub', 'rev']);
+  P.moveTask('s2', WED); P.moveTask('sub', WED); P.moveTask('rev', FRI);
+  want(P);
+  // ... or reschedule step 2 and submit before marking the review failed
+  P = load(plan([TH('t', SEQ())]));
+  P.failTasks(['s2', 'sub']);
+  P.moveTask('s2', WED); P.moveTask('sub', WED);
+  P.failTasks(['rev']); P.moveTask('rev', FRI);
+  want(P);
+  // a retry that fails again is a second attempt: it stays with the other retries, in thread order
+  P.failTasks(['sub']);
+  assert.deepStrictEqual(dayList(P, WED), [['fail', 'rev'], ['task', 's2'], ['fail', 'sub'], ['task', 'rep']]);
+  // and unmarking it puts the task back in that place
+  P.unfailTask('sub');
+  assert.deepStrictEqual(dayList(P, WED), [['fail', 'rev'], ['task', 's2'], ['task', 'sub'], ['task', 'rep']]);
+});
+
+test('a task retried on the day it failed comes after its failed attempt', () => {
+  const P = load(plan([TH('t', [T('a', MON), T('b', MON)])]));
+  P.failTasks(['b']); P.moveTask('b', MON);
+  assert.deepStrictEqual(dayList(P, MON), [['task', 'a'], ['fail', 'b'], ['task', 'b']]);
+  P.failTasks(['a']); P.moveTask('a', MON);   // a: retried too, so after b's first attempt
+  assert.deepStrictEqual(dayList(P, MON), [['fail', 'a'], ['fail', 'b'], ['task', 'a'], ['task', 'b']]);
+});
+
+test('a day keeps threads together: a retry sits under its attempt, before later steps, inside its own thread', () => {
+  const P = load(plan([TH('t', [T('a', MON), T('b', MON)]), TH('u', [T('x', MON)])]));
+  P.failTasks(['a']); P.moveTask('a', MON);
+  assert.deepStrictEqual(dayList(P, MON), [['fail', 'a'], ['task', 'a'], ['task', 'b'], ['task', 'x']]);
+});
+
+test('the gap a drag opens is where the day will really list the task (dayDropBefore)', () => {
+  const P = load(plan([TH('t', SEQ()), TH('u', [T('z', WED)])]));
+  P.failTasks(['s2', 'sub', 'rev']);
+  // the review dropped back on the day of its own failed attempt: right below that attempt
+  const before = j(P.dayItems(WED).map(it => it.fl ? it.fl.id : it.k.id));
+  assert.strictEqual(P.dayDropBefore(WED, ['rev']), before[before.indexOf(P.findTask('rev').task.fails[0].id) + 1]);
+  // step 2 + submit dropped on Wednesday: below the review's failed attempt, above rep (a later step, untried)
+  const ids = ['s2', 'sub'], nx = P.dayDropBefore(WED, ids);
+  P.moveTask('s2', WED); P.moveTask('sub', WED);
+  const list = j(P.dayItems(WED).map(it => it.fl ? it.fl.id : it.k.id));
+  assert.strictEqual(nx, list[list.indexOf('s2') + ids.length]);
+  assert.strictEqual(nx, 'rep');
+  P.failTasks(ids);
+  assert.strictEqual(P.dayDropBefore(FRI, ids), null);   // nothing after it: the end of the day
+});
+
 test('failing late: the later done tasks can be marked failed too, links among them put back', () => {
   const P = load(plan([TH('t', [T('a', '2026-11-02', { done: true }), T('b', '2026-11-03', { link: 'nextDay', done: true }), T('c', '2026-11-04', { link: 'nextDay', done: true }), T('d', '2026-11-09')])]));
   const r = P.failTasks(['a']);

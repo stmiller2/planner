@@ -58,12 +58,12 @@ function renderCal(strip) {
     const d = addDays(start, n), dd = parseD(d), wd = dd.getDay(), w = Math.floor(n / 7);
     const cls = ['day', (wd === 0 || wd === 6) && 'we', d === today && 'today', d < today && 'past', cs.some(c => c.start <= d && d <= c.end) && 'cf'].filter(Boolean).join(' ');
     const label = (n === 0 || dd.getDate() === 1) ? `${MON[dd.getMonth()]} ${dd.getDate()}` : dd.getDate();
-    // runs and failed attempts in sidebar order (index order n), so a failed attempt stays where its task was
-    const nOf = new Map(dayTasks(d).map(it => [it.k.id, it.n]));
+    // runs and failed attempts in the day's own order (see dayItems), so an attempt stays where it happened
+    const posOf = dayOrder(d);
     const items = (byDate[d] || []).map(r => {
       const chips = []; for (let k = r.s; k <= r.e; k++) chips.push([r.t.tasks[k].id, chip(r, k)]);
-      return [nOf.get(r.t.tasks[r.s].id), r.e > r.s ? `<div class="grp" style="--c:${esc(colorOf(r.t))}">${selRuns(chips)}</div>` : selRuns(chips)];
-    }).concat(dayFails(d).map(e => [e.n, failChip(e)])).sort((a, b) => a[0] - b[0]).map(x => x[1]).join('') + (archOn[d] || []).map(archChip).join('');
+      return [posOf(r.t.tasks[r.s].id), r.e > r.s ? `<div class="grp" style="--c:${esc(colorOf(r.t))}">${selRuns(chips)}</div>` : selRuns(chips)];
+    }).concat(dayFails(d).map(e => [posOf(e.fl.id), failChip(e)])).sort((a, b) => a[0] - b[0]).map(x => x[1]).join('') + (archOn[d] || []).map(archChip).join('');
     const gap = wkSlots[w] ? `<div class="cf-gap" style="height:${wkSlots[w] * CF_PITCH + 4}px"></div>` : '';
     html += `<div class="${cls}" data-date="${d}" style="grid-row:${w + 1};grid-column:${n % 7 + 1}"><div class="dn"><span class="n" data-act="openday" data-date="${d}">${label}</span></div>${gap}<div class="items">${items}</div></div>`;
   }
@@ -198,10 +198,12 @@ function chip({ p, t, path }, i) {
 }
 /* A failed attempt (task.fails, see failTasks): a struck, hatched chip on the day it happened. It isn't the task
    itself (no data-id: no checkbox, selection or notes), but hovering it picks out the task, clicking shows it in the
-   sidebar, dragging it to a day reschedules the task (the failed attempt stays), and right-clicking opens openFailMenu. */
+   sidebar and right-clicking opens openFailMenu. While the task is unscheduled, dragging the chip to a day
+   reschedules the task (the attempt stays where it is); dropping it back on itself calls that off (failBail), and
+   once the task sits on a day again its attempts can't be dragged - that chip is the task's, so you drag it. */
 function failChip(e) {
   const tip = `Failed attempt ${e.a + 1} · ${[e.p.name, ...e.path].join(' › ')}`;
-  return `<div class="chip failed" draggable="true" data-fid="${e.fl.id}" data-kid="${e.k.id}" style="--c:${esc(colorOf(e.t))}" title="${esc(tip)}">
+  return `<div class="chip failed" draggable="${e.k.date ? 'false' : 'true'}" data-fid="${e.fl.id}" data-kid="${e.k.id}" style="--c:${esc(colorOf(e.t))}" title="${esc(tip)}">
     <span class="fx">${ICON.x}</span>
     <div class="cb" data-act="reveal" data-id="${e.k.id}"><div class="tt">${esc(e.k.title)}</div><div class="ts"><span class="fl">failed</span><span class="tn">${esc(e.t.name)}</span></div></div>
   </div>`;
@@ -238,8 +240,6 @@ grid.addEventListener('click', e => {
    and on the drop the chips slide into place: within a day from where they were, onto it from the gap; chips that
    changed day fade in where they land (flipTo). */
 const calGap = makeGap('cgap');
-// task id -> its place in the order days list their tasks (index order: thread by thread)
-const taskOrder = memo(() => { const m = new Map(); allThreads().forEach(x => x.t.tasks.forEach(k => m.set(k.id, m.size))); return m; });
 // the chips that land on the day itself: the dragged task with its same-day group (just it with Option), or a selection
 function calLanding(split) {
   if (drag.ids) return drag.ids;
@@ -247,27 +247,36 @@ function calLanding(split) {
   const [s, e] = dayRunOf(f.t, f.i); return f.t.tasks.slice(s, e + 1).map(k => k.id);
 }
 function calGapAt(day, split) {
-  const f = findTask(drag.id); if (!f || !MOTION() || (!drag.ids && f.task.date === day.dataset.date)) return calGap.hide();
-  const ord = taskOrder(), me = ord.get((drag.ids || [drag.id])[0]), items = day.querySelector('.items');
-  const rank = c => { const x = c.matches('.chip') ? c : c.querySelector('.chip[data-id], .chip[data-kid]'); if (!x || x.classList.contains('arch')) return Infinity;
-    return x.dataset.id ? ord.get(x.dataset.id) : ord.get(x.dataset.kid) + .5; };
-  const kids = [...items.children].filter(c => !c.classList.contains('dgap')), at = kids.findIndex(c => rank(c) > me);
-  const n = calLanding(split).slice(0, 3), h = n.reduce((a, id) => a + (($(`#grid .chip[data-id="${id}"]`) || {}).offsetHeight || drag.ch), 0) + 4 * (n.length - 1);
-  calGap.show(day.dataset.date + ':' + at, el => at < 0 ? items.appendChild(el) : items.insertBefore(el, kids[at]), h);
+  const d = day.dataset.date, f = findTask(drag.id);
+  if (!f || !MOTION() || (!drag.ids && f.task.date === d)) return calGap.hide();
+  const ids = calLanding(split), items = day.querySelector('.items');
+  // the item the drop would sit above (dayDropBefore): the gap opens before its chip, inside its group if it's in one
+  const nx = dayDropBefore(d, ids), q = nx ? `[data-id="${nx}"], [data-fid="${nx}"]` : '';
+  const kids = [...items.children].filter(c => !c.classList.contains('dgap'));
+  const at = nx ? kids.findIndex(c => c.matches(q) || c.querySelector(q)) : -1;
+  const n = ids.slice(0, 3), h = n.reduce((a, id) => a + (($(`#grid .chip[data-id="${id}"]`) || {}).offsetHeight || drag.ch), 0) + 4 * (n.length - 1);
+  calGap.show(d + ':' + at, el => at < 0 ? items.appendChild(el) : items.insertBefore(el, kids[at]), h);
 }
 const CAL_CHIPS = '#grid .chip[data-id], #grid .chip[data-fid]';
 const chipKey = el => el.dataset.id ? 'c:' + el.dataset.id : 'f:' + el.dataset.fid;
 const dropDay = e => e.target.closest('.day') || (e.target.closest('.cfb') && $(`#grid .day[data-date="${calDayAt(e.clientX, e.clientY)}"]`));
+/* Back on the chip it came from = don't reschedule: a failed attempt's chip sits on the day its task would land on
+   if it were dropped anywhere else there, so without this there'd be no way to change your mind over that day. */
+const failBail = e => !!(drag && drag.from === 'fail' && e.target.closest(`.chip.failed[data-fid="${drag.fid}"]`));
 grid.addEventListener('dragover', e => {
   if (!drag || drag.kind !== 'task') return; const day = dropDay(e); if (!day) return;
-  e.preventDefault(); e.dataTransfer.dropEffect = splitHeld(e) ? 'copy' : 'move';
+  e.preventDefault();
+  if (failBail(e)) { e.dataTransfer.dropEffect = 'none'; $$('.day.over').forEach(x => x.classList.remove('over')); return calGap.hide(); }
+  e.dataTransfer.dropEffect = splitHeld(e) ? 'copy' : 'move';
   if (!day.classList.contains('over')) { $$('.day.over').forEach(x => x.classList.remove('over')); day.classList.add('over'); }
   calGapAt(day, splitHeld(e));
 });
 grid.addEventListener('dragleave', e => { if (!grid.contains(e.relatedTarget)) { $$('.day.over').forEach(x => x.classList.remove('over')); calGap.hide(); } });
 grid.addEventListener('drop', e => {
   const day = dropDay(e); if (!drag || drag.kind !== 'task' || !day) return;
-  e.preventDefault(); const id = drag.id, many = drag.ids, split = splitHeld(e), date = day.dataset.date; drag = null;
+  e.preventDefault();
+  if (failBail(e)) { drag = null; calGap.hide(); return; }   // dropped back on its own chip: nothing to do
+  const id = drag.id, many = drag.ids, split = splitHeld(e), date = day.dataset.date; drag = null;
   // chips now (the dropped ones at the gap), and which day each was on
   const before = snapRects(CAL_CHIPS, chipKey), dayOf = new Map($$(CAL_CHIPS).map(c => [chipKey(c), c.closest('.day').dataset.date]));
   const gr = calGap.el && calGap.el.getBoundingClientRect();

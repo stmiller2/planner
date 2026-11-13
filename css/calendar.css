@@ -100,6 +100,9 @@ body.dragging .chip, body.dragging .task{cursor:grabbing}
 .fx svg{width:13px;height:13px;stroke-width:2.6}
 .ts .fl,.tm .fl{color:var(--fail);font-weight:600}
 .chip.failed.arch{cursor:default;opacity:.8}
+/* only draggable while its task is unscheduled (failChip): once the task has a day again, you drag the task's chip */
+.chip.failed:not([draggable="true"]){cursor:default}
+body.dragging .chip.failed:not([draggable="true"]){cursor:inherit}
 /* a task that failed before: which attempt this one is */
 .try{display:inline-block;font-size:9.5px;font-weight:650;line-height:14px;padding:0 4px;border-radius:7px;margin-left:5px;vertical-align:1px;white-space:nowrap;
   color:var(--fail);background:color-mix(in srgb,var(--fail) 12%,transparent);text-decoration:none}

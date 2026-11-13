@@ -107,7 +107,7 @@ function renderDayList(box, only, cur = ui.dayView) {
   const addBox = tid => `<input class="add dvadd" data-tid="${tid}" placeholder="New task (Enter to add, Esc to stop)">`;
   let html = '';
   days.forEach(day => {
-    const items = dayTasks(day), all = items.concat(dayFails(day)).sort((a, b) => a.n - b.n);   // failed attempts among them, in sidebar order
+    const items = dayTasks(day), all = dayItems(day);   // failed attempts among them, each where it happened (see dayItems)
     let sec = '', lastT = null;
     all.forEach(it => {
       if (it.t !== lastT) {

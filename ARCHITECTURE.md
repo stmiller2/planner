@@ -103,6 +103,12 @@ scratch  = { id, title, done }         one-off to-dos outside projects; no dates
   each one is drawn on its day (calendar `failChip`, day-view `.dv-item.failed` / `.dv-blk.failed`, Timeline `fail`
   dots) as an element with `data-fid` / `data-kid` and no `data-id`, so the task handlers (selection, notes, day-view
   drags, TASK_EL) skip it. `attemptNo(k)` = fails + 1.
+- A day's list mixes its live tasks and its failed attempts: `dayItems(d)` → `orderDay` (core/model.js), thread by
+  thread. Live tasks keep thread order; each failed attempt goes just above the first live task that comes after it
+  (a later attempt, `attemptOf`, or further down the thread). So a failed step picked up again on the day of the
+  attempt that showed it lists under that attempt, what worked stays above what failed after it, and untried later
+  steps stay after the retries. It depends only on what each item is, never on the order things were marked.
+  `dayOrder(d)` gives the same order as a lookup by task / attempt id (calendar). Don't order a day by `n` alone.
 
 `ui` (js/core/prefs.js, localStorage `planner.ui`) holds view state and settings, never plan data.
 
@@ -134,8 +140,8 @@ for live preview) must call `touch()`.
 | Timeline | `admireData` (ui/timeline-data.js), `renderAdmire`, `admTipHTML` (ui/timeline.js) |
 | multi-select, selection bar | end of ui/sidebar.js; ops under "several tasks at once" in core/ops.js |
 | task notes | ui/notes.js, `setTaskNotes`, task menu `openTaskMenu` (ui/sidebar.js) |
-| drag motion | sidebar: `treeGap` / `gapPlace`, drop → `treeRectsFor` + `flipTo` (ui/sidebar.js); calendar: `calGap` / `calGapAt`, drop → `flipTo` (ui/calendar.js); day view: `dvAim` / `dvFrame` (eased ghost), `dvLane` (its lane while moving), `dvRest` → `dvReflow` (columns make room once the pointer pauses), `dvGap`, `dvUp` → `flipTo` (ui/dayview-edit.js); gap heights: `gapH` (what lands at that spot: `treeMoving`, `calLanding`, listTarget.ids); helpers in ui/dom.js |
-| failed attempts | `failTasks` / `failLater` / `unscheduleLater` / `unfailTask` / `removeFail` (core/ops.js), `markFailed`, `openFailMenu` (ui/sidebar.js), `failChip` (ui/calendar.js), `renderDayList` / `renderDayTimeline`, `admireData` (`fail` kind) |
+| drag motion | sidebar: `treeGap` / `gapPlace`, drop → `treeRectsFor` + `flipTo` (ui/sidebar.js); calendar: `calGap` / `calGapAt` (where it lands: `dayDropBefore`, core/model.js), drop → `flipTo` (ui/calendar.js); day view: `dvAim` / `dvFrame` (eased ghost), `dvLane` (its lane while moving), `dvRest` → `dvReflow` (columns make room once the pointer pauses), `dvGap`, `dvUp` → `flipTo` (ui/dayview-edit.js); gap heights: `gapH` (what lands at that spot: `treeMoving`, `calLanding`, listTarget.ids); helpers in ui/dom.js |
+| failed attempts | `failTasks` / `failLater` / `unscheduleLater` / `unfailTask` / `removeFail` (core/ops.js), `dayItems` / `dayOrder` / `dayDropBefore` (core/model.js), `markFailed`, `openFailMenu` (ui/sidebar.js), `failChip` (ui/calendar.js), `renderDayList` / `renderDayTimeline`, `admireData` (`fail` kind) |
 | header, date range, 1–5 weeks / days | Planner.html; `renderHeader`, `setRange`, `navStep` / `navToday` (ui/app.js) |
 | keyboard shortcuts | keydown handler at end of ui/app.js, `switchView`; list them in `shortcutsHTML` (ui/dialogs.js) |
 | a button's action | its `data-act` case (ui/app.js) |
@@ -205,6 +211,10 @@ Four places can need text when something changes. Update them only where the cha
 - Non-passive `wheel` listeners only on the calendar (`main`) and day-view timeline (`.dv-main`); keep natively
   scrolling lists free of them.
 - Redraws preserve each calendar day's and list's scroll position (renderCal).
+- The calendar's gap must open where the drop would actually land, which for a day holding failed attempts is not
+  index order: ask `dayDropBefore(day, ids)` (core/model.js), never work it out from the chips on screen.
+- A failed attempt's chip is draggable only while its task is unscheduled, and dropping it back on itself cancels
+  (`failBail`, ui/calendar.js): it's the only way out over the day the task would land on anyway.
 - A drag gap (`.dgap`) sits under the pointer: the `dragenter` on it must be accepted (dragdrop.js) or the drop never
   fires, and each list's dragover keeps the target the gap stands for while the pointer is on it (`gap.over(e)`).
   Code that walks a list's children skips `.dgap`. Day-view blocks carry `data-s` / `data-d` (start / duration) for

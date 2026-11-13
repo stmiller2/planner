@@ -58,6 +58,7 @@ function migThread(t, top, counter) {
     const link = k.linkToPrev in LINKS ? k.linkToPrev : (k.sameDayAsPrev ? 'sameDay' : null);
     const K = { ...k, id: k.id || uid(), title: String(k.title ?? ''), date: /^\d{4}-\d{2}-\d{2}$/.test(k.date) ? k.date : null, done: !!k.done, linkToPrev: link };
     if (typeof K.notes !== 'string' || !K.notes.trim()) delete K.notes;   // notes: free text (see setTaskNotes)
+    delete K.seq;   // seq: briefly recorded by an earlier version (when it was put on its day), no longer used
     const fl = migFails(k.fails); if (fl.length) K.fails = fl; else delete K.fails;   // fails: earlier failed attempts (see failTasks)
     delete K.sameDayAsPrev; delete K.doneOn;   // doneOn: briefly recorded by an earlier version, no longer used
     T.tasks.push(K);
@@ -133,6 +134,45 @@ const dayTasks = d => (index().byDate.get(d) || []).slice();
 // failed attempts on day d, as { ...thread entry, k (the task), fl (the attempt), a (its number - 1), n }; findFail by id
 const dayFails = d => (index().failDate.get(d) || []).slice();
 const findFail = id => index().byFail.get(id) || null;
+/* A day's live tasks and failed attempts in one list, thread by thread (index order). Within a thread the live
+   tasks - done or not, first try or retry - keep the thread's order, and each failed attempt goes just above the
+   first of them that comes after it: a task on a later attempt (a retry, picked up after the failure), or one
+   further down the thread. So on the day a sequence was found to have failed, its failed attempt sits on top and
+   the redone steps below it, though the thread puts them first, while what worked earlier that day stays above
+   what failed after it, and a step nobody has tried yet stays in its place after the retries. Nothing here depends
+   on the order things were marked.
+   attemptOf: which attempt an item is, from 0 (a live task: how often it failed before; an attempt: its number - 1) */
+// task id -> [its thread's place (index order), its own place in the thread]
+const dayRank = memo(() => { const m = new Map(); allThreads().forEach((x, ti) => x.t.tasks.forEach((k, i) => m.set(k.id, [ti, i]))); return m; });
+const attemptOf = it => it.fl ? it.a : (it.k.fails ? it.k.fails.length : 0);
+function orderDay(live, fails) {
+  const pl = it => dayRank().get(it.k.id), out = [];
+  const tis = [...new Set(live.concat(fails).map(it => pl(it)[0]))].sort((a, b) => a - b);
+  for (const ti of tis) {
+    const L = live.filter(it => pl(it)[0] === ti).sort((a, b) => pl(a)[1] - pl(b)[1]);
+    const F = fails.filter(it => pl(it)[0] === ti).sort((a, b) => attemptOf(a) - attemptOf(b) || pl(a)[1] - pl(b)[1]);
+    const at = F.map(f => { const i = L.findIndex(l => attemptOf(l) > attemptOf(f) || pl(l)[1] > pl(f)[1]); return i < 0 ? L.length : i; });
+    let j = 0;
+    for (let i = 0; i <= L.length; i++) {   // one pass, so the attempts stay in their order even if their places don't
+      while (j < F.length && at[j] <= i) out.push(F[j++]);
+      if (i < L.length) out.push(L[i]);
+    }
+  }
+  return out;
+}
+const dayItems = d => orderDay(dayTasks(d), dayFails(d));
+/* Where tasks dropped on day d would land in its list: the id of the item they would sit above (a task's or an
+   attempt's), or null for the end of the list. Worked out by listing the day with them on it (dropping doesn't
+   change their attempt), so it's where dayItems will put them; the calendar's drag opens its gap there (calGapAt). */
+function dayDropBefore(d, ids) {
+  const drop = ids.map(findTask).filter(Boolean).map(f => ({ ...f, k: f.task }));
+  if (!drop.length) return null;
+  const list = orderDay(dayTasks(d).filter(it => !ids.includes(it.k.id)).concat(drop), dayFails(d));
+  const nx = list.slice(Math.min(...drop.map(x => list.indexOf(x))) + 1).find(it => !drop.includes(it));
+  return nx ? (nx.fl ? nx.fl.id : nx.k.id) : null;
+}
+// where a day's items sit in that order: task id / attempt id -> its place (-1 = not on the day)
+function dayOrder(d) { const m = new Map(dayItems(d).map((it, j) => [it.fl ? it.fl.id : it.k.id, j])); return id => m.has(id) ? m.get(id) : -1; }
 // which attempt a task is on now (1 = never failed)
 const attemptNo = k => (k.fails ? k.fails.length : 0) + 1;
 function subtreeTasks(t) { return t.tasks.concat(...t.threads.map(subtreeTasks)); }

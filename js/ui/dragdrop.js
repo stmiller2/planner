@@ -1,7 +1,9 @@
 'use strict';
 /* HTML5 drag & drop shared by the sidebar and the calendar: what is being dragged (`drag`) and Option-drop.
    drag = { kind: 'task' | 'thread', id, from: 'side' | 'cal' | 'fail', ids? }: ids = a sidebar selection dragged together;
-   'fail' = a failed attempt's chip (id = its task), which can only be dropped on a day. */
+   'fail' = a failed attempt's chip (id = its task, fid = the attempt), which can only be dropped on a day and is
+   draggable only while the task is unscheduled (failChip, ui/calendar.js). Dropping it back on the chip it came
+   from calls the whole thing off, which is the only way out when the day it would land on is its own (failBail). */
 // how tall a gap to open for rows `els` (what will actually land there), at most 3 rows' worth
 const gapH = (els, one = 27) => Math.min(84, [...new Set(els.filter(Boolean))].reduce((a, x) => a + x.offsetHeight, 0) || one);
 /* holding Option while dropping moves just that one task (unlinked; nothing else shifts). In an HTML5 drag, Chrome on
@@ -17,7 +19,7 @@ document.addEventListener('dragstart', e => {
   closeMenu();
   if (el.dataset.tdrag) drag = { kind: 'thread', id: el.dataset.tdrag, from: 'side' };
   else if (el.dataset.id) drag = { kind: 'task', id: el.dataset.id, from: el.classList.contains('chip') ? 'cal' : 'side' };
-  else if (el.dataset.kid) drag = { kind: 'task', id: el.dataset.kid, from: 'fail' };   // a failed attempt: reschedules its task
+  else if (el.dataset.kid) drag = { kind: 'task', id: el.dataset.kid, from: 'fail', fid: el.dataset.fid };   // a failed attempt: reschedules its task
   else return;
   e.dataTransfer.effectAllowed = 'copyMove';
   e.dataTransfer.setData('text/plain', drag.id);
