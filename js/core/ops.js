@@ -283,10 +283,11 @@ function failInto(fs, relink) {
     const fl = { id: uid(), date: k.date }; if (p) { fl.start = p.start; fl.dur = p.dur; }
     if (k.done) fl.done = true;
     // joined: same-day linked to the task before it, which fails too - with it, or earlier (failLater: the link was
-    // cut then, and is in relink) - so the two attempts stay one group on the calendar (dayFailRuns)
-    const pv = ts[i - 1];
-    if (pv && ((k.linkToPrev === 'sameDay' && chosen.has(pv.id))
-      || (relink.some(([id, l, from]) => id === k.id && l === 'sameDay' && from === pv.id) && pv.fails && pv.fails[pv.fails.length - 1].date === k.date))) fl.joined = true;
+    // cut then, and is in relink) - so the two attempts stay one group on the calendar (dayFailRuns). Its attempt's
+    // id: that's its latest, made just now (tasks fail in order) or by the failTasks before.
+    const pv = ts[i - 1], pf = pv && pv.fails && pv.fails[pv.fails.length - 1];
+    if (pf && pf.date === k.date && ((k.linkToPrev === 'sameDay' && chosen.has(pv.id))
+      || relink.some(([id, l, from]) => id === k.id && l === 'sameDay' && from === pv.id))) fl.joined = pf.id;
     if (k.linkToPrev && !chosen.has(ts[i - 1].id)) { fl.prev = k.linkToPrev; k.linkToPrev = null; }
     if (nx && nx.linkToPrev && !chosen.has(nx.id)) { fl.next = nx.linkToPrev; relink.push([nx.id, nx.linkToPrev, k.id]); nx.linkToPrev = null; }
     k.fails = (k.fails || []).concat(fl);

@@ -83,8 +83,9 @@ thread   = { id, name, color, tasks: [task], threads: [sub-thread], afterTask, u
 task     = { id, title, date: 'YYYY-MM-DD' | null, done, linkToPrev: null | 'sameDay' | 'nextDay', plan?, notes?, fails? }
 fail     = { id, date, start?, dur?, done?, prev?, next?, joined? }   a failed attempt: the date (and day-view slot)
            the task had when marked failed; done / prev / next (it was done, links cut from it) let unfailTask undo
-           it; joined: failed same-day linked to the task before it (failInto), so the calendar keeps the two
-           attempts one bubble (dayFailRuns). Version-4 files didn't record it: migrate infers it from the links.
+           it; joined: the id of the attempt it failed same-day linked to (failInto), so the calendar keeps the
+           two one bubble (dayFailRuns) whatever is put between their tasks later. Version-4 files didn't record
+           it (migrate infers it from the links); early version-5 ones say `true` (migrate finds the attempt).
 entry    = { id, kind: 'task' | 'thread' | 'project', at, item, from }   at = date archived, from = where it was
 conflict = { id, title, start, end }   end inclusive; start null = undated
 scratch  = { id, title, done }         one-off to-dos outside projects; no dates

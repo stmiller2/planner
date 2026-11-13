@@ -38,8 +38,8 @@ function computeColors() { colors = liveColors(); }
 const colorOf = t => colors.get(t.id) || t.color || PALETTE[0];
 
 // a task's failed attempts: [{ id, date, start?, dur?, done?, prev?, next?, joined? }] (start / dur: its day-view slot
-// then, minutes; done / prev / next: it was done, and the links cut from it, for unfailTask; joined: it failed
-// same-day linked to the attempt of the task before it, see failInto), oldest first
+// then, minutes; done / prev / next: it was done, and the links cut from it, for unfailTask; joined: the id of the
+// attempt it failed same-day linked to, see failInto), oldest first
 function migFails(a) {
   return (Array.isArray(a) ? a : []).filter(x => x && /^\d{4}-\d{2}-\d{2}$/.test(x.date || '')).map(x => {
     const o = { id: x.id || uid(), date: x.date };
@@ -47,7 +47,7 @@ function migFails(a) {
     if (x.done === true) o.done = true;                        // done / prev / next: for unfailTask
     if (x.prev in LINKS) o.prev = x.prev;
     if (x.next in LINKS) o.next = x.next;
-    if (x.joined === true) o.joined = true;
+    if (typeof x.joined === 'string' || x.joined === true) o.joined = x.joined;   // true: from an earlier version, see migThread
     return o;
   }).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
 }
@@ -65,10 +65,14 @@ function migThread(t, top, counter) {
     delete K.sameDayAsPrev; delete K.doneOn;   // doneOn: briefly recorded by an earlier version, no longer used
     T.tasks.push(K);
   }
-  // files before version 5 didn't record joined (see failInto): an attempt there counts as joined when its task is
-  // still same-day linked to the one before it, and that one has an attempt on the same day
-  if (!(counter.version >= 5)) T.tasks.forEach((K, i) => (K.fails || []).forEach(fl => {
-    if (i > 0 && K.linkToPrev === 'sameDay' && (T.tasks[i - 1].fails || []).some(x => x.date === fl.date)) fl.joined = true;
+  // joined (see failInto) wasn't always an attempt's id. Files before version 5 didn't record it: an attempt there
+  // counts as joined when its task is still same-day linked to the one before it, and that one has an attempt on the
+  // same day. A version-5 file may say just `true` (joined to the task before it, then): the nearest earlier task
+  // in the thread with an attempt on that day.
+  const sameDayFail = (i, d) => { for (let h = i - 1; h >= 0; h--) { const x = (T.tasks[h].fails || []).find(f => f.date === d); if (x) return x; } return null; };
+  T.tasks.forEach((K, i) => (K.fails || []).forEach(fl => {
+    if (!(counter.version >= 5) && i > 0 && K.linkToPrev === 'sameDay') { const x = (T.tasks[i - 1].fails || []).find(f => f.date === fl.date); if (x) fl.joined = x.id; }
+    if (fl.joined === true) { const x = sameDayFail(i, fl.date); if (x) fl.joined = x.id; else delete fl.joined; }
   }));
   for (const c of (Array.isArray(t.threads) ? t.threads : [])) {
     const C = migThread(c, false, counter);
@@ -168,12 +172,13 @@ function orderDay(live, fails) {
   return out;
 }
 const dayItems = d => orderDay(dayTasks(d), dayFails(d));
-/* a day's failed attempts in day order, in runs: attempts that failed same-day linked (joined, see failInto) and sit
-   next to each other in the day's list form one run, which the calendar draws as one bubble like a same-day group */
+/* a day's failed attempts in day order, in runs: an attempt right after the one it failed same-day linked to (joined,
+   see failInto) joins its run, which the calendar draws as one bubble like a same-day group. By id, not by place in
+   the thread: a task put between the two since (a new step in the redone chain, say) doesn't split them. */
 function dayFailRuns(d) {
   const out = []; let prev = null;
   dayItems(d).forEach(it => {
-    if (it.fl && it.fl.joined && prev && prev.fl && prev.t === it.t && prev.i === it.i - 1) out[out.length - 1].push(it);
+    if (it.fl && it.fl.joined && prev && prev.fl && prev.fl.id === it.fl.joined) out[out.length - 1].push(it);
     else if (it.fl) out.push([it]);
     prev = it;
   });

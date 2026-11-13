@@ -402,6 +402,24 @@ test('attempts that failed same-day linked stay one group (joined, dayFailRuns)'
     { ...T('c'), fails: [{ id: 'f3', date: MON }] }])]));
   assert.deepStrictEqual(runs(L, MON), [['a', 'b'], ['c']]);
   assert.strictEqual(L.state.version, 5);
+  // an early version-5 file said just true: joined to the nearest earlier task with an attempt that day
+  const V = load({ version: 5, projects: [{ id: 'p', name: 'P', threads: [TH('t', [{ ...T('a'), fails: [{ id: 'f1', date: MON }] }, T('n'),
+    { ...T('b'), fails: [{ id: 'f2', date: MON, joined: true }] }])] }] });
+  assert.strictEqual(V.findTask('b').task.fails[0].joined, 'f1');
+  assert.deepStrictEqual(runs(V, MON), [['a', 'b']]);
+});
+
+test('a step added inside a redone chain does not split the attempts it failed as', () => {
+  const runs = (P, d) => j(P.dayFailRuns(d).map(g => g.map(it => it.k.id)));
+  const P = load(plan([TH('t', [T('s2', MON), T('sub', MON, { link: 'sameDay' })])]));
+  P.failTasks(['s2', 'sub']);
+  P.moveTask('s2', WED);                                                          // redone together, still linked
+  P.addTasks('t', ['check'], { tid: 't', refId: 'sub', side: 'before' });         // a new step between them
+  const ids = j(P.findThread('t').t.tasks.map(k => [k.title, k.date, k.linkToPrev]));
+  assert.deepStrictEqual(ids, [['s2', WED, null], ['check', WED, 'sameDay'], ['sub', WED, 'sameDay']]);
+  assert.deepStrictEqual(runs(P, MON), [['s2', 'sub']]);
+  assert.deepStrictEqual(dayList(P, MON), [['fail', 's2'], ['fail', 'sub']]);
+  assert.deepStrictEqual(j(P.dayItems(WED).map(it => it.k.title)), ['s2', 'check', 'sub']);
 });
 
 test('failing late: the later done tasks can be marked failed too, links among them put back', () => {
