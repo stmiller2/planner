@@ -31,7 +31,7 @@ function readData(text, fix, buttons = '') {
 // make loaded data the planner (fresh undo history)
 function adopt(data) {
   blocked = false;
-  state = data ? migrate(data) : { version: 4, projects: [] }; dataLoaded = true;
+  state = data ? migrate(data) : { version: 5, projects: [] }; dataLoaded = true;
   undoStack.length = 0; redoStack.length = 0;
 }
 const backend = () => MODE === 'server' ? server : MODE === 'fs' ? folder : null;

@@ -77,12 +77,14 @@ js/main.js              calls start(); loaded last
 ## The data (planner.json)
 
 ```
-state    = { version: 4, title?, projects: [project], archive: [entry], conflicts: [conflict], scratch: [scratch] }
+state    = { version: 5, title?, projects: [project], archive: [entry], conflicts: [conflict], scratch: [scratch] }
 project  = { id, name, threads: [thread], unordered? }
 thread   = { id, name, color, tasks: [task], threads: [sub-thread], afterTask, unordered? }
 task     = { id, title, date: 'YYYY-MM-DD' | null, done, linkToPrev: null | 'sameDay' | 'nextDay', plan?, notes?, fails? }
-fail     = { id, date, start?, dur?, done?, prev?, next? }   a failed attempt: the date (and day-view slot) the task had
-           when marked failed; done / prev / next (it was done, links cut from it) let unfailTask undo it
+fail     = { id, date, start?, dur?, done?, prev?, next?, joined? }   a failed attempt: the date (and day-view slot)
+           the task had when marked failed; done / prev / next (it was done, links cut from it) let unfailTask undo
+           it; joined: failed same-day linked to the task before it (failInto), so the calendar keeps the two
+           attempts one bubble (dayFailRuns). Version-4 files didn't record it: migrate infers it from the links.
 entry    = { id, kind: 'task' | 'thread' | 'project', at, item, from }   at = date archived, from = where it was
 conflict = { id, title, start, end }   end inclusive; start null = undated
 scratch  = { id, title, done }         one-off to-dos outside projects; no dates

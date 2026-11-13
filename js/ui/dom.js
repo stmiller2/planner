@@ -143,13 +143,20 @@ function showWarn(list) {
     return `<div><b>Conflict</b>: ${one ? `“${esc(one.task.title)}” is` : `${ks.size} tasks are`} scheduled during “${esc(c.title)}” (${cfSpan(c)}).</div>`;
   });
   list = list.filter(v => v.kind !== 'cf');
-  const lines = [...cfLines, ...list.slice(0, Math.max(0, 3 - cfLines.length)).map(v =>
-    `<div><b>Out of order</b> in ${esc([v.p.name, ...v.path].join(' › '))}: #${v.i + 1} “${esc(v.task.title)}” (${fmtShort(v.task.date)}) comes before “${esc(v.prev.title)}”${v.prevPath !== v.path ? ` in ${esc(v.prevPath[v.prevPath.length - 1])}` : ''} (${fmtShort(v.prev.date)}), which should be done first.</div>`)];
+  // a task as its title, then its own (sub-)thread and number there and its date: “Submit” (Sequencing #3, Nov 4)
+  const where = (k, path, i) => `“${esc(k.title)}” (${esc(path[path.length - 1])} #${i + 1}, ${fmtShort(k.date)})`;
+  const lines = [...cfLines, ...list.slice(0, Math.max(0, 3 - cfLines.length)).map(v => { const pf = findTask(v.prev.id);
+    return `<div><b>Out of order</b>: ${where(v.task, v.path, v.i)} comes before ${where(v.prev, v.prevPath, pf ? pf.i : 0)}, which should be done first.</div>`; })];
   const extra = list.length - Math.max(0, 3 - cfLines.length); if (extra > 0) lines.push(`<div>…and ${extra} more out of order.</div>`);
   $('#warn .msg').innerHTML = lines.join('');
   $('#warn').style.display = 'flex';
+  armWarn();
 }
-function hideWarn() { $('#warn').style.display = 'none'; }
+// warnings go away by themselves after WARN_MS, the count starting over once the pointer leaves the bar (app.js)
+const WARN_MS = 5000;
+let warnTimer = 0;
+function armWarn() { clearTimeout(warnTimer); warnTimer = setTimeout(hideWarn, WARN_MS); }
+function hideWarn() { clearTimeout(warnTimer); $('#warn').style.display = 'none'; }
 let toastTimer;
 function toast(msg, ms = 3500) {
   const t = $('#toast'); t.textContent = msg; t.style.display = 'flex';

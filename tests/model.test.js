@@ -10,7 +10,7 @@ test('loading upgrades old files: links, sub-thread anchors, colors, bad dates',
     { name: 'B', color: 'red', tasks: [] },
   ] }], conflicts: [{ title: 'Trip', start: '2026-11-10', end: '2026-11-05' }, 'junk'], archive: [{ kind: 'nonsense', item: {} }] });
   const s = P.state, [A, B] = s.projects[0].threads, [one, two] = A.tasks;
-  assert.strictEqual(s.version, 4);
+  assert.strictEqual(s.version, 5);
   assert.strictEqual(two.linkToPrev, 'sameDay');
   assert.strictEqual(two.date, '2026-11-02');            // unreadable date, then lined up with its chain
   assert.ok(!('sameDayAsPrev' in two) && !('doneOn' in two));

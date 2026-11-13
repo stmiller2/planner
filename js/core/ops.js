@@ -282,6 +282,11 @@ function failInto(fs, relink) {
     const ts = f.t.tasks, i = ts.indexOf(f.task), k = f.task, nx = ts[i + 1], p = planOf(k);
     const fl = { id: uid(), date: k.date }; if (p) { fl.start = p.start; fl.dur = p.dur; }
     if (k.done) fl.done = true;
+    // joined: same-day linked to the task before it, which fails too - with it, or earlier (failLater: the link was
+    // cut then, and is in relink) - so the two attempts stay one group on the calendar (dayFailRuns)
+    const pv = ts[i - 1];
+    if (pv && ((k.linkToPrev === 'sameDay' && chosen.has(pv.id))
+      || (relink.some(([id, l, from]) => id === k.id && l === 'sameDay' && from === pv.id) && pv.fails && pv.fails[pv.fails.length - 1].date === k.date))) fl.joined = true;
     if (k.linkToPrev && !chosen.has(ts[i - 1].id)) { fl.prev = k.linkToPrev; k.linkToPrev = null; }
     if (nx && nx.linkToPrev && !chosen.has(nx.id)) { fl.next = nx.linkToPrev; relink.push([nx.id, nx.linkToPrev, k.id]); nx.linkToPrev = null; }
     k.fails = (k.fails || []).concat(fl);

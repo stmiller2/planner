@@ -3,7 +3,7 @@
    state = { version, title?, projects: [{ id, name, threads, unordered? }], archive: [...], conflicts: [...], scratch: [...] }
      thread = { id, name, color (null = shade of its parent's), tasks: [...], threads: [sub-threads], afterTask, unordered? }
      task   = { id, title, date (YYYY-MM-DD or null), done, linkToPrev (null | 'sameDay' | 'nextDay'), plan?, notes?, fails? }
-       fails = earlier failed attempts [{ id, date, start?, dur?, done?, prev?, next? }]: drawn where they happened (see failTasks)
+       fails = earlier failed attempts [{ id, date, start?, dur?, done?, prev?, next?, joined? }]: drawn where they happened (see failTasks)
      scratch = day view's "Other to-do": [{ id, title, done }], small to-dos outside every project (no dates)
    Every change goes through mutate(), which normalizes, records undo, re-renders, saves and raises warnings. */
 
@@ -11,7 +11,7 @@
 const LINKS = { sameDay: { badge: '=', label: 'Same day as' }, nextDay: { badge: '+1d', label: 'Day after' } };
 
 /* ---------- state ---------- */
-let state = { version: 4, projects: [], archive: [], conflicts: [], scratch: [] };
+let state = { version: 5, projects: [], archive: [], conflicts: [], scratch: [] };
 const undoStack = [], redoStack = [];
 // stateGen counts changes to `state`; anything derived from it (index, colors, warnings, JSON) is cached per generation.
 // Call touch() after changing state in place outside mutate().
@@ -37,8 +37,9 @@ const liveColors = memo(() => { const m = new Map(); state.projects.forEach(p =>
 function computeColors() { colors = liveColors(); }
 const colorOf = t => colors.get(t.id) || t.color || PALETTE[0];
 
-// a task's failed attempts: [{ id, date, start?, dur?, done?, prev?, next? }] (start / dur: its day-view slot then,
-// minutes; done / prev / next: it was done, and the links cut from it, for unfailTask), oldest first
+// a task's failed attempts: [{ id, date, start?, dur?, done?, prev?, next?, joined? }] (start / dur: its day-view slot
+// then, minutes; done / prev / next: it was done, and the links cut from it, for unfailTask; joined: it failed
+// same-day linked to the attempt of the task before it, see failInto), oldest first
 function migFails(a) {
   return (Array.isArray(a) ? a : []).filter(x => x && /^\d{4}-\d{2}-\d{2}$/.test(x.date || '')).map(x => {
     const o = { id: x.id || uid(), date: x.date };
@@ -46,6 +47,7 @@ function migFails(a) {
     if (x.done === true) o.done = true;                        // done / prev / next: for unfailTask
     if (x.prev in LINKS) o.prev = x.prev;
     if (x.next in LINKS) o.next = x.next;
+    if (x.joined === true) o.joined = true;
     return o;
   }).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
 }
@@ -63,6 +65,11 @@ function migThread(t, top, counter) {
     delete K.sameDayAsPrev; delete K.doneOn;   // doneOn: briefly recorded by an earlier version, no longer used
     T.tasks.push(K);
   }
+  // files before version 5 didn't record joined (see failInto): an attempt there counts as joined when its task is
+  // still same-day linked to the one before it, and that one has an attempt on the same day
+  if (!(counter.version >= 5)) T.tasks.forEach((K, i) => (K.fails || []).forEach(fl => {
+    if (i > 0 && K.linkToPrev === 'sameDay' && (T.tasks[i - 1].fails || []).some(x => x.date === fl.date)) fl.joined = true;
+  }));
   for (const c of (Array.isArray(t.threads) ? t.threads : [])) {
     const C = migThread(c, false, counter);
     // older files had no interleaving: sub-threads came after all of the parent's tasks
@@ -74,9 +81,9 @@ function migThread(t, top, counter) {
   return T;
 }
 function migrate(d) {
-  const s = { version: 4, projects: [] };
+  const s = { version: 5, projects: [] };
   if (d && typeof d.title === 'string' && d.title.trim()) s.title = d.title.trim();   // custom name shown top-left
-  const counter = { n: 0 };
+  const counter = { n: 0, version: d && d.version };   // (version: what the file was saved as, for migThread)
   for (const p of (d && Array.isArray(d.projects) ? d.projects : [])) {
     const P = { ...p, id: p.id || uid(), name: String(p.name ?? 'Project'), threads: [] };
     delete P.color;
@@ -161,6 +168,17 @@ function orderDay(live, fails) {
   return out;
 }
 const dayItems = d => orderDay(dayTasks(d), dayFails(d));
+/* a day's failed attempts in day order, in runs: attempts that failed same-day linked (joined, see failInto) and sit
+   next to each other in the day's list form one run, which the calendar draws as one bubble like a same-day group */
+function dayFailRuns(d) {
+  const out = []; let prev = null;
+  dayItems(d).forEach(it => {
+    if (it.fl && it.fl.joined && prev && prev.fl && prev.t === it.t && prev.i === it.i - 1) out[out.length - 1].push(it);
+    else if (it.fl) out.push([it]);
+    prev = it;
+  });
+  return out;
+}
 /* Where tasks dropped on day d would land in its list: the id of the item they would sit above (a task's or an
    attempt's), or null for the end of the list. Worked out by listing the day with them on it (dropping doesn't
    change their attempt), so it's where dayItems will put them; the calendar's drag opens its gap there (calGapAt). */

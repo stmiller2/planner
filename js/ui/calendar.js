@@ -63,7 +63,8 @@ function renderCal(strip) {
     const items = (byDate[d] || []).map(r => {
       const chips = []; for (let k = r.s; k <= r.e; k++) chips.push([r.t.tasks[k].id, chip(r, k)]);
       return [posOf(r.t.tasks[r.s].id), r.e > r.s ? `<div class="grp" style="--c:${esc(colorOf(r.t))}">${selRuns(chips)}</div>` : selRuns(chips)];
-    }).concat(dayFails(d).map(e => [posOf(e.fl.id), failChip(e)])).sort((a, b) => a[0] - b[0]).map(x => x[1]).join('') + (archOn[d] || []).map(archChip).join('');
+    }).concat(dayFailRuns(d).map(g => [posOf(g[0].fl.id), g.length > 1 ? `<div class="grp" style="--c:${esc(colorOf(g[0].t))}">${g.map(failChip).join('')}</div>` : failChip(g[0])]))
+      .sort((a, b) => a[0] - b[0]).map(x => x[1]).join('') + (archOn[d] || []).map(archChip).join('');
     const gap = wkSlots[w] ? `<div class="cf-gap" style="height:${wkSlots[w] * CF_PITCH + 4}px"></div>` : '';
     html += `<div class="${cls}" data-date="${d}" style="grid-row:${w + 1};grid-column:${n % 7 + 1}"><div class="dn"><span class="n" data-act="openday" data-date="${d}">${label}</span></div>${gap}<div class="items">${items}</div></div>`;
   }
@@ -219,7 +220,7 @@ function setHL(id, force) {
   if (!id) return;
   $$(`.task[data-id="${id}"], #tree .drun[data-has~="${id}"]`).forEach(x => x.classList.add('hl'));   // sidebar: just that task (or its folded line)
   $$(`.chip[data-id="${id}"]`).forEach(c => (c.closest('.grp') || c).classList.add('hl'));  // calendar: its whole same-day group
-  $$(`.chip[data-kid="${id}"]`).forEach(c => c.classList.add('hl'));                       // ... and its failed attempts
+  $$(`.chip[data-kid="${id}"]`).forEach(c => (c.closest('.grp') || c).classList.add('hl'));  // ... and its failed attempts (with the ones that failed linked to them)
 }
 
 // hover a task in one place -> highlight it in the other

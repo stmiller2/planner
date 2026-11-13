@@ -215,6 +215,8 @@ $('#addProject').onclick = addProject;
 $('#archBtn').onclick = showArchive;
 $('#warnUndo').onclick = () => { undo(); hideWarn(); };
 $('#warnClose').onclick = hideWarn;
+$('#warn').onmouseenter = () => clearTimeout(warnTimer);   // (held while you reach for Undo)
+$('#warn').onmouseleave = () => { if ($('#warn').style.display !== 'none') armWarn(); };
 $('#helpBtn').onclick = showHelp;
 $('#setBtn').innerHTML = ICON.gear;
 $('#setBtn').onclick = showSettings;

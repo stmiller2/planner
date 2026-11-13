@@ -376,6 +376,34 @@ test('the gap a drag opens is where the day will really list the task (dayDropBe
   assert.strictEqual(P.dayDropBefore(FRI, ids), null);   // nothing after it: the end of the day
 });
 
+test('attempts that failed same-day linked stay one group (joined, dayFailRuns)', () => {
+  const runs = (P, d) => j(P.dayFailRuns(d).map(g => g.map(it => it.k.id)));
+  const chain = () => [T('a', MON), T('b', MON, { link: 'sameDay' }), T('c', MON, { link: 'sameDay' }), T('x', MON)];
+  // the whole chain at once: one group, x (not linked) on its own
+  let P = load(plan([TH('t', chain())]));
+  P.failTasks(['a', 'b', 'c', 'x']);
+  assert.deepStrictEqual(runs(P, MON), [['a', 'b', 'c'], ['x']]);
+  // part of it: b's link to a was cut, so only b + c group
+  P = load(plan([TH('t', chain())]));
+  P.failTasks(['b', 'c']);
+  assert.deepStrictEqual(runs(P, MON), [['b', 'c']]);
+  // the follow-up prompt's "mark failed too" (failLater): still linked when they failed, so still one group
+  P = load(plan([TH('t', [T('a', MON, { done: true }), T('b', MON, { link: 'sameDay', done: true })])]));
+  const r = P.failTasks(['a']); P.failLater(r.laterDone, r.relink);
+  assert.deepStrictEqual(runs(P, MON), [['a', 'b']]);
+  // they stay grouped after the chain is rescheduled, and its retries come after them
+  P.moveTask('a', WED);
+  assert.deepStrictEqual(runs(P, MON), [['a', 'b']]);
+  // removing one attempt leaves the other on its own
+  P.removeFail(P.findTask('a').task.fails[0].id);
+  assert.deepStrictEqual(runs(P, MON), [['b']]);
+  // an older (version 4) file didn't record it: inferred from the links still in place
+  const L = load(plan([TH('t', [{ ...T('a'), fails: [{ id: 'f1', date: MON }] }, { ...T('b', null, { link: 'sameDay' }), fails: [{ id: 'f2', date: MON }] },
+    { ...T('c'), fails: [{ id: 'f3', date: MON }] }])]));
+  assert.deepStrictEqual(runs(L, MON), [['a', 'b'], ['c']]);
+  assert.strictEqual(L.state.version, 5);
+});
+
 test('failing late: the later done tasks can be marked failed too, links among them put back', () => {
   const P = load(plan([TH('t', [T('a', '2026-11-02', { done: true }), T('b', '2026-11-03', { link: 'nextDay', done: true }), T('c', '2026-11-04', { link: 'nextDay', done: true }), T('d', '2026-11-09')])]));
   const r = P.failTasks(['a']);
