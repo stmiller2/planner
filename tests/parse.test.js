@@ -14,6 +14,9 @@ test('typed dates', () => {
     '+3': '2026-10-31', '+2w': '2026-11-11', '-1': '2026-10-27',
     '30': '2026-10-30', '5': '2026-11-05',   // a day number: this month, or next if it has passed
     '2/30': null, 'soon': null, '': '',
+    // words for "no date" (the date boxes that take one unschedule on these, as on an empty box)
+    'none': '', 'none,': '', 'no': '', 'na': '', 'n/a': '', 'nil': '', 'no date': '', 'unschedule': '', 'unsched': '',
+    'Unscheduled': '', 'undated': '', 'clear': '', '-': '', 'nope': null, 'nan': null,
   };
   for (const [typed, want] of Object.entries(cases)) assert.strictEqual(P.parseDateText(typed, base), want, typed);
 });

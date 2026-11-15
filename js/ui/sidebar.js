@@ -152,13 +152,14 @@ function openLinkMenu(id, btn) {
 // task anywhere (sidebar row, calendar chip, day-view item or block: at = the pointer, el = the task; see app.js).
 // menuTask: the task's element it was opened on (its notes open beside it: editNotes)
 let menuTask = null;
-// Also: mark it failed (scheduled tasks only), unmark its latest failed attempt, and remove any of its failed attempts.
+// Also, for a scheduled task: unschedule it and mark it failed. And: unmark its latest failed attempt, remove any of
+// its failed attempts.
 function openTaskMenu(id, btn, at, el) {
   const f = findTask(id); if (!f) return;
   menuTask = el || (btn && btn.closest(TASK_EL)) || null;
   const fails = (f.task.fails || []).slice().reverse();   // newest first
   menu.innerHTML = menuBtn('k-notes', id, ICON.notes, f.task.notes ? 'Edit notes' : 'Add notes')
-    + (f.task.date ? menuBtn('k-fail', id, ICON.failed, 'Mark failed') : '')
+    + (f.task.date ? menuBtn('k-unsched', id, ICON.nodate, 'Unschedule') + menuBtn('k-fail', id, ICON.failed, 'Mark failed') : '')
     + (fails.length ? '<hr>' + unfailBtn(f.task, fails[0], true) + fails.map(x => failRmBtn(x, fails.length > 1)).join('') : '')
     + '<hr>' + menuBtn('arch-k', id, ICON.archive, 'Archive') + menuBtn('del-k', id, ICON.trash, 'Delete');
   placeMenu(btn, at);
@@ -546,8 +547,9 @@ function selAct(act, a) {
   if (act === 'sel-clear') return clearSel();
   if (act === 'sel-date') {
     const ds = new Set(ids.map(id => findTask(id).task.date)), one = ds.size === 1 ? [...ds][0] : null;
+    // the × unschedules all of them: shown when any one is scheduled, not only when they share a date
     return editDateIn(a, { value: one, allowEmpty: true, emptyText: 'no date (unschedule all)', placeholder: 'e.g. fri, tm',
-      commit: v => selDate(ids, v), clear: one ? () => selDate(ids, null) : null });
+      commit: v => selDate(ids, v), clear: [...ds].some(Boolean) ? () => selDate(ids, null) : null });
   }
   if (act === 'sel-link') {
     const n = linkTasks(ids, a.dataset.v), threads = new Set(ids.map(id => findTask(id).t.id)).size;

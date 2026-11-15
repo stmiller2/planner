@@ -34,7 +34,8 @@ css/  (one file per area; later files override earlier ones)
 
 js/core/  (no DOM; also loaded by the unit tests)
   util.js               esc, ids, date strings, formatting, colors, plural, clamp
-  parse.js              typed dates ("fri", "11/26", "+3", "td" / "tm") and times ("2pm", "930")
+  parse.js              typed dates ("fri", "11/26", "+3", "td" / "tm"; NO_DATE words — "none", "na",
+                        "unschedule" — read as '', i.e. no date) and times ("2pm", "930")
   prefs.js              `ui`: per-browser prefs (UI_PREFS) + new-task-box state
   model.js              `state`, migrate, the index (findTask / findThread / dayTasks / dayFails / findFail), chains and links, sub-thread
                         layout, order + conflict warnings, memo, mutate / undo / redo

@@ -2,11 +2,15 @@
 /* Reading what people type: dates (parseDateText) and times of day (parseTime). No DOM. */
 /* ---------- typed dates ----------
    "Nov 26", "26 Nov", "11/26", "11/26/27", "2026-11-26", "fri", "next fri", "today" / "td", "tomorrow" / "tm", "+3", "+2w", "26".
-   Without a year: this year, unless that's more than two months ago (then next year). '' = no date, null = can't read it. */
+   Without a year: this year, unless that's more than two months ago (then next year). '' = no date, null = can't read it.
+   An empty box and the words in NO_DATE ("none", "na", "unschedule", ...) both read as '' — the boxes that take a
+   date (editDateIn with allowEmpty) treat that as unscheduling; the ones that don't show it as unreadable. */
+const NO_DATE = /^(no(ne)?|n\/?a|nil|nd|no ?date|unsch(edule[ds]?|ed)?|unset|undated|clear|-|–|—)$/;
 const MONTH3 = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], WD3 = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 function parseDateText(str, base = todayISO()) {
   let s = String(str || '').trim().toLowerCase().replace(/'(\d{2})\b/g, '20$1').replace(/[,.]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!s) return '';
+  if (NO_DATE.test(s)) return '';
   const t = parseD(base), mk = (y, mo, d) => { const x = new Date(y, mo, d); return x.getDate() === d ? iso(x) : null; };
   const guess = (mo, d) => { const a = mk(t.getFullYear(), mo, d); return a && diffDays(a, base) < -60 ? mk(t.getFullYear() + 1, mo, d) : a; };
   const mon = w => w.length >= 3 ? MONTH3.indexOf(w.slice(0, 3)) : -1;

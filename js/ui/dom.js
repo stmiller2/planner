@@ -22,6 +22,8 @@ const ICON = {
   up: svg('<path d="m18 15-6-6-6 6"/>'),
   down: svg('<path d="m6 9 6 6 6-6"/>'),
   calendar: svg('<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9.5h18M9 9.5V21M15 9.5V21M3 15.25h18"/>'),
+  // unschedule: a calendar struck through (not ICON.x — that is "remove", used for deleting a failed attempt)
+  nodate: svg('<path d="M4.2 4.2A2 2 0 0 0 3 6v13a2 2 0 0 0 2 2h14a2 2 0 0 0 1.8-1.2"/><path d="M21 16V6a2 2 0 0 0-2-2H9"/><path d="M3 9.5h5.5M12.5 9.5h8.5"/><path d="M2 2l20 20"/>'),
   day: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
   timeline: svg('<path d="M4 4v16"/><path d="M8 7h7"/><path d="M11 12h9"/><path d="M8 17h5"/>'),
   archive: svg('<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/>'),
@@ -54,7 +56,8 @@ const dhint = document.createElement('div'); dhint.id = 'dhint'; document.body.a
 function dateHint(inp, opt = {}) {
   const v = parseDateText(inp.value), bad = v === null || (v === '' && !opt.allowEmpty && inp.value.trim() !== '') || (v && opt.min && v < opt.min);
   inp.classList.toggle('bad', !!bad);
-  dhint.textContent = v ? (opt.min && v < opt.min ? `before ${fmtShort(opt.min)}` : dayLabel(v)) : v === '' ? (opt.emptyText || '') : 'try Nov 26, 11/26, fri, td, tm, +3';
+  dhint.textContent = v ? (opt.min && v < opt.min ? `before ${fmtShort(opt.min)}` : dayLabel(v)) : v === '' ? (opt.emptyText || '')
+    : 'try Nov 26, 11/26, fri, td, tm, +3' + (opt.allowEmpty ? ', none' : '');
   if (!dhint.textContent || document.activeElement !== inp) { dhint.style.display = 'none'; return bad ? null : v; }
   const r = inp.getBoundingClientRect(); dhint.style.display = 'block';
   dhint.style.left = Math.min(innerWidth - dhint.offsetWidth - 8, Math.max(8, r.left)) + 'px';
@@ -75,7 +78,9 @@ function editDateIn(btn, opt) {
   const finish = inlineBox(inp, save => {
     const v = save ? dateHint(inp, opt) : null;   // (reading the box can show the hint again: hide it after)
     dhint.style.display = 'none';
-    if (save && v !== null && (v || null) !== (opt.value || null)) opt.commit(v || null); else render();
+    // v === '' is "no date": always commit it (the box may have been opened on tasks with different dates, or on
+    // nothing at all) — mutate() drops the change if it turns out to be a no-op.
+    if (save && v !== null && (v === '' || v !== (opt.value || null))) opt.commit(v || null); else render();
   }, {
     enter: () => { if (dateHint(inp, opt) !== null) finish(true); },
     keys: e => {

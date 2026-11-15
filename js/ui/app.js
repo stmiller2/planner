@@ -89,6 +89,7 @@ document.addEventListener('click', e => {
     case 'k-notes': closeMenu(); editNotes(id, menuTask); break;
     case 'del-k': closeMenu(); delTask(id); quickAct('del'); break;
     case 'arch-k': closeMenu(); archiveTask(id); quickAct('arch'); break;
+    case 'k-unsched': closeMenu(); moveTask(id, null); break;
     case 'k-fail': closeMenu(); markFailed([id]); break;
     case 'fail-rm': closeMenu(); removeFail(a.dataset.fid); break;
     case 'k-unfail': closeMenu(); unfailTask(id); break;
