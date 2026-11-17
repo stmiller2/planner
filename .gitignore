@@ -9,5 +9,8 @@ local.planner.server.plist
 
 .DS_Store
 node_modules/
+# the online version (wrangler.jsonc): files built for upload, and wrangler's local test data
+dist/
+.wrangler/
 __pycache__/
 server-errors.log

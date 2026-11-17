@@ -4,6 +4,8 @@ Vibe-coded experiment planner I use to help schedule lab work. Code is all AI-ge
 
 “Help” section in the app explains how to use it.
 
+Can be accessed online from https://planner.stmiller2.workers.dev; contact me to get your email added for access. If you'd rather try it first or just run it locally, you can follow the steps below to run it off your laptop.
+
 ### Install
 
 It runs off a local server on your computer bound to <http://localhost:47823/>. You need Python 3.7 or newer to run the server.

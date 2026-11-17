@@ -5,7 +5,9 @@ a file, a feature that spans views, or a new rule.
 
 ## Overview
 
-- Plain HTML / CSS / JS: no framework, build step or npm packages.
+- Plain HTML / CSS / JS: no framework, build step or npm packages in the app itself.
+- The same files run two ways: on the user's computer (serve_planner.py, or Planner.html opened from disk) and online
+  at https://planner.stmiller2.workers.dev (Cloudflare; see Online). Changes to the app reach both.
 - `Planner.html` is markup plus `<link>` / `<script>` tags. Scripts are non-module and share one global scope,
   run in tag order, so the page also works opened from `file://`.
 - Every change to the plan goes through `mutate()` (js/core/model.js).
@@ -19,6 +21,12 @@ serve_planner.py        server on localhost:47823: app files, GET/PUT /api/data 
                         conflict check, GET/PUT /api/folder (Settings > Data file; change_folder)
 mac/install-server.sh   start the server at login (fills in mac/local.planner.server.plist.template)
 windows/install-server.cmd   same for Windows (runs install-server.ps1; errors to server-errors.log in data folder)
+wrangler.jsonc          the online version on Cloudflare (see Online): Worker, D1 database, Access settings
+worker/index.js         Cloudflare Worker: /api/data like serve_planner.py, per signed-in person, from D1;
+                        verifies the Cloudflare Access token (DEV_USER stands in on localhost under wrangler dev)
+worker/build.js         copies the app files into dist/ (what Cloudflare serves); run by wrangler dev / deploy
+migrations/             D1 schema (plans, backups)
+.dev.vars               DEV_USER for `wrangler dev` only (never uploaded)
 README.md               user-facing setup and troubleshooting
 tests/                  see Testing
 
@@ -150,7 +158,9 @@ for live preview) must call `touch()`.
 | keyboard shortcuts | keydown handler at end of ui/app.js, `switchView`; list them in `shortcutsHTML` (ui/dialogs.js) |
 | a button's action | its `data-act` case (ui/app.js) |
 | help text | `showHelp` (ui/dialogs.js) |
-| where the data lives (Help, Settings) | `dataWhereHTML` (js/storage.js), `dataFileRows` / `moveDataFolder` (ui/dialogs.js), `change_folder` (serve_planner.py) |
+| where the data lives (Help, Settings) | `dataWhereHTML` (js/storage.js), `dataFileRows` / `moveDataFolder` (ui/dialogs.js), `change_folder` (serve_planner.py); online: the `server.hosted` branches of the same |
+| loading / saving online, accounts | `load` / `save` / `signedInEmail` (worker/index.js), `server` (js/storage.js); keep /api/data the same as serve_planner.py |
+| which files go online | `FILES` / `DIRS` in worker/build.js |
 | reading old files | `migrate` / `migThread` (core/model.js) |
 
 Styles for each are in the matching css/ file.
@@ -178,7 +188,9 @@ Add to `UI_PREFS` (default, allowed values, `setting: true`), a row in `renderSe
 ### Checklist: a new file
 
 Add its tag to `Planner.html` in order: code that runs at load can only use files above it (calls made later can
-reach any file). New js/core/ files also go in `CORE` in tests/load.js. The server already serves js/ and css/.
+reach any file). New js/core/ files also go in `CORE` in tests/load.js. The server already serves js/ and css/, and
+worker/build.js already copies them online. A new file outside js/ and css/ that the page loads (an image, say) also
+goes in `FILES` in serve_planner.py and in worker/build.js.
 
 ## Docs
 
@@ -239,16 +251,80 @@ Data is never in the repo (.gitignore). `start()` (js/storage.js) picks a mode:
 - **fs**: opened from disk in Chrome / Edge; folder chosen via the File System Access API, handle kept in IndexedDB.
 - **fallback**: opened from disk elsewhere; localStorage plus Export / Import.
 
+The online version is `server` mode too: worker/index.js speaks the same /api/data protocol and adds
+`X-Planner-Hosted` / `X-Planner-User`, read into `server.hosted` / `server.user`. Code that differs online checks
+`MODE === 'server' && server.hosted` (Help, Settings > Data file: account, Export / Import, Sign out; the conflict
+prompt's wording). Online only, changes that couldn't be saved (signed out: Access answers with a redirect, seen
+as `opaqueredirect`; offline; tab closed) are kept in localStorage `planner.pending` and offered back on the next
+load (`keepPending` / `offerPending`). Version tags come from `X-Planner-Version` when present (`server.tagOf`).
+
 Shared logic (read, reject invalid JSON, save 350 ms after a change, "changed on disk" prompt, reload on focus) is
 written once; the `server` and `folder` objects only implement read / write / poll. `backups/` in the data folder
 keeps one copy per day (last 14), made by the server or, in fs mode, the page.
 
+## Online (Cloudflare)
+
+Live at https://planner.stmiller2.workers.dev, entirely on Cloudflare's free plan. Online and local plans are
+separate; Export / Import (Settings > Data file) moves a plan between them.
+
+- **Pieces.** Cloudflare serves dist/ as static files: worker/build.js copies Planner.html (also as index.html), the
+  manifest, icons, css/ and js/ there, run automatically by `wrangler dev` / `wrangler deploy` ("build" in
+  wrangler.jsonc). Only /api/* runs the Worker (`run_worker_first`). Cloudflare Access sits in front of the whole
+  address: sign-in with an emailed one-time PIN; the Access application's policy lists the allowed emails.
+- **Who is signed in.** The Worker trusts only the Access token (`Cf-Access-Jwt-Assertion`), verified against the
+  team's public keys using ACCESS_TEAM_DOMAIN and ACCESS_AUD ("vars" in wrangler.jsonc; identifiers, not secrets).
+  The email in it is the account. Under `wrangler dev`, DEV_USER (.dev.vars, never uploaded) stands in, on
+  localhost only. Never add another way to tell who someone is (headers, query strings, cookies) without verifying it.
+- **Data.** D1 database `planner` (schema in migrations/): `plans(email PK, data, version, created_at, updated_at)`,
+  one row per person holding planner.json's text, `version` bumped on each save; `backups(email, day, data)`, the
+  plan before the first save of each UTC day, newest 14 kept. A change to planner.json's shape needs no D1 migration:
+  D1 stores the text and `migrate()` upgrades it in the browser.
+- **Protocol.** /api/data in worker/index.js mirrors serve_planner.py (ETag = version tag, `"none"` = no plan yet,
+  204 / 304, If-Match → 412), so js/storage.js has one `server` backend for both. Change both together, with tests
+  in tests/worker.test.js. Online-only headers: `X-Planner-Hosted`, `X-Planner-User`, `X-Planner-Version`.
+- **Free-plan limits** (daily ones reset 00:00 UTC; past a limit requests fail, nothing is billed): 100k Worker
+  requests / day, 10 ms CPU per request, D1 100k rows written and 5M read / day, 2 MB per row (saves over 1.9 MB get
+  413), Access 50 people. Each save is one request and one row write (plus one backup row a day). Keep it that way:
+  no writes per request (last-seen stamps, logs in D1), no polling timers, no heavy work in the Worker.
+- **People.** Zero Trust > Access controls > Applications > planner > Edit > its policy > Include > Emails. Someone
+  holds one of the 50 seats from their first sign-in until removed from Zero Trust's user list. Login method:
+  One-time PIN (Integrations > Identity providers; new Zero Trust organizations default to Cloudflare-account
+  login instead).
+- **Restoring someone's backup:**
+  ```
+  npx wrangler d1 execute planner --remote --command "SELECT day FROM backups WHERE email = 'x@example.org'"
+  npx wrangler d1 execute planner --remote --command "UPDATE plans SET data = (SELECT data FROM backups WHERE email = 'x@example.org' AND day = '2026-11-20'), version = version + 1 WHERE email = 'x@example.org'"
+  ```
+  Their open windows then report a conflict on the next save ("Load the saved version"). D1 Time Travel can also
+  restore the whole database to any moment in the last 7 days (`npx wrangler d1 time-travel`).
+- **Pushing to main publishes** (Workers Builds deploys each push). Claude sessions: don't commit, push, run
+  `wrangler deploy` or any `--remote` command; the user does.
+
+### Applying a change (the user's steps)
+
+1. Run `node --test tests/*.test.js`.
+2. Try it on this computer as usual (the Planner server, http://localhost:47823). If the change touches
+   js/storage.js, worker/, wrangler.jsonc, migrations/ or Settings > Data file, also try the online version here:
+   `npx wrangler dev`, then http://localhost:8787 (signed in as test@localhost, with a test database kept in
+   .wrangler/). The first time, and after adding a migration, run `npx wrangler d1 migrations apply planner --local`
+   before `wrangler dev`.
+3. If the change adds a file to migrations/: run `npx wrangler d1 migrations apply planner --remote` before pushing.
+   A migration must also work with the code that is live until the push deploys: add tables or columns; don't
+   rename or drop them in the same change.
+4. Commit and push to main. Workers Builds deploys it in a minute or two; the dashboard (Workers & Pages > planner >
+   Deployments) lists each deployment with its commit and can roll back to an earlier one. Avoid running
+   `npx wrangler deploy` by hand, so the site never runs code that isn't on GitHub (it deploys whatever is in this
+   folder, committed or not).
+5. Check https://planner.stmiller2.workers.dev. Tabs that were already open keep the old code until reloaded.
+
 ## Testing
 
-- `node --test tests/*.test.js`: unit tests of js/core/ (loaded by tests/load.js; no browser, ~1 s).
+- `node --test tests/*.test.js`: unit tests of js/core/ (loaded by tests/load.js; no browser, ~1 s), and of
+  worker/index.js against an in-memory SQLite stand-in for D1 (tests/worker.test.js; needs Node 22.13+).
 - `node tests/browser/smoke.js`: headless run of every view and the main interactions against
   tests/fixtures/sample.json, failing on page errors. Needs `npm install playwright && npx playwright install
   chromium`, run outside this folder (or with node_modules/ ignored).
+- The online mode has no browser test in the repo: check it with `npx wrangler dev` (see Online).
 - Bug fix in the rules → add a test that would have caught it.
 
 Scale checking to the change:

@@ -1,0 +1,39 @@
+// Cloudflare setup for the online Planner (run from this folder: npx wrangler dev / npx wrangler deploy).
+// Running Planner on your own computer (serve_planner.py, or opening Planner.html) doesn't use this file.
+{
+  "name": "planner",                      // the site's address becomes https://planner.<your-subdomain>.workers.dev
+  "main": "worker/index.js",              // answers /api/data (loading and saving plans)
+  "compatibility_date": "2026-10-01",
+
+  // the app's files: worker/build.js copies them into dist/ first, then Cloudflare serves them as they are
+  "build": { "command": "node worker/build.js", "watch_dir": ["js", "css"] },
+  "assets": {
+    "directory": "./dist",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "none"
+  },
+
+  // where plans are kept. database_id: printed by `npx wrangler d1 create planner`
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "planner",
+      "database_id": "83d9f737-c5a5-459d-ad8c-b5cc3c6a78f0",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Cloudflare Access (the sign-in in front of the site). Fill in after turning Access on; neither is a secret.
+  //   ACCESS_TEAM_DOMAIN: https://<your-team-name>.cloudflareaccess.com
+  //   ACCESS_AUD: the Access application's "Application Audience (AUD) Tag"
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "https://noisy-hall-acef.cloudflareaccess.com",
+    "ACCESS_AUD": "42882c6fedc94c452437cf8af5a49cd483d0de16cd2bb81ebf06d60bfb5261fb"
+  },
+
+  // only the main address; no extra per-version preview addresses
+  "workers_dev": true,
+  "preview_urls": false,
+
+  "observability": { "enabled": true }    // keeps the Worker's error log (dashboard > the Worker > Logs)
+}

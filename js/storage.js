@@ -56,7 +56,10 @@ async function writeNow(force) {
 }
 function changedOnDisk(b) {
   setStatus('Conflict', 'err');
-  showModal(`<h3>planner.json changed on disk</h3>
+  if (b === server && server.hosted) showModal(`<h3>Your plan was changed elsewhere</h3>
+    <p>It was saved from another window or device after this window loaded it. Which version do you want to keep?</p>
+    <div class="row"><button class="btn primary" id="mLoad">Load the saved version</button><button class="btn" id="mKeep">Keep this window’s version</button></div>`, false);
+  else showModal(`<h3>planner.json changed on disk</h3>
     <p>The file was modified outside this window (${b.others}, or an edit). Which version do you want to keep?</p>
     <div class="row"><button class="btn primary" id="mLoad">Load the file’s version</button><button class="btn" id="mKeep">Keep this window’s version</button></div>`, false);
   $('#mLoad').onclick = () => { dirty = false; b.reload(); };
@@ -69,16 +72,18 @@ window.addEventListener('focus', async () => {
   try {
     const got = await b.poll(); if (!got) return;
     state = migrate(JSON.parse(got.text)); got.seen();
-    undoStack.length = 0; redoStack.length = 0; render(); toast('Loaded newer planner.json from disk.');
+    undoStack.length = 0; redoStack.length = 0; render(); toast(server.hosted && b === server ? 'Loaded the latest version of your plan.' : 'Loaded newer planner.json from disk.');
   } catch (e) {}
 });
 window.addEventListener('beforeunload', e => {
+  if (dirty && MODE === 'server' && server.hosted) server.keepPending();   // online: the save may not finish; keep a copy here
   if (dirty) { flushSave(); e.preventDefault(); e.returnValue = ''; }
   else if (unexported()) { e.preventDefault(); e.returnValue = 'You have changes that haven’t been exported to planner.json yet.'; }   // Safari etc.
 });
 // the status button in the header: where the data lives
 // where the plan is kept, as HTML for Help and Settings
 function dataWhereHTML() {
+  if (MODE === 'server' && server.hosted) return `your online account (<code>${esc(server.user)}</code>)`;
   if (MODE === 'server') return `<code class="path">${esc(server.file)}</code>`;
   if (MODE === 'fs' && folder.dir) return `<code>planner.json</code> in the folder “${esc(folder.dir.name)}” you chose (browsers don’t reveal a folder’s full path)`;
   if (MODE === 'fallback') return 'this browser’s own storage, not a file (Export saves a copy as <code>planner.json</code>)';
@@ -86,45 +91,90 @@ function dataWhereHTML() {
 }
 function showStorageInfo() { if (MODE === 'fs') showConnect(folder.dir, null, true); else if (MODE === 'server') server.info(); }
 
-/* ---------- the local Planner server ---------- */
+/* ---------- the Planner server: serve_planner.py on this computer, or the online Planner ----------
+   Both answer /api/data the same way. The online one (worker/index.js, behind a Cloudflare Access sign-in) says so
+   with X-Planner-Hosted and names the signed-in person in X-Planner-User: `hosted` and `user` below. */
 const server = {
-  api: '/api/data', tag: null, file: '', retry: null,
+  api: '/api/data', tag: null, file: '', retry: null, hosted: false, user: '',
   others: 'another Planner window',
   ready: () => true,
-  fetch() { return fetch(this.api, { cache: 'no-store', headers: this.tag ? { 'If-None-Match': this.tag } : {} }); },
+  // redirect: 'manual' so an expired sign-in (online: Access answers with a redirect to its sign-in page) shows
+  // up as such instead of as a failed request
+  fetch() { return fetch(this.api, { cache: 'no-store', redirect: 'manual', headers: this.tag ? { 'If-None-Match': this.tag } : {} }); },
+  // the version of the plan a response describes (online, X-Planner-Version too, in case the ETag was rewritten)
+  tagOf: r => r.headers.get('X-Planner-Version') || r.headers.get('ETag'),
   async probe() {   // the server's first answer, if this page came from it
     if (!/^https?:$/.test(location.protocol)) return null;
     try { const r = await fetch(this.api, { cache: 'no-store' }); return (r.status === 200 || r.status === 204) ? r : null; } catch (e) { return null; }
   },
   async open(r) {
     setStatus('Loading…', 'busy');
-    this.tag = r.headers.get('ETag'); this.file = decodeURIComponent(r.headers.get('X-Planner-File') || 'planner.json');
+    this.tag = this.tagOf(r); this.file = decodeURIComponent(r.headers.get('X-Planner-File') || 'planner.json');
     this.fixed = r.headers.get('X-Planner-Fixed') === '1';   // folder given for this run (--data): Settings can't change it
-    const data = readData(r.status === 200 ? await r.text() : '', ' next to it, then reopen Planner.');
+    this.hosted = r.headers.get('X-Planner-Hosted') === '1';
+    this.user = decodeURIComponent(r.headers.get('X-Planner-User') || '');
+    const text = r.status === 200 ? await r.text() : '';
+    const data = readData(text, this.hosted ? '. Nothing in it has been changed; reload the page to try again.' : ' next to it, then reopen Planner.');
     if (data === undefined) return;
     adopt(data);
     hideModal(); hideWarn(); render(); setStatus('Saved', 'ok');
     if (!data || data.version !== state.version) { dirty = true; await writeNow(); }   // new or older-format file: save it now
+    if (this.hosted) this.offerPending(text);
   },
   async write(text, force) {
     clearTimeout(this.retry);
     setStatus('Saving…', 'busy');
     const headers = { 'Content-Type': 'application/json' };
     if (this.tag && !force) headers['If-Match'] = this.tag;   // refused (412) if the file changed since
-    const r = await fetch(this.api, { method: 'PUT', headers, body: text, cache: 'no-store' });
+    const r = await fetch(this.api, { method: 'PUT', headers, body: text, cache: 'no-store', redirect: 'manual' });
     if (r.status === 412) return 'conflict';
+    if (r.type === 'opaqueredirect' || r.status === 401) { const e = new Error('signed out'); e.signedOut = true; throw e; }
     if (!r.ok) throw new Error((await r.text()) || 'HTTP ' + r.status);
-    this.tag = r.headers.get('ETag');
+    this.tag = this.tagOf(r);
+    if (this.hosted) this.dropPending();
   },
   failed(e) {
     setStatus('Not saved', 'err');
-    toast('Couldn’t reach the Planner server to save (' + e.message + '). Your changes are kept in this window and will be retried.', 6000);
+    if (this.hosted) {
+      this.keepPending();
+      if (e.signedOut) return this.signedOut();
+      toast('Couldn’t save to your account (' + e.message + '). Your changes are kept in this window and will be retried.', 6000);
+    } else toast('Couldn’t reach the Planner server to save (' + e.message + '). Your changes are kept in this window and will be retried.', 6000);
     this.retry = setTimeout(() => { if (dirty) flushSave(); }, 5000);
   },
   async poll() {
     const r = await this.fetch(); if (r.status !== 200) return null;
-    const tag = r.headers.get('ETag'), text = await r.text();
+    const tag = this.tagOf(r), text = await r.text();
     return { text, seen: () => { this.tag = tag; } };
+  },
+  /* online only: changes that couldn't be saved (signed out, offline, tab closed mid-save) are also kept in this
+     browser, and offered back the next time the plan opens here */
+  keepPending() {
+    try { localStorage.setItem('planner.pending', JSON.stringify({ user: this.user, at: Date.now(), text: JSON.stringify(state, null, 2) })); } catch (e) {}
+  },
+  dropPending() { try { localStorage.removeItem('planner.pending'); } catch (e) {} },
+  offerPending(saved) {
+    let p = null; try { p = JSON.parse(localStorage.getItem('planner.pending')); } catch (e) {}
+    if (!p || p.user !== this.user || typeof p.text !== 'string') return;
+    if (p.text === saved) return this.dropPending();   // it did get saved after all
+    let data; try { data = migrate(JSON.parse(p.text)); } catch (e) { return this.dropPending(); }
+    const when = new Date(p.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    showModal(`<h3>Restore unsaved changes?</h3>
+      <p>This browser kept changes from ${esc(when)} that didn’t reach your account (you were signed out, offline, or the window closed before they were saved).</p>
+      <p class="sub">Restoring replaces the plan you see now with that version; <kbd>⌘Z</kbd> undoes it.</p>
+      <div class="row"><button class="btn primary" id="mRestore">Restore them</button><button class="btn" id="mDiscard">Discard them</button></div>`, false);
+    $('#mRestore').onclick = () => { this.dropPending(); hideModal(); mutate(() => { state = data; }); toast('Restored your unsaved changes.'); };
+    $('#mDiscard').onclick = () => { this.dropPending(); hideModal(); };
+  },
+  signedOut() {
+    showModal(`<h3>You’ve been signed out</h3>
+      <p>Your sign-in expired, so the latest changes couldn’t be saved. They’re kept in this browser: sign in again and you’ll be offered them back.</p>
+      <div class="row"><button class="btn primary" id="mSignIn">Sign in again</button></div>`, false);
+    $('#mSignIn').onclick = () => { dirty = false; location.reload(); };
+  },
+  signOut() {
+    const go = () => { location.href = '/cdn-cgi/access/logout'; };
+    if (dirty) flushSave().then(go); else go();
   },
   // Settings > Data file: ask the server to use another folder ({ folder, action: 'check' | 'move' | 'open' })
   async setFolder(folder, action) {
@@ -136,6 +186,12 @@ const server = {
   },
   async reload() { this.tag = null; try { await this.open(await this.fetch()); } catch (e) { setStatus('Not connected', 'err'); } },
   info() {
+    if (this.hosted) {
+      showModal(`<h3>Your data</h3><p>Saving to your online account (<code>${esc(this.user)}</code>) as you go. A copy is kept each day (last 14). Export and Import are in Settings, under <b>Data file</b>.</p>
+      <div class="row"><button class="btn primary" id="mClose">Close</button><button class="btn" id="mOut">Sign out</button></div>`);
+      $('#mClose').onclick = hideModal; $('#mOut').onclick = () => this.signOut();
+      return;
+    }
     showModal(`<h3>Data file</h3><p>Saving to <code>${esc(this.file)}</code> through the Planner server on this computer. One copy per day is kept in the <code>backups</code> folder next to it (last 14).</p>
     <div class="row"><button class="btn primary" id="mClose">Close</button></div>`);
     $('#mClose').onclick = hideModal;
@@ -276,14 +332,16 @@ $('#exportBtn').onclick = () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }));
   a.download = 'planner.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  markExported(); fbStatus();
+  if (MODE === 'fallback') { markExported(); fbStatus(); }
 };
+// (also Settings > Data file online, where it replaces the plan in your account: ⌘Z undoes it)
 $('#importBtn').onclick = () => $('#importFile').click();
 $('#importFile').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
   try {
     const d = migrate(JSON.parse(await f.text())); mutate(() => { state = d; });
-    markExported(); fbStatus(); toast('Imported ' + f.name);
+    if (MODE === 'fallback') { markExported(); fbStatus(); toast('Imported ' + f.name); }
+    else toast(`Imported ${f.name}. ⌘Z undoes it.`, 5000);
   }
   catch (err) { toast('Import failed: ' + err.message); }
   e.target.value = '';

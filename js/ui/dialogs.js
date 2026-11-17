@@ -26,7 +26,9 @@ function showHelp() {
   <h4>Archive</h4>
   <p>To remove a task, thread, or project from the sidebar without deleting it, choose <b>Archive</b> from its settings menu <span class="hic">${ICON.gear}</span> (<b>Delete</b> is there too). Archived tasks still appear in the timeline and calendar.</p>
   <h4>Your data</h4>
-  <p>Your plan is saved to ${dataWhereHTML()}${MODE === 'fallback' ? '' : ' as you go, with a dated copy each day in <code>backups/</code> next to it (last 14 days)'}. You can change where in Settings, under <b>Data file</b>.</p>
+  ${MODE === 'server' && server.hosted
+    ? `<p>Your plan is saved to ${dataWhereHTML()} as you go, with a copy kept each day (last 14 days). To copy it to or from a <code>planner.json</code> file, use Export and Import in Settings, under <b>Data file</b>.</p>`
+    : `<p>Your plan is saved to ${dataWhereHTML()}${MODE === 'fallback' ? '' : ' as you go, with a dated copy each day in <code>backups/</code> next to it (last 14 days)'}. You can change where in Settings, under <b>Data file</b>.</p>`}
   <div class="hkeys"><h4>Keyboard shortcuts</h4><div class="keys">${shortcutsHTML()}</div></div>
   <div class="row"><button class="btn primary" id="mClose">Close</button></div>`);
   body.parentElement.classList.add('help'); $('#modal').dataset.kind = 'help';
@@ -65,6 +67,8 @@ function showSettings() {
     if (b.id === 'dfCancel') { $('#modal .dfmsg').innerHTML = ''; return; }
     if (b.id === 'dfChoose') return chooseFolder(true);
     if (b.id === 'dfExport') return $('#exportBtn').click();
+    if (b.id === 'dfImport') return $('#importFile').click();
+    if (b.id === 'dfSignOut') return server.signOut();
     const g = b.closest('.seg[data-set]'); if (g) applySetting(g.dataset.set, b.dataset.v);
   };
   card.onchange = e => { const k = e.target.dataset.set; if (k) applySetting(k, e.target.checked); };
@@ -134,8 +138,13 @@ function renderSettings() {
 
 /* ---------- Settings > Data file ---------- */
 // where the plan is saved, and how to move it: with the server, type a folder (the server moves the plan there and
-// remembers it); with a folder chosen in Chrome, pick another one; in a browser without file access, Export
+// remembers it); with a folder chosen in Chrome, pick another one; in a browser without file access, Export;
+// online (server.hosted), the account, Export / Import and Sign out
 function dataFileRows(row) {
+  if (MODE === 'server' && server.hosted) return row('Saved to', `<p>${dataWhereHTML()}, as you go.</p><p>A copy is kept each day (last 14).</p>`) +
+    row('Copy to or from a file', `<p>Export saves your plan as a <code>planner.json</code> file. Import replaces the plan here with one from a file (<kbd>⌘Z</kbd> undoes it).</p><p>Use these to move a plan between this site and Planner on your own computer.</p>`,
+      `<span style="display:flex;gap:6px"><button class="btn" id="dfExport">Export</button><button class="btn" id="dfImport">Import</button></span>`) +
+    row('Signed in as', `<p><code>${esc(server.user)}</code></p>`, `<button class="btn" id="dfSignOut">Sign out</button>`);
   if (MODE === 'server') {
     const move = server.fixed
       ? `<p>The server was started with a data folder for that run only (<code>--data</code> or <code>PLANNER_DATA</code>), so it can’t be changed here. Restart it without that, or run <code>serve_planner.py --set-data FOLDER</code>.</p>`
