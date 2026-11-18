@@ -132,7 +132,7 @@ function syncTimePop() {
   if (!tpEl.contains(document.activeElement)) fillTimePop();
 }
 $('#dayview').addEventListener('click', e => {
-  if (e.detail !== 1 || Date.now() - dvNoClick < 300 || e.target.closest('input, button, .inl')) return;
+  if (MOBILE || e.detail !== 1 || Date.now() - dvNoClick < 300 || e.target.closest('input, button, .inl')) return;
   const el = e.target.closest('.dv-blk[data-id], .dv-item[data-id]'); if (!el) return;
   const id = el.dataset.id, x = e.clientX, y = e.clientY;
   clearTimeout(tpopTimer);
@@ -201,7 +201,7 @@ const dvListDayAt = (x, y) => {   // a day's section in the list, or a day colum
   return el ? el.dataset.date : null;
 };
 $('#dayview').addEventListener('pointerdown', e => {
-  if (e.button !== 0 || e.ctrlKey || e.target.closest('.inl')) return;   // (Ctrl-click on a Mac = right-click)
+  if (MOBILE || e.button !== 0 || e.ctrlKey || e.target.closest('.inl')) return;   // (no dragging on mobile yet)   // (Ctrl-click on a Mac = right-click)
   const b = e.target.closest('.dv-cfb'), t = e.target.closest('.dv-cfp');
   if (b) cfDragStart(e, b.dataset.cid, e.target.closest('.h.l') ? 'l' : e.target.closest('.h.r') ? 'r' : 'move', (x) => dvDayAt(x), () => renderDay());
   else if (t) cfDragStart(e, t.dataset.cid, 'move', dvListDayAt, () => renderDay(), t.dataset.day);
@@ -211,7 +211,7 @@ $('#dayview').addEventListener('pointerdown', e => {
 let dv = null, dvGhost = null;
 $('#dayview').addEventListener('pointerdown', e => {
   if (dv) dvCancel();   // (a drag whose release never arrived)
-  if (e.button !== 0 || e.ctrlKey) return;
+  if (MOBILE || e.button !== 0 || e.ctrlKey) return;
   const seam = dvSeam(e);
   if (seam) { e.preventDefault(); hideInsline(); dvNoClick = Date.now(); dvAdd = seam.before ? { tid: seam.tid, beforeId: seam.id, day: seam.day } : { tid: seam.tid, afterId: seam.id, day: seam.day }; renderDay(); return; }
   if (e.target.closest('input, button, select')) return;

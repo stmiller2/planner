@@ -102,7 +102,7 @@ function buildDaySkeleton(box) {
   box.querySelector('.dv-side').addEventListener('wheel', e => dayWheel(e, false), { passive: true });
 }
 function renderDayList(box, only, cur = ui.dayView) {
-  const days = only || dvDays(), multi = ui.dayCount > 1, solo = !!only && !multi, today = todayISO(), listEl = box.querySelector('.dv-list');
+  const days = only || dvDays(), multi = dayN() > 1, solo = !!only && !multi, today = todayISO(), listEl = box.querySelector('.dv-list');
   const keepEl = box.querySelector('.dvadd'), keep = keepEl ? keepEl.value : '', keepTop = listEl.scrollTop;
   const addBox = tid => `<input class="add dvadd" data-tid="${tid}" placeholder="New task (Enter to add, Esc to stop)">`;
   let html = '';
@@ -145,16 +145,18 @@ function renderDayList(box, only, cur = ui.dayView) {
   const inp = box.querySelector('.dvadd');
   if (inp) { inp.value = keep; if (!rendering || dvAdd) inp.focus(); }
 }
-const dvTitle = first => { const nm = d => { const x = parseD(d); return `${DOW[x.getDay()]}, ${MON[x.getMonth()]} ${x.getDate()}`; }; return ui.dayCount > 1 ? `${nm(first)} – ${nm(addDays(first, ui.dayCount - 1))}` : nm(first); };
+const dvTitle = first => { const nm = d => { const x = parseD(d); return `${DOW[x.getDay()]}, ${MON[x.getMonth()]} ${x.getDate()}`; }; return dayN() > 1 ? `${nm(first)} – ${nm(addDays(first, dayN() - 1))}` : nm(first); };
 // the visible days: the open day plus the next one or two (1-, 2- or 3-day view)
-const dvDays = () => Array.from({ length: ui.dayCount }, (_, i) => addDays(ui.dayView, i));
+// days shown side by side: ui.dayCount (mobile: always one)
+const dayN = () => MOBILE ? 1 : ui.dayCount;
+const dvDays = () => Array.from({ length: dayN() }, (_, i) => addDays(ui.dayView, i));
 // the timeline always covers the whole day; ui.dayHours of it fit in the window and the rest scrolls
 function renderDayTimeline(box) {
   const days = dayStrip ? dayStrip.days : dvDays(), sH = 0, eH = 24, sc = box.querySelector('.dv-scroll');
   const oldPPM = PPM, keepMin = sc.firstElementChild ? sc.scrollTop / oldPPM : null, today = todayISO();   // keep the same time at the top
   // day headers (2- and 3-day views) sit above the scrolling hours
   const tmpl = dayStrip ? `58px repeat(${days.length}, ${dayStrip.W}px)` : `58px repeat(${days.length}, minmax(0,1fr))`;
-  const heads = ui.dayCount > 1 ? `<div class="dv-heads" style="grid-template-columns:${tmpl}"><div></div>${days.map(d => {
+  const heads = dayN() > 1 ? `<div class="dv-heads" style="grid-template-columns:${tmpl}"><div></div>${days.map(d => {
       const dd = parseD(d);
       return `<div class="${d === ui.dayView ? 'cur' : ''} ${d === today ? 'today' : ''}">${DOW[dd.getDay()]} <b>${dd.getDate()}</b></div>`; }).join('')}</div>` : '';
   const headEl = box.querySelector('.dv-heads');
@@ -243,7 +245,7 @@ function enterStrip(before = 1, after = 1) {
   if (dayStrip) return;
   closeTimePop(false); hideTip();
   const col = $('#dayview .dv-col'), W = col ? col.getBoundingClientRect().width : 300;
-  dayStrip = { W, days: Array.from({ length: before + ui.dayCount + after }, (_, i) => addDays(ui.dayView, i - before)) };
+  dayStrip = { W, days: Array.from({ length: before + dayN() + after }, (_, i) => addDays(ui.dayView, i - before)) };
   renderDayTimeline($('#dayview')); setStripX(W * before);
 }
 function exitStrip(newDay) {
@@ -271,9 +273,9 @@ function daySlide(dir, m = 1) {
   enterStrip(dir < 0 ? m : 1, dir > 0 ? m : 1);
   const box = $('#dayview'), oldDays = dvDays(), newFirst = addDays(ui.dayView, dir * m), listEl = $('.dv-list', box), s0 = listEl.scrollTop;
   // the list holds the old days and the arriving ones while it scrolls to the new first day
-  const lo = dir > 0 ? oldDays[0] : newFirst, union = Array.from({ length: ui.dayCount + m }, (_, i) => addDays(lo, i));
+  const lo = dir > 0 ? oldDays[0] : newFirst, union = Array.from({ length: dayN() + m }, (_, i) => addDays(lo, i));
   renderDayList(box, union, newFirst);
-  const adj = ui.dayCount > 1 ? 2 : 0;   // 2: a later section's top border
+  const adj = dayN() > 1 ? 2 : 0;   // 2: a later section's top border
   const top = d => { const el = listEl.querySelector(`.dv-day[data-date="${d}"]`); return el ? el.getBoundingClientRect().top - listEl.getBoundingClientRect().top + listEl.scrollTop + adj : 0; };
   listEl.scrollTop = 0;
   const from = dir > 0 ? s0 : top(oldDays[0]) + s0, to = dir > 0 ? top(newFirst) : 0;

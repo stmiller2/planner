@@ -158,7 +158,8 @@ function openTaskMenu(id, btn, at, el) {
   const f = findTask(id); if (!f) return;
   menuTask = el || (btn && btn.closest(TASK_EL)) || null;
   const fails = (f.task.fails || []).slice().reverse();   // newest first
-  menu.innerHTML = menuBtn('k-notes', id, ICON.notes, f.task.notes ? 'Edit notes' : 'Add notes')
+  menu.innerHTML = (MOBILE ? menuBtn('k-done', id, f.task.done ? ICON.undone : ICON.check, f.task.done ? 'Mark not done' : 'Mark done') + '<hr>' : '')   // (mobile's chips have no checkbox)
+    + menuBtn('k-notes', id, ICON.notes, f.task.notes ? 'Edit notes' : 'Add notes')
     + (f.task.date ? menuBtn('k-unsched', id, ICON.nodate, 'Unschedule') + menuBtn('k-fail', id, ICON.failed, 'Mark failed') : '')
     + (fails.length ? '<hr>' + unfailBtn(f.task, fails[0], true) + fails.map(x => failRmBtn(x, fails.length > 1)).join('') : '')
     + '<hr>' + menuBtn('arch-k', id, ICON.archive, 'Archive') + menuBtn('del-k', id, ICON.trash, 'Delete');

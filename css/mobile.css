@@ -1,0 +1,70 @@
+/* Mobile mode (body.mobile, set by js/ui/mobile.js for a phone-sized window). Loaded last, so it overrides the rest. */
+#mBurger,#mScrim,.m-foot{display:none}
+body.mobile{touch-action:manipulation}   /* (no double-tap zoom delay) */
+body.mobile #app{grid-template-columns:minmax(0,1fr);height:100dvh}
+body.mobile :is(#scratch,.sc-rz,#resizer,.sb-tab){display:none !important}
+
+/* header: ☰ · dates · Today · view switcher (the rest is in the drawer's footer) */
+body.mobile header{gap:6px;padding:0 6px 0 4px}
+body.mobile #mBurger{display:inline-grid;width:36px;height:36px;flex:none;color:var(--ink)}
+body.mobile #mBurger svg{width:22px;height:22px}
+body.mobile .brand{width:auto;min-width:0;order:3}
+body.mobile .brand .bname{display:none}
+body.mobile .views .ic{width:32px;height:30px}
+body.mobile :is(#prev,#next,.spacer,.dvcount,.hright){display:none}
+body.mobile #range{order:1;flex:1;min-width:0;padding-left:0;overflow:hidden;text-overflow:ellipsis}
+body.mobile #todayBtn{order:2}
+body.mobile header [data-tip]::after{display:none}
+
+/* drawers: the sidebar (calendar, Timeline) or day view's task list (day view), from the left over a dimmed page.
+   #dayview has no z-index here, so its list can sit above #mScrim (and the calendar under day view is hidden instead) */
+body.mobile :is(aside,.dv-side){position:fixed;top:0;left:0;bottom:0;width:min(86vw,360px);z-index:45;transform:translateX(-102%);
+  transition:transform .22s cubic-bezier(.2,.8,.2,1);border-right:1px solid var(--line)}
+body.mobile #app.mdrawer:is(:not(.dayon),.admon) aside,body.mobile #app.mdrawer.dayon:not(.admon) .dv-side{transform:none;box-shadow:0 0 30px rgba(0,0,0,.25)}
+body.mobile #mScrim{display:block;position:fixed;inset:0;z-index:44;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .22s}
+body.mobile #app.mdrawer #mScrim{opacity:1;pointer-events:auto}
+body.mobile .m-foot{display:flex;flex:none;align-items:center;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.m-foot .seg button{padding:4px 8px}
+.m-foot .m-wkl{font-size:12px;color:var(--muted)}
+.m-foot .m-sp{flex:1}
+.m-foot .ic{width:32px;height:32px}
+.m-foot .ic svg{width:17px;height:17px}
+.m-foot .m-status{border:0;background:none;color:var(--muted);font-size:12px;padding:4px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-foot .m-acct{flex:none;width:28px;height:28px;border:0;border-radius:50%;background:var(--accent);color:#fff;font-size:12.5px;font-weight:650;display:grid;place-items:center;padding:0}
+.m-foot .m-acct[hidden]{display:none}
+
+/* menus: a sheet along the bottom, above the drawers */
+body.mobile #menu{left:8px !important;right:8px;top:auto !important;bottom:calc(8px + env(safe-area-inset-bottom));min-width:0;max-height:70dvh;overflow-y:auto;z-index:60;font-size:15px;border-radius:12px}
+body.mobile #menu button{padding:10px 12px}
+body.mobile #ntip{z-index:60;max-width:calc(100vw - 16px)}
+body.mobile .card,body.mobile .card.wide{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:18px 16px}
+body.mobile .card.framed{padding:0}
+
+/* calendar: nothing scrolls; sideways swipes turn the page (mobile.js) */
+body.mobile main{position:relative;touch-action:none}
+body.mobile #app.dayon main{visibility:hidden}
+body.mobile #dow div{padding:4px 0;text-align:center;font-size:10px;letter-spacing:.03em}
+body.mobile .day{padding:4px 2px 2px}   /* (the top padding and .dn's height match CF_TOP, where conflict bars start) */
+body.mobile .dn{padding-left:0;padding-right:0}
+body.mobile .dn .n{padding:0 4px}
+body.mobile .items{overflow:hidden;gap:2px;padding:0;margin:0;scrollbar-gutter:auto}
+body.mobile .day.more::after{display:none}
+/* chips: the title on one line, cut off at the day's edge */
+body.mobile .chip.m{display:block;padding:1px 1px 1px 3px;border-left-width:2px;border-radius:3px;cursor:default;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.mobile .chip.m .tt{font-size:10.5px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:clip}
+body.mobile .grp{border-radius:3px}
+body.mobile .m-hid{display:none !important}
+body.mobile .m-more{flex:none;height:11px;font-size:13px;line-height:6px;color:var(--muted);text-align:center;font-weight:700;letter-spacing:.15em}
+body.mobile :is(#grid,.mpage) .cfb{pointer-events:none;font-size:10px}   /* (taps reach the day under the bar) */
+body.mobile .cfb .h{display:none}
+/* the pages either side while swiping */
+.mpage{position:absolute;display:grid;overflow:hidden;background:var(--bg)}
+
+/* day view: the timeline, one day, full width */
+body.mobile #dayview{right:0;grid-template-columns:minmax(0,1fr);z-index:auto}
+body.mobile .dv-grid{margin-right:8px}
+body.mobile .dv-main{touch-action:pan-y}
+body.mobile :is(.dv-blk,.dv-item,.dv-cfb,.dv-cfp){touch-action:pan-y;cursor:default;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.mobile .dv-blk :is(.h,.x){display:none}
+body.mobile .dv-item .acts{display:flex}
+body.mobile [draggable="true"]{-webkit-user-drag:none}

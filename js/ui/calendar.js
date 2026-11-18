@@ -59,7 +59,7 @@ function calWeeksHTML(start, weeks, row0) {
     }
   }
   const archOn = archivedByDate();
-  const archChip = x => x.fl ? `<div class="chip arch failed" style="--c:${esc(x.color)}" title="${esc(x.path)} · failed attempt ${x.a + 1} · archived">
+  const archChip = x => MOBILE ? mChip(`arch ${x.fl ? 'failed' : x.k.done ? 'done' : ''}`, '', x.color, x.k.title) : x.fl ? `<div class="chip arch failed" style="--c:${esc(x.color)}" title="${esc(x.path)} · failed attempt ${x.a + 1} · archived">
     <span class="fx">${ICON.x}</span><div class="cb"><div class="tt">${esc(x.k.title)}</div><div class="ts"><span class="fl">failed</span><span class="tn">${esc(x.name)} · archived</span></div></div></div>`
     : `<div class="chip arch ${x.k.done ? 'done' : ''}" style="--c:${esc(x.color)}" title="${esc(x.path)} · archived">
     <input type="checkbox" ${x.k.done ? 'checked' : ''} disabled tabindex="-1"><div class="cb"><div class="tt">${esc(x.k.title)}</div><div class="ts"><span class="tn">${esc(x.name)} · archived</span></div></div></div>`;
@@ -112,6 +112,8 @@ function fitRows() {
   if (weekAnim) return;
   const grid = $('#grid'), days = viewDays(grid); if (!days.length) return;
   const H = grid.clientHeight; if (!H) return;
+  // mobile: equal weeks; days that can't show all their tasks end in "…" (mClip)
+  if (MOBILE) { grid.style.gridTemplateRows = `repeat(${Math.floor(days.length / 7)}, minmax(0,1fr))`; mClip(grid); return; }
   grid.style.gridTemplateRows = fitSizes(weekNeeds(days), H).tpl;
   days.forEach(d => markMore(d.querySelector('.items')));
 }
@@ -269,7 +271,7 @@ let nbTimer = 0;
 const laterNeighbours = () => { clearTimeout(nbTimer); nbTimer = setTimeout(buildNeighbours, 60); };
 function buildNeighbours() {
   const g = $('#grid');
-  if (weekAnim || drag || calStale || ui.dayView || admOpen || !g.clientHeight) return;
+  if (MOBILE || weekAnim || drag || calStale || ui.dayView || admOpen || !g.clientHeight) return;   // (mobile pages sideways: mPages)
   const days = viewDays(g); if (days.length !== ui.weeks * 7) return;
   const rows = rowHeights(); g.style.setProperty('--nbh', (rows.reduce((x, y) => x + y, 0) / rows.length).toFixed(1) + 'px');
   for (const [side, ws] of [['above', addDays(ui.viewStart, -7)], ['below', addDays(ui.viewStart, 7 * ui.weeks)]]) {
@@ -297,7 +299,7 @@ function setPull(px, settle) {
 // push (not the swipe's momentum) and another WEEK_PULL change the week.
 const weekWheel = wheelSteps({
   pull: WEEK_PULL,
-  skip: e => ui.dayView || e.ctrlKey || drag,                            // day view, pinch-zoom, or mid drag-and-drop
+  skip: e => MOBILE || ui.dayView || e.ctrlKey || drag,                            // day view, pinch-zoom, or mid drag-and-drop
   axis: e => [wheelPx(e, e.deltaY), 0],
   ignore: e => Math.abs(e.deltaX) > Math.abs(e.deltaY),                  // sideways: nothing to do
   claim: (e, dy) => {
@@ -321,8 +323,11 @@ function selRuns(chips) {
   for (const [id, h] of chips) { if (sel.has(id) !== on) { end(); on = sel.has(id); } run += h; }
   end(); return out;
 }
+// mobile (mobile.js): just the title, on one line
+const mChip = (cls, attrs, color, title) => `<div class="chip m ${cls}" ${attrs} style="--c:${esc(color)}"><div class="tt">${esc(title)}</div></div>`;
 function chip({ p, t, path }, i) {
   const k = t.tasks[i];
+  if (MOBILE) return mChip(k.done ? 'done' : '', `data-id="${k.id}" data-thread="${t.id}"`, colorOf(t), k.title);
   // next-day links to the task before / after it in the thread (see showLinkLines)
   const prev = k.linkToPrev === 'nextDay' && i > 0 ? t.tasks[i - 1] : null, next = t.tasks[i + 1] && t.tasks[i + 1].linkToPrev === 'nextDay' ? t.tasks[i + 1] : null;
   const nd = prev || next ? `<span class="nd">linked to ${prev && next ? 'prior and later tasks' : prev ? 'a prior task' : 'a later task'}</span>` : '';
@@ -340,6 +345,7 @@ function chip({ p, t, path }, i) {
    reschedules the task (the attempt stays where it is); dropping it back on itself calls that off (failBail), and
    once the task sits on a day again its attempts can't be dragged - that chip is the task's, so you drag it. */
 function failChip(e) {
+  if (MOBILE) return mChip('failed', `data-fid="${e.fl.id}" data-kid="${e.k.id}"`, colorOf(e.t), e.k.title);
   const tip = `Failed attempt ${e.a + 1} · ${[e.p.name, ...e.path].join(' › ')}`;
   return `<div class="chip failed" draggable="${e.k.date ? 'false' : 'true'}" data-fid="${e.fl.id}" data-kid="${e.k.id}" style="--c:${esc(colorOf(e.t))}" title="${esc(tip)}">
     <span class="fx">${ICON.x}</span>

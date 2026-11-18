@@ -43,7 +43,8 @@ function setRange(first = ui.dayView) {
   if (first) { $('#range').textContent = dvTitle(first); return; }
   const end = addDays(ui.viewStart, ui.weeks * 7 - 1);
   const s = parseD(ui.viewStart), e = parseD(end);
-  $('#range').textContent = `${MON[s.getMonth()]} ${s.getDate()}${s.getFullYear() !== e.getFullYear() ? ', ' + s.getFullYear() : ''} – ${MON[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
+  const yr = MOBILE && s.getFullYear() === e.getFullYear() && e.getFullYear() === new Date().getFullYear() ? '' : `, ${e.getFullYear()}`;   // (mobile: no room for this year's)
+  $('#range').textContent = `${MON[s.getMonth()]} ${s.getDate()}${s.getFullYear() !== e.getFullYear() ? ', ' + s.getFullYear() : ''} – ${MON[e.getMonth()]} ${e.getDate()}${yr}`;
 }
 
 /* ---------- sidebar resize ---------- */
@@ -52,7 +53,7 @@ const SB_TAB = 30;
 function setSbw(w) {
   ui.sbw = w; if (w) ui.sbwLast = w;
   $('#app').style.setProperty('--sbw', (w || SB_TAB) + 'px');
-  $('#app').classList.toggle('sbhidden', !w);
+  $('#app').classList.toggle('sbhidden', !w && !MOBILE);   // (mobile: the sidebar is a drawer, never collapsed)
 }
 const rz = $('#resizer');
 rz.addEventListener('pointerdown', e => {
@@ -101,6 +102,7 @@ document.addEventListener('click', e => {
     case 'unsched': moveTask(id, null); break;
     case 'kmenu': openTaskMenu(id, a); break;
     case 'k-notes': closeMenu(); editNotes(id, menuTask); break;
+    case 'k-done': { closeMenu(); const f = findTask(id); if (f) mutate(() => f.task.done = !f.task.done); break; }   // (mobile's task menu)
     case 'acct': openAccount(a); break;
     case 'acct-export': closeMenu(); $('#exportBtn').click(); break;
     case 'acct-import': closeMenu(); $('#importFile').click(); break;
@@ -185,7 +187,7 @@ document.addEventListener('mousedown', e => {
 }, true);
 // header: ‹ Today › (and ← / → / T) step the calendar a week or day view a day, sliding just like a scroll does
 function navStep(dir) {
-  if (!ui.dayView) return weekShift(dir);
+  if (!ui.dayView) return MOBILE ? mPage(dir) : weekShift(dir);   // (mobile: a page of ui.weeks weeks, sideways)
   if (!dv && !cfDrag) daySlide(dir);
 }
 // Today: a quick slide to it. From far away, the view first jumps to TODAY_SLIDE steps short of today and slides
@@ -204,6 +206,7 @@ function navToday() {
   if (weekAnim) weekAnim.finish();
   const w = weekStartOf(t), n = diffDays(w, ui.viewStart) / 7;
   if (!n) return;
+  if (MOBILE) { mPagerDrop(); ui.viewStart = w; return renderWeeks(); }   // (pages start on this week)
   const dir = Math.sign(n), m = Math.min(Math.abs(n), TODAY_SLIDE);
   if (Math.abs(n) > m) { ui.viewStart = addDays(w, -7 * dir * m); renderWeeks(); }
   weekShift(dir, m);

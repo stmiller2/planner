@@ -56,6 +56,7 @@ function dropNotesTip() {   // the note itself (an in-place edit is saved first)
 function hideNotesTip() { clearTimeout(ntTimer); ntTimer = null; dropNotesTip(); }
 const ntStay = () => { clearTimeout(ntGone); ntGone = null; };
 document.addEventListener('mouseover', e => {
+  if (MOBILE) return;   // (no hover on a phone: the task menu's notes item opens them)
   if (ntip.contains(e.target)) return ntStay();
   if (ntEdit) return;                                   // while editing, only a press elsewhere (or ↩ / Esc) ends it
   const el = e.target.closest ? e.target.closest(NT_SEL) : null;
