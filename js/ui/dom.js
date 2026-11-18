@@ -28,6 +28,9 @@ const ICON = {
   timeline: svg('<path d="M4 4v16"/><path d="M8 7h7"/><path d="M11 12h9"/><path d="M8 17h5"/>'),
   archive: svg('<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/>'),
   notes: svg('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/>'),
+  download: svg('<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>'),
+  upload: svg('<path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>'),
+  signout: svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>'),
   gear: svg('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'),
 };
 
@@ -95,7 +98,7 @@ function editDateIn(btn, opt) {
 
 /* ---------- popup menu (the link menu) ---------- */
 const menu = $('#menu');
-function closeMenu() { menu.style.display = 'none'; }
+function closeMenu() { menu.style.display = 'none'; delete menu.dataset.for; }
 // it stays put while what it belongs to moves: scrolling (or a wheel step to other weeks / days) closes it
 document.addEventListener('scroll', e => { if (menu.style.display === 'block' && !menu.contains(e.target)) closeMenu(); }, true);
 document.addEventListener('wheel', e => { if (menu.style.display === 'block' && !menu.contains(e.target)) closeMenu(); }, { capture: true, passive: true });
@@ -242,13 +245,19 @@ function wheelSteps(o) {
     const t = e.timeStamp, dt = t - g.last, fresh = dt > WEEK_GAP;
     const [d, across] = o.axis(e);
     if (o.ignore && o.ignore(e)) { g.last = t; return; }
-    if (fresh) g = { acc: 0, last: t, v: 0, rises: 0, locked: false, stepAt: 0, mine: o.claim(e, d, across), endT: null };
+    if (fresh) g = { acc: 0, last: t, v: 0, rises: 0, locked: false, stepAt: 0, mine: o.claim(e, d, across), endT: null, extra: 0 };
     g.last = t;
-    if (!g.mine) return;
-    if (canPrevent) e.preventDefault();
     // speed rather than per-event size: when events bunch up, one event can carry several events' worth of scroll
     const v = Math.abs(d) / Math.max(dt, 8);
     const rising = v > g.v * 1.15; g.rises = rising ? g.rises + 1 : 0; g.v = v;
+    // a gesture left to something else (a day's list) is taken over once that has nothing left to scroll (o.reclaim:
+    // the extra pull it then needs). What's left of it may be the swipe's momentum, so, as after a step, it only
+    // counts from a fresh push.
+    if (!g.mine) {
+      if (!(o.reclaim && o.claim(e, d, across))) return;
+      g.mine = true; g.acc = 0; g.extra = o.reclaim; g.locked = true; g.stepAt = t - WEEK_SLIDE_MS - 1; g.rises = 0;
+    }
+    if (canPrevent) e.preventDefault();
     if (g.locked) {
       if (!o.busy() && t - g.stepAt > WEEK_SLIDE_MS && g.rises >= 3 && v > 0.3) { g.locked = false; g.acc = 0; }
       else return;
@@ -256,7 +265,7 @@ function wheelSteps(o) {
     if (o.waitWhileBusy && o.busy()) return;
     g.acc += d;
     clearTimeout(g.endT);
-    if (Math.abs(g.acc) >= o.pull) { g.locked = true; g.stepAt = t; g.rises = 0; const dir = Math.sign(g.acc); g.acc = 0; o.step(dir); return; }
+    if (Math.abs(g.acc) >= o.pull + g.extra) { g.locked = true; g.stepAt = t; g.rises = 0; const dir = Math.sign(g.acc); g.acc = 0; o.step(dir); return; }
     o.follow(g.acc);
     g.endT = setTimeout(o.back, WEEK_GAP);
   };

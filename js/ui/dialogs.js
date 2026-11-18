@@ -27,7 +27,7 @@ function showHelp() {
   <p>To remove a task, thread, or project from the sidebar without deleting it, choose <b>Archive</b> from its settings menu <span class="hic">${ICON.gear}</span> (<b>Delete</b> is there too). Archived tasks still appear in the timeline and calendar.</p>
   <h4>Your data</h4>
   ${MODE === 'server' && server.hosted
-    ? `<p>Your plan is saved to ${dataWhereHTML()} as you go, with a copy kept each day (last 14 days). To copy it to or from a <code>planner.json</code> file, use Export and Import in Settings, under <b>Data file</b>.</p>`
+    ? `<p>Your plan is saved to ${dataWhereHTML()} as you go, with a copy kept each day (last 14 days). To copy it to or from a <code>planner.json</code> file, use Export and Import in the account menu (the round button at the top right).</p>`
     : `<p>Your plan is saved to ${dataWhereHTML()}${MODE === 'fallback' ? '' : ' as you go, with a dated copy each day in <code>backups/</code> next to it (last 14 days)'}. You can change where in Settings, under <b>Data file</b>.</p>`}
   <div class="hkeys"><h4>Keyboard shortcuts</h4><div class="keys">${shortcutsHTML()}</div></div>
   <div class="row"><button class="btn primary" id="mClose">Close</button></div>`);
@@ -84,7 +84,8 @@ function applySetting(key, v) {
   // the scratch board in the view you're in follows at once (scratchForView does nothing while remembering)
   if (key === null || key === 'scratchOn' || key === 'scratchRemember' || (key === 'scratchDay') === !!ui.dayView && /^scratch(Cal|Day)$/.test(key)) scratchForView();
   if (!warnings().length) hideWarn();
-  saveUI(); render(); renderSettings();
+  saveUI(); if (settingsToPlan()) scheduleSave();   // (they travel with the plan; not undoable)
+  render(); renderSettings();
 }
 function renderSettings() {
   const body = $('#modal .mbody'); if (!body) return;
@@ -131,7 +132,7 @@ function renderSettings() {
     ${row('Conflict warning', 'Show a warning when an uncompleted task lands on the same day as a Conflict.', sw('conflictWarn'))}
     <h4>Data file</h4>
     ${dataFileRows(row)}
-    <p class="sub" style="margin-top:18px">Settings are saved in this browser, so Chrome and Safari each keep their own.</p>
+    <p class="sub" style="margin-top:18px">Settings are saved with your plan, so they’re the same in every browser and on every device that opens it. The theme and the layout (sidebar width, how many weeks or days are shown) stay with each browser.</p>
     <div class="row"><button class="btn primary" id="sClose">Done</button><button class="btn" id="sReset">Restore defaults</button></div>`;
   body.scrollTop = top;
 }

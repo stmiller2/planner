@@ -106,6 +106,8 @@ function migrate(d) {
   // scratch tasks (day view's "Other to-do"): { id, title, done }
   s.scratch = (d && Array.isArray(d.scratch) ? d.scratch : []).filter(x => x && typeof x === 'object')
     .map(x => ({ id: x.id || uid(), title: String(x.title ?? ''), done: !!x.done })).filter(x => x.title.trim());
+  // the Settings-window preferences (see settingsToPlan, prefs.js); each value is checked when it's applied
+  if (d && d.settings && typeof d.settings === 'object' && !Array.isArray(d.settings)) s.settings = { ...d.settings };
   return s;
 }
 
@@ -356,8 +358,10 @@ function afterChange(vBefore) {
   if (!now.length) hideWarn();
   else if (vBefore) { const fresh = now.filter(v => !vBefore.has(v.key)); if (fresh.length) showWarn(fresh); }
 }
-function undo() { if (!undoStack.length) return; redoStack.push(stateJSON()); state = JSON.parse(undoStack.pop()); hideWarn(); afterChange(null); }
-function redo() { if (!redoStack.length) return; undoStack.push(stateJSON()); state = JSON.parse(redoStack.pop()); afterChange(null); }
+// (settings aren't part of undo / redo: they stay as they are now)
+const keepSettings = (next, cur = state.settings) => { if (cur) next.settings = cur; else delete next.settings; return next; };
+function undo() { if (!undoStack.length) return; redoStack.push(stateJSON()); state = keepSettings(JSON.parse(undoStack.pop())); hideWarn(); afterChange(null); }
+function redo() { if (!redoStack.length) return; undoStack.push(stateJSON()); state = keepSettings(JSON.parse(redoStack.pop())); afterChange(null); }
 
 /* A task's slot in day view: task.plan = { date, start, dur } (minutes from midnight). It only counts while plan.date
    matches the task's date, so moving a task to another day leaves its old slot dormant (it comes back if the task does). */

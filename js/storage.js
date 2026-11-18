@@ -33,6 +33,9 @@ function adopt(data) {
   blocked = false;
   state = data ? migrate(data) : { version: 5, projects: [] }; dataLoaded = true;
   undoStack.length = 0; redoStack.length = 0;
+  // a plan without settings yet takes this browser's, and is saved with them once it's open (a new or older-format
+  // file is saved as it opens anyway). A plan's own settings are applied when it's drawn (settingsFromPlan).
+  if (!state.settings && settingsToPlan() && data && data.version === state.version) setTimeout(scheduleSave, 0);
 }
 const backend = () => MODE === 'server' ? server : MODE === 'fs' ? folder : null;
 
@@ -113,6 +116,8 @@ const server = {
     this.fixed = r.headers.get('X-Planner-Fixed') === '1';   // folder given for this run (--data): Settings can't change it
     this.hosted = r.headers.get('X-Planner-Hosted') === '1';
     this.user = decodeURIComponent(r.headers.get('X-Planner-User') || '');
+    // online: the account button (its menu: openAccount, ui/app.js) shows the first letter of the address
+    const ab = $('#acctBtn'); ab.hidden = !this.hosted; ab.textContent = (this.user[0] || '?').toUpperCase(); ab.title = this.user;
     const text = r.status === 200 ? await r.text() : '';
     const data = readData(text, this.hosted ? '. Nothing in it has been changed; reload the page to try again.' : ' next to it, then reopen Planner.');
     if (data === undefined) return;
@@ -187,7 +192,7 @@ const server = {
   async reload() { this.tag = null; try { await this.open(await this.fetch()); } catch (e) { setStatus('Not connected', 'err'); } },
   info() {
     if (this.hosted) {
-      showModal(`<h3>Your data</h3><p>Saving to your online account (<code>${esc(this.user)}</code>) as you go. A copy is kept each day (last 14). Export and Import are in Settings, under <b>Data file</b>.</p>
+      showModal(`<h3>Your data</h3><p>Saving to your online account (<code>${esc(this.user)}</code>) as you go. A copy is kept each day (last 14). Export and Import are in the account menu (the round button at the top right).</p>
       <div class="row"><button class="btn primary" id="mClose">Close</button><button class="btn" id="mOut">Sign out</button></div>`);
       $('#mClose').onclick = hideModal; $('#mOut').onclick = () => this.signOut();
       return;
@@ -339,7 +344,9 @@ $('#importBtn').onclick = () => $('#importFile').click();
 $('#importFile').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
   try {
-    const d = migrate(JSON.parse(await f.text())); mutate(() => { state = d; });
+    const d = migrate(JSON.parse(await f.text()));
+    if (!d.settings && state.settings) d.settings = state.settings;   // a file without settings keeps the ones in use
+    mutate(() => { state = d; });
     if (MODE === 'fallback') { markExported(); fbStatus(); toast('Imported ' + f.name); }
     else toast(`Imported ${f.name}. ⌘Z undoes it.`, 5000);
   }

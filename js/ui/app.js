@@ -6,9 +6,23 @@
 let rendering = false;     // true while render() runs (focus changes during it aren't the user's)
 let calStale = false;      // the calendar skipped a render while day view / the timeline covered it
 function render() {
+  planSettings();
   rendering = true; computeColors(); renderHeader(); renderTree(); renderScratch();
   if (ui.dayView || admOpen) calStale = true; else { calStale = false; renderCal(); }
   renderDay(); renderAdmire(); rendering = false; if (hl) setHL(hl, true);
+}
+// the settings the plan carries (state.settings, see settingsToPlan in prefs.js) win over this browser's: after a
+// load, a reload from another device or an import they're applied here, with what applySetting would also do
+function planSettings() {
+  const ch = settingsFromPlan(); if (!ch.length) return;
+  if (ch.includes('weekStart')) ui.viewStart = weekStartOf(addDays(ui.viewStart, 3));   // (stays on the same week)
+  if (ch.some(k => /^scratch/.test(k))) scratchForView();
+}
+// a new range of weeks, nothing else changed: just the header and the calendar (the sidebar and the rest stay as they
+// are; redrawing them made each week step stall on a big plan)
+function renderWeeks() {
+  if (ui.dayView || admOpen) return render();
+  renderHeader(); calStale = false; renderCal(); if (hl) setHL(hl, true);
 }
 
 let dataLoaded = false;
@@ -54,7 +68,7 @@ $('aside').insertAdjacentHTML('afterbegin', sbTab('Projects / Conflicts'));
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  if (!e.target.closest('#menu') && !e.target.closest('[data-act="linkmenu"], [data-act="tmenu"], [data-act="pmenu"], [data-act="kmenu"]')) closeMenu();
+  if (!e.target.closest('#menu') && !e.target.closest('[data-act="linkmenu"], [data-act="tmenu"], [data-act="pmenu"], [data-act="kmenu"], [data-act="acct"]')) closeMenu();
   if (e.target.closest('.inl')) return;            // clicks inside a rename box just move the cursor
   const a = e.target.closest('[data-act]'); if (!a) return;
   const act = a.dataset.act;
@@ -87,6 +101,10 @@ document.addEventListener('click', e => {
     case 'unsched': moveTask(id, null); break;
     case 'kmenu': openTaskMenu(id, a); break;
     case 'k-notes': closeMenu(); editNotes(id, menuTask); break;
+    case 'acct': openAccount(a); break;
+    case 'acct-export': closeMenu(); $('#exportBtn').click(); break;
+    case 'acct-import': closeMenu(); $('#importFile').click(); break;
+    case 'acct-out': closeMenu(); server.signOut(); break;
     case 'del-k': closeMenu(); delTask(id); quickAct('del'); break;
     case 'arch-k': closeMenu(); archiveTask(id); quickAct('arch'); break;
     case 'k-unsched': closeMenu(); moveTask(id, null); break;
@@ -187,7 +205,7 @@ function navToday() {
   const w = weekStartOf(t), n = diffDays(w, ui.viewStart) / 7;
   if (!n) return;
   const dir = Math.sign(n), m = Math.min(Math.abs(n), TODAY_SLIDE);
-  if (Math.abs(n) > m) { ui.viewStart = addDays(w, -7 * dir * m); render(); }
+  if (Math.abs(n) > m) { ui.viewStart = addDays(w, -7 * dir * m); renderWeeks(); }
   weekShift(dir, m);
 }
 $('#prev').onclick = () => navStep(-1);
@@ -219,6 +237,14 @@ $('#warnClose').onclick = hideWarn;
 $('#warn').onmouseenter = () => clearTimeout(warnTimer);   // (held while you reach for Undo)
 $('#warn').onmouseleave = () => { if ($('#warn').style.display !== 'none') armWarn(); };
 $('#helpBtn').onclick = showHelp;
+// online: the account button's menu (who is signed in, Export / Import, Sign out); a second click closes it
+function openAccount(btn) {
+  if (menu.style.display === 'block' && menu.dataset.for === 'acct') return closeMenu();
+  menu.innerHTML = `<div class="acct-hd">Signed in as<b>${esc(server.user)}</b></div><hr>`
+    + menuBtn('acct-export', '', ICON.download, 'Export') + menuBtn('acct-import', '', ICON.upload, 'Import')
+    + '<hr>' + menuBtn('acct-out', '', ICON.signout, 'Sign out');
+  placeMenu(btn); menu.dataset.for = 'acct';
+}
 $('#setBtn').innerHTML = ICON.gear;
 $('#setBtn').onclick = showSettings;
 // theme: Auto (follow macOS) → Light → Dark. The page always carries the theme in effect (data-theme="light" / "dark"),

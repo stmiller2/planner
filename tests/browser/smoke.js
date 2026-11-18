@@ -30,7 +30,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
     await check('loads the data and shows the calendar', async () => {
       await page.waitForFunction(() => document.querySelector('#status').textContent === 'Saved');
-      assert.strictEqual(await page.locator('#grid .day').count(), 21);
+      assert.strictEqual(await page.locator('#grid .day:not(.nb)').count(), 21);   // (.nb: the weeks either side, built ahead)
       assert.ok(await page.locator('#grid .chip').count() > 10);
       assert.ok(await page.locator('#tree .task').count() > 10);
     });
@@ -50,6 +50,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.strictEqual((await task('a6')).date, '2026-11-10');
     });
     await check('undo', async () => { await page.keyboard.press('Control+z'); assert.strictEqual((await task('a6')).date, '2026-11-02'); });
+    await check('completed tasks are collapsed by default', async () => {
+      assert.strictEqual(await page.evaluate(() => ui.collapseDone), true);
+      await page.evaluate(() => applySetting('collapseDone', false));   // (the checks below were written with them shown)
+    });
     await check('sidebar: dragging inside linked chains (reorder a same-day group, join one, split a next-day link)', async () => {
       const order = () => page.evaluate(() => findThread('t1').t.tasks.map(k => [k.id, k.linkToPrev]));
       const dragRow = async (id, onto, half) => {
@@ -232,9 +236,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await check('collapsed completed tasks: the "+ N completed" line\'s number column lines up with the task rows\'', async () => {
       const x = await page.evaluate(() => {
         const t = state.projects[0].threads[0], k = t.tasks, keep = JSON.stringify(k), cd = ui.collapseDone;
-        k[0].done = k[1].done = true; k[1].linkToPrev = k[2].linkToPrev = 'nextDay'; k[2].done = false; ui.collapseDone = true; render();
+        k[0].done = k[1].done = true; k[1].linkToPrev = k[2].linkToPrev = 'nextDay'; k[2].done = false; applySetting('collapseDone', true);
         const dr = $('#tree .drun'), out = [dr.className, dr.querySelector('.drn').getBoundingClientRect().left, $(`.task[data-id="${k[2].id}"] .num`).getBoundingClientRect().left];
-        t.tasks = JSON.parse(keep); ui.collapseDone = cd; render();
+        t.tasks = JSON.parse(keep); applySetting('collapseDone', cd);
         return out;
       });
       assert.ok(/\bd-n\b/.test(x[0]), x[0]); assert.strictEqual(x[1], x[2]);

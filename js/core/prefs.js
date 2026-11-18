@@ -1,6 +1,9 @@
 'use strict';
-/* `ui`: this browser's view preferences and settings (saved in localStorage, not in planner.json), plus a little
-   transient view state shared between views. Every saved preference is declared once in UI_PREFS:
+/* `ui`: view preferences and settings, plus a little transient view state shared between views. All of it is kept in
+   this browser (localStorage); the Settings-window ones (setting: true) also travel with the plan (state.settings in
+   planner.json / the online account: settingsToPlan / settingsFromPlan below), so every browser and device using the
+   plan shows the same. Layout (sidebar width, collapsed threads, weeks shown…) and the theme stay per browser.
+   Every saved preference is declared once in UI_PREFS:
      def      default value
      ok(v)    whether a stored value is acceptable (otherwise the default is used)
      key      name in localStorage, when it differs
@@ -19,7 +22,7 @@ const UI_PREFS = {
   snap:          { def: 15, ok: oneOf(5, 10, 15, 30), setting: true },
   clock:         { def: '12', ok: oneOf('12', '24'), setting: true },
   dateLabels:    { def: 'relative', ok: oneOf('relative', 'absolute'), setting: true },
-  collapseDone:  { def: false, ok: isBool, setting: true },                   // sidebar: 2+ done tasks in a row -> one "+ N completed" line
+  collapseDone:  { def: true, ok: isBool, setting: true },                   // sidebar: 2+ done tasks in a row -> one "+ N completed" line
   confirmDelete: { def: true, ok: isBool, setting: true },
   orderWarn:     { def: true, ok: isBool, setting: true },
   conflictWarn:  { def: true, ok: isBool, setting: true },
@@ -55,6 +58,22 @@ function saveUI() {
   try { localStorage.setItem('planner.ui', JSON.stringify(out)); } catch (e) {}
 }
 function resetSettings() { for (const [k, p] of Object.entries(UI_PREFS)) if (p.setting) ui[k] = prefDefault(k); }
+// the plan's copy of the settings: written when they change here (true: it changed, so the plan needs saving)…
+const SETTING_KEYS = Object.keys(UI_PREFS).filter(k => UI_PREFS[k].setting);
+function settingsToPlan() {
+  if (!state) return false;
+  const s = Object.fromEntries(SETTING_KEYS.map(k => [k, ui[k]]));
+  if (JSON.stringify(s) === JSON.stringify(state.settings || null)) return false;
+  state.settings = s; touch(); return true;
+}
+// …and taken from it whenever the plan is drawn (loaded, reloaded from elsewhere, imported): the keys that changed
+function settingsFromPlan() {
+  const s = state && state.settings; if (!s) return [];
+  const changed = SETTING_KEYS.filter(k => UI_PREFS[k].ok(s[k]) && ui[k] !== s[k]);
+  changed.forEach(k => { ui[k] = s[k]; });
+  if (changed.length) saveUI();
+  return changed;
+}
 
 const ui = loadUI();
 ui.viewStart = weekStartOf(todayISO());   // first day shown on the calendar

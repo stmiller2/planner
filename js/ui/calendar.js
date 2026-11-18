@@ -21,14 +21,32 @@ const archivedByDate = memo(() => {
   });
   return archOn;
 });
-function renderCal(strip) {
-  if (weekAnim && !strip) return;                       // mid-slide: the slide re-renders when it lands
+function renderCal() {
+  if (weekAnim) { weekAnim.stale = true; return; }      // mid-slide: the slide redraws everything when it lands
   hideLinkLine();
-  const weeks = strip ? strip.weeks : ui.weeks, start = strip ? strip.start : ui.viewStart;
-  const days = weeks * 7, end = addDays(start, days - 1), today = todayISO();
   const cols = colTemplate();
   const dow = $('#dow'); dow.style.gridTemplateColumns = cols;
   dow.innerHTML = Array.from({ length: 7 }, (_, i) => `<div>${DOW[(ui.weekStart + i) % 7]}</div>`).join('');
+  const grid = $('#grid');
+  grid.style.gridTemplateColumns = cols;
+  const { days, bars } = calWeeksHTML(ui.viewStart, ui.weeks, 0);
+  // days scrolled down to tasks further down their list stay where they were
+  const keepScroll = new Map(); $$('.day .items', grid).forEach(it => { if (it.scrollTop) keepScroll.set(it.parentElement.dataset.date, it.scrollTop); });
+  // no scrollbar while it's laid out and measured: the new days can overflow for a moment (the old rows still apply),
+  // and a scrollbar would narrow the days and make fitRows size the weeks for narrower columns than they end up with
+  const overflow = grid.style.overflow; grid.style.overflow = 'hidden';
+  grid.innerHTML = days + bars;   // (the weeks either side, if built, go with it: buildNeighbours makes them again)
+  barWidths(grid.querySelectorAll('.cfb'));
+  fitRows();
+  grid.style.overflow = overflow;
+  keepScroll.forEach((top, d) => { const it = grid.querySelector(`.day[data-date="${d}"] .items`); if (it) { it.scrollTop = top; markMore(it); } });
+  laterNeighbours();
+}
+/* The markup of `weeks` weeks from `start`, put in grid rows row0 + 1…: { days, bars }. Each week stands on its own
+   (its conflicts get their lines within the week), so a week slide can add or drop whole weeks (weekShift) and get
+   what a full redraw would. The first day shown is labelled with its month by firstLabels, afterwards. */
+function calWeeksHTML(start, weeks, row0) {
+  const end = addDays(start, weeks * 7 - 1), today = todayISO();
   // boxes: runs of tasks joined by same-day links (shown together in a dashed box)
   const byDate = {};
   for (const { p, t, path } of allThreads()) {
@@ -45,69 +63,89 @@ function renderCal(strip) {
     <span class="fx">${ICON.x}</span><div class="cb"><div class="tt">${esc(x.k.title)}</div><div class="ts"><span class="fl">failed</span><span class="tn">${esc(x.name)} · archived</span></div></div></div>`
     : `<div class="chip arch ${x.k.done ? 'done' : ''}" style="--c:${esc(x.color)}" title="${esc(x.path)} · archived">
     <input type="checkbox" ${x.k.done ? 'checked' : ''} disabled tabindex="-1"><div class="cb"><div class="tt">${esc(x.k.title)}</div><div class="ts"><span class="tn">${esc(x.name)} · archived</span></div></div></div>`;
-  const grid = $('#grid');
-  grid.style.gridTemplateColumns = cols;
-  // conflicts in view: each gets a slot (a line) so overlapping ones stack; a week keeps room for the slots it uses
-  const cs = confs().filter(c => c.start && c.end >= start && c.start <= end)
+  const all = confs().filter(c => c.start && c.end >= start && c.start <= end)
     .sort((a, b) => a.start < b.start ? -1 : a.start > b.start ? 1 : a.end > b.end ? -1 : 1);
-  const slotOf = packLines(cs).line;
-  const wkSlots = Array.from({ length: weeks }, (_, w) => { const ws = addDays(start, 7 * w), we = addDays(ws, 6);
-    return cs.filter(c => c.start <= we && c.end >= ws).reduce((m, c) => Math.max(m, slotOf.get(c.id) + 1), 0); });
-  let html = '', bars = '';
-  for (let n = 0; n < days; n++) {
-    const d = addDays(start, n), dd = parseD(d), wd = dd.getDay(), w = Math.floor(n / 7);
-    const cls = ['day', (wd === 0 || wd === 6) && 'we', d === today && 'today', d < today && 'past', cs.some(c => c.start <= d && d <= c.end) && 'cf'].filter(Boolean).join(' ');
-    const label = (n === 0 || dd.getDate() === 1) ? `${MON[dd.getMonth()]} ${dd.getDate()}` : dd.getDate();
-    // runs and failed attempts in the day's own order (see dayItems), so an attempt stays where it happened
-    const posOf = dayOrder(d);
-    const items = (byDate[d] || []).map(r => {
-      const chips = []; for (let k = r.s; k <= r.e; k++) chips.push([r.t.tasks[k].id, chip(r, k)]);
-      return [posOf(r.t.tasks[r.s].id), r.e > r.s ? `<div class="grp" style="--c:${esc(colorOf(r.t))}">${selRuns(chips)}</div>` : selRuns(chips)];
-    }).concat(dayFailRuns(d).map(g => [posOf(g[0].fl.id), g.length > 1 ? `<div class="grp" style="--c:${esc(colorOf(g[0].t))}">${g.map(failChip).join('')}</div>` : failChip(g[0])]))
-      .sort((a, b) => a[0] - b[0]).map(x => x[1]).join('') + (archOn[d] || []).map(archChip).join('');
-    const gap = wkSlots[w] ? `<div class="cf-gap" style="height:${wkSlots[w] * CF_PITCH + 4}px"></div>` : '';
-    html += `<div class="${cls}" data-date="${d}" style="grid-row:${w + 1};grid-column:${n % 7 + 1}"><div class="dn"><span class="n" data-act="openday" data-date="${d}">${label}</span></div>${gap}<div class="items">${items}</div></div>`;
-  }
+  let days = '', bars = '';
   for (let w = 0; w < weeks; w++) {
-    const ws = addDays(start, 7 * w), we = addDays(ws, 6);
-    cs.filter(c => c.start <= we && c.end >= ws).forEach(c => {
+    const ws = addDays(start, 7 * w), we = addDays(ws, 6), row = row0 + w + 1;
+    // the week's conflicts: each gets a line so overlapping ones stack; a day under bars keeps room for the lowest
+    // one over it (days with no bar over them keep none)
+    const cs = all.filter(c => c.start <= we && c.end >= ws), slotOf = packLines(cs).line;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(ws, i), dd = parseD(d), wd = dd.getDay(), over = cs.filter(c => c.start <= d && d <= c.end);
+      const cls = ['day', i === 6 && 'l7', (wd === 0 || wd === 6) && 'we', d === today && 'today', d < today && 'past', over.length && 'cf'].filter(Boolean).join(' ');
+      // runs and failed attempts in the day's own order (see dayItems), so an attempt stays where it happened
+      const posOf = dayOrder(d);
+      const items = (byDate[d] || []).map(r => {
+        const chips = []; for (let k = r.s; k <= r.e; k++) chips.push([r.t.tasks[k].id, chip(r, k)]);
+        return [posOf(r.t.tasks[r.s].id), r.e > r.s ? `<div class="grp" style="--c:${esc(colorOf(r.t))}">${selRuns(chips)}</div>` : selRuns(chips)];
+      }).concat(dayFailRuns(d).map(g => [posOf(g[0].fl.id), g.length > 1 ? `<div class="grp" style="--c:${esc(colorOf(g[0].t))}">${g.map(failChip).join('')}</div>` : failChip(g[0])]))
+        .sort((a, b) => a[0] - b[0]).map(x => x[1]).join('') + (archOn[d] || []).map(archChip).join('');
+      const sl = over.reduce((m, c) => Math.max(m, slotOf.get(c.id) + 1), 0), gap = sl ? `<div class="cf-gap" style="height:${sl * CF_PITCH + 4}px"></div>` : '';
+      days += `<div class="${cls}" data-date="${d}" style="grid-row:${row};grid-column:${i + 1} / ${i + 2}"><div class="dn"><span class="n" data-act="openday" data-date="${d}">${dayNum(d, w === 0 && i === 0 && row0 === 0)}</span></div>${gap}<div class="items">${items}</div></div>`;
+    }
+    cs.forEach(c => {
       const a = c.start < ws ? ws : c.start, b = c.end > we ? we : c.end, st = c.start >= ws, en = c.end <= we;
-      bars += `<div class="cfb ${st ? 's' : ''} ${en ? 'e' : ''}" data-cid="${c.id}" data-d0="${a}" title="${cfTip(c)}"
-        style="grid-row:${w + 1};grid-column:${diffDays(a, ws) + 1} / ${diffDays(b, ws) + 2};margin-top:${CF_TOP + slotOf.get(c.id) * CF_PITCH}px">
+      bars += `<div class="${['cfb', st && 's', en && 'e'].filter(Boolean).join(' ')}" data-cid="${c.id}" data-d0="${a}" title="${cfTip(c)}"
+        style="grid-row:${row};grid-column:${diffDays(a, ws) + 1} / ${diffDays(b, ws) + 2};margin-top:${CF_TOP + slotOf.get(c.id) * CF_PITCH}px">
         <span class="cfl" data-act="rename-c" data-id="${c.id}">${esc(c.title)}</span>${st ? '<i class="h l"></i>' : ''}${en ? '<i class="h r"></i>' : ''}</div>`;
     });
   }
-  // days scrolled down to tasks further down their list stay where they were
-  const keepScroll = new Map(); $$('.day .items', grid).forEach(it => { if (it.scrollTop) keepScroll.set(it.parentElement.dataset.date, it.scrollTop); });
-  grid.innerHTML = html + bars;   // bars after the days, so the days stay children 1…n
-  // renaming a long conflict: the box takes the width of the day it starts on
-  $$('.cfb', grid).forEach(b => { const d = grid.querySelector(`.day[data-date="${b.dataset.d0}"]`); if (d) b.style.setProperty('--colw', d.offsetWidth + 'px'); });
-  if (strip) grid.style.gridTemplateRows = strip.rows.map(h => h + 'px').join(' ');
-  else fitRows();
-  keepScroll.forEach((top, d) => { const it = grid.querySelector(`.day[data-date="${d}"] .items`); if (it) { it.scrollTop = top; markMore(it); } });
+  return { days, bars };
+}
+// a day's number; the first day shown and each 1st of a month also say the month
+const dayNum = (d, first) => { const dd = parseD(d); return first || dd.getDate() === 1 ? `${MON[dd.getMonth()]} ${dd.getDate()}` : String(dd.getDate()); };
+// after weeks were added or dropped: the first day's label (and the one that was first) as a fresh redraw has them
+function firstLabels(grid) {
+  viewDays(grid).forEach((d, i) => { const n = d.querySelector('.dn .n'), t = dayNum(d.dataset.date, i === 0); if (n.textContent !== t) n.textContent = t; });
+}
+// the days shown, in date order (not the pre-built weeks either side, .nb; page order isn't date order after a slide)
+const viewDays = (grid = $('#grid')) => $$(':scope > .day:not(.nb)', grid).sort((a, b) => a.dataset.date < b.dataset.date ? -1 : 1);
+// renaming a long conflict: the box takes the width of the day it starts on
+function barWidths(bars) {
+  const grid = $('#grid');
+  bars.forEach(b => { const d = grid.querySelector(`.day[data-date="${b.dataset.d0}"]`); if (d) b.style.setProperty('--colw', d.offsetWidth + 'px'); });
 }
 /* Week heights: busy weeks grow into the space emptier weeks don't need, but the calendar never gets taller
    than the window; when a week can't fit, its row is capped and the crowded days scroll inside themselves. */
 function fitRows() {
   if (weekAnim) return;
-  const grid = $('#grid'), days = $$('.day', grid), n = ui.weeks; if (!days.length) return;
+  const grid = $('#grid'), days = viewDays(grid); if (!days.length) return;
   const H = grid.clientHeight; if (!H) return;
-  const nat = Array(n).fill(0);
+  grid.style.gridTemplateRows = fitSizes(weekNeeds(days), H).tpl;
+  days.forEach(d => markMore(d.querySelector('.items')));
+}
+// the height each week's fullest day needs (days: the grid's .day elements, 7 a week). Row heights don't change
+// it (a capped day's list scrolls; offsetTop ignores that), so it can be read from any layout, the slide's included.
+function weekNeeds(days) {
+  const nat = Array(Math.floor(days.length / 7)).fill(0);
   days.forEach((d, idx) => {
     const it = d.querySelector('.items'), last = it.lastElementChild, dn = d.querySelector('.dn'), gap = d.querySelector('.cf-gap');
     const bottom = last ? last.offsetTop + last.offsetHeight + 3 : gap ? gap.offsetTop + gap.offsetHeight + 3 : dn.offsetTop + dn.offsetHeight;
     nat[Math.floor(idx / 7)] = Math.max(nat[Math.floor(idx / 7)], bottom + 9);   // + bottom padding and border
   });
-  const want = nat.map(h => Math.max(h, Math.min(110, H / n)));
-  let rows;
-  if (want.reduce((a, b) => a + b, 0) <= H) rows = want.map(h => `minmax(${Math.ceil(h)}px, 1fr)`);
-  else {                                   // cap: weeks that fit keep their height, the rest share what's left equally
-    const sorted = [...want].sort((a, b) => a - b); let rem = H, k = n, cap = H / n;
-    for (const h of sorted) { if (h <= rem / k) { rem -= h; k--; } else { cap = rem / k; break; } }
-    rows = want.map(h => `${Math.floor(Math.min(h, cap))}px`);
+  return nat;
+}
+// rows for weeks needing nat px in a calendar H px tall: tpl for grid-template-rows, px = the heights that gives
+function fitSizes(nat, H) {
+  const n = nat.length, want = nat.map(h => Math.max(h, Math.min(110, H / n)));
+  if (want.reduce((a, b) => a + b, 0) <= H) {   // all fit: each gets at least what it needs, the rest is shared (1fr)
+    const min = want.map(h => Math.ceil(h));
+    // as the browser shares it: rows needing more than an equal share keep their minimum, the others split the rest
+    let fixed = new Set(), fr = 0;
+    for (;;) {
+      const rest = min.filter((_, i) => !fixed.has(i));
+      fr = (H - min.reduce((a, h, i) => a + (fixed.has(i) ? h : 0), 0)) / Math.max(rest.length, 1);
+      const more = min.findIndex((h, i) => !fixed.has(i) && h > fr);
+      if (more < 0) break; fixed.add(more);
+    }
+    return { tpl: min.map(h => `minmax(${h}px, 1fr)`).join(' '), px: min.map((h, i) => fixed.has(i) ? h : Math.max(h, fr)) };
   }
-  grid.style.gridTemplateRows = rows.join(' ');
-  days.forEach(d => markMore(d.querySelector('.items')));
+  // cap: weeks that fit keep their height, the rest share what's left equally
+  const sorted = [...want].sort((a, b) => a - b); let rem = H, k = n, cap = H / n;
+  for (const h of sorted) { if (h <= rem / k) { rem -= h; k--; } else { cap = rem / k; break; } }
+  const px = want.map(h => Math.floor(Math.min(h, cap)));
+  return { tpl: px.map(h => h + 'px').join(' '), px };
 }
 // fade at the bottom of a day that has more tasks below (macOS hides scrollbars until you scroll)
 function markMore(it) { if (it) it.parentElement.classList.toggle('more', it.scrollTop + it.clientHeight < it.scrollHeight - 2); }
@@ -121,7 +159,7 @@ $('#grid').addEventListener('scroll', e => { if (e.target.classList && e.target.
 const WEEK_PULL = 70;   // px of scrolling needed to change week
 let weekAnim = null;   // { cancel, finish } while a week is sliding in
 // px height of each week row as currently laid out
-const rowHeights = () => { const ds = $$('#grid .day'); return Array.from({ length: Math.floor(ds.length / 7) }, (_, w) => ds[w * 7].getBoundingClientRect().height); };
+const rowHeights = () => { const ds = viewDays(); return Array.from({ length: Math.floor(ds.length / 7) }, (_, w) => ds[w * 7].getBoundingClientRect().height); };
 /* Slide one week up (dir 1) or down (dir -1), or m weeks at once (T: jump to today). The grid briefly holds the old
    and new views together (m extra weeks) and scrolls from where it is now to where the new view sits, so you see the
    calendar move. Row heights blend along the way: the slide starts laid out exactly like the old view and ends exactly
@@ -129,16 +167,39 @@ const rowHeights = () => { const ds = $$('#grid .day'); return Array.from({ leng
    that are in neither view (a slide of more weeks than are shown) pass by at an average height. */
 function weekShift(dir, m = 1) {
   if (weekAnim) weekAnim.finish();
-  const g = $('#grid');
-  const pulled = -(parseFloat((g.style.transform.match(/-?[\d.]+/) || [0])[0]) || 0);   // how far the pull already moved it
-  g.classList.remove('settle'); g.style.transform = '';
-  const oldStart = ui.viewStart, oldRows = rowHeights();
-  ui.viewStart = addDays(oldStart, 7 * dir * m); render();              // the new view, for its row heights (and header)
-  const newRows = rowHeights(), n = ui.weeks;
-  if (oldRows.length !== n || newRows.length !== n) return;
-  // strip of n+m weeks: the old view at strip row oi, the new one at ni. Each row's height goes from a (laid out as the
-  // old view) to b (as the new one), and the scroll position from s0 to s1.
-  const oi = dir > 0 ? 0 : m, ni = dir > 0 ? m : 0, avg = [...oldRows, ...newRows].reduce((x, y) => x + y, 0) / (2 * n);
+  clearTimeout(nbTimer);
+  const g = $('#grid'), pulled = weekPull;   // how far a swipe's pull already moved it: the slide goes on from there
+  setPull(0);
+  const oldStart = ui.viewStart, oldRows = rowHeights(), n = ui.weeks;
+  ui.viewStart = addDays(oldStart, 7 * dir * m); renderHeader();
+  if (oldRows.length !== n || !g.clientHeight || calStale) return renderWeeks();
+  // strip of n+m weeks: the old view at strip row oi, the new one at ni. The days already shown stay as they are;
+  // the arriving week is the one already built beside them (buildNeighbours), or (not built yet, or several weeks
+  // at once) is built now. Each row's height goes from a (laid out as the old view) to b (as the new one). The new
+  // view's heights come from the strip itself (what its weeks need, sized as fitRows would).
+  const oi = dir > 0 ? 0 : m, ni = dir > 0 ? m : 0;
+  weekAnim = { cancel() {}, finish: null, stale: false };
+  g.style.overflow = 'hidden'; hideLinkLine();
+  const side = dir > 0 ? 'below' : 'above', ready = m === 1 && g.querySelector(`:scope > .day.nb.${side}`);
+  // what the weeks need, read before anything changes (nothing has to be laid out again to read it)
+  let nat = null;
+  if (ready) {
+    const nbNat = weekNeeds($$(`:scope > .day.nb.${side}`, g).sort((x, y) => x.dataset.date < y.dataset.date ? -1 : 1)), viewNat = weekNeeds(viewDays(g));
+    nat = dir > 0 ? viewNat.concat(nbNat) : nbNat.concat(viewNat);
+  }
+  $$(`:scope > .nb${ready ? ':not(.' + side + ')' : ''}`, g).forEach(el => el.remove());   // the rest aren't needed
+  if (dir < 0) for (const el of g.children) if (!el.classList.contains('nb') && el.style.gridRowStart) el.style.gridRow = String(parseInt(el.style.gridRowStart, 10) + m);
+  if (ready) {   // it joins the grid as an ordinary week
+    $$(':scope > .nb', g).forEach(el => { el.classList.remove('nb', 'above', 'below'); el.style.gridRow = String(dir > 0 ? n + 1 : 1); });
+  } else {
+    const { days: dh, bars: bh } = calWeeksHTML(dir > 0 ? addDays(oldStart, 7 * n) : ui.viewStart, m, dir > 0 ? n : 0);
+    const oldBars = new Set(g.querySelectorAll('.cfb'));
+    g.insertAdjacentHTML('beforeend', dh + bh);
+    barWidths([...g.querySelectorAll('.cfb')].filter(b => !oldBars.has(b)));
+  }
+  firstLabels(g);
+  const newRows = fitSizes((nat || weekNeeds(viewDays(g))).slice(ni, ni + n), g.clientHeight).px;
+  const avg = [...oldRows, ...newRows].reduce((x, y) => x + y, 0) / (2 * n);
   const hOf = (rows, at, i) => i >= at && i < at + n ? rows[i - at] : null;
   const a = [], b = [];
   for (let i = 0; i < n + m; i++) {
@@ -146,19 +207,94 @@ function weekShift(dir, m = 1) {
     b.push(hOf(newRows, ni, i) ?? hOf(oldRows, oi, i) ?? avg);
   }
   const sum = (rows, k) => rows.slice(0, k).reduce((x, y) => x + y, 0);
-  const start = dir > 0 ? oldStart : ui.viewStart, s0 = sum(a, oi) + pulled, s1 = sum(b, ni);
-  weekAnim = { cancel() {}, finish: null };
-  renderCal({ start, weeks: n + m, rows: a });
+  const s0 = sum(a, oi) + pulled, s1 = sum(b, ni);
+  // The slide moves pixels instead of redrawing them, as the day view's does: the strip is laid out once, each row as
+  // tall as it gets (R), nothing scrolls, and every day and conflict bar is moved into place with a transform each
+  // frame (days are layers: css #grid .day). Only the days of rows that change height get a new height (and a
+  // repaint). (Resizing the rows and scrolling instead made the whole calendar repaint on every frame.)
+  const moving = a.map((h, i) => h !== b[i]);
+  // (rows that keep their height keep exactly it, and their days stay stretched to it: nothing in them is laid out again)
+  const R = a.map((h, i) => moving[i] ? Math.ceil(Math.max(h, b[i])) : h), T = R.map((_, i) => sum(R, i));
+  const rows = R.map(() => ({ days: [], bars: [] }));
+  for (const el of g.children) {
+    const r = parseInt(el.style.gridRowStart, 10) - 1; if (!(r >= 0 && r < R.length)) continue;
+    if (el.classList.contains('day')) rows[r].days.push(el); else if (el.classList.contains('cfb')) rows[r].bars.push(el);
+  }
+  g.style.gridTemplateRows = R.map(h => h + 'px').join(' ');
+  g.classList.add('sliding'); g.scrollTop = 0;
   if (hl) setHL(hl, true);
-  g.style.overflow = 'hidden'; g.scrollTop = s0;
-  const land = () => { weekAnim.cancel(); weekAnim = null; g.style.overflow = ''; g.scrollTop = 0; render(); };
+  const frame = (k, all) => {
+    let y = -(s0 + (s1 - s0) * k);
+    R.forEach((_, i) => {
+      const h = a[i] + (b[i] - a[i]) * k, tf = `translate3d(0,${(y - T[i]).toFixed(2)}px,0)`;
+      for (const d of rows[i].days) {
+        d.style.transform = tf;
+        // a row changing height: its days get it (the fade on days with more below, markMore, follows, so it doesn't
+        // drop out mid-slide)
+        if (moving[i]) { if (all) d.style.alignSelf = 'start'; d.style.height = h.toFixed(2) + 'px'; markMore(d.querySelector('.items')); }
+        else if (all) markMore(d.querySelector('.items'));
+      }
+      for (const c of rows[i].bars) c.style.transform = tf;
+      y += h;
+    });
+  };
+  frame(0, true);
+  // landing: the weeks that left go, the rest drop their slide styles and take the new view's rows (b, as fitRows
+  // has them). Something changed mid-slide (renderCal waited: stale): everything is redrawn instead.
+  const land = () => {
+    weekAnim.cancel(); const stale = weekAnim.stale; weekAnim = null;
+    g.classList.remove('sliding');
+    if (stale) { g.style.overflow = ''; return renderWeeks(); }
+    const lo = ni + 1, hi = ni + n;   // rows kept
+    for (const el of [...g.children]) {
+      const r = parseInt(el.style.gridRowStart, 10);
+      if (!r) continue;
+      if (r < lo || r > hi) { el.remove(); continue; }
+      if (dir > 0) el.style.gridRow = String(r - m);
+      el.style.transform = ''; el.style.height = ''; el.style.alignSelf = '';
+    }
+    firstLabels(g);
+    fitRows();                  // (still without a scrollbar: see renderCal)
+    g.style.overflow = '';
+    if (hl) setHL(hl, true);
+    laterNeighbours();
+  };
   weekAnim.finish = land;
-  weekAnim.cancel = tween(WEEK_SLIDE_MS + 50 * (m - 1), k => {
-    g.style.gridTemplateRows = a.map((h, i) => (h + (b[i] - h) * k).toFixed(2) + 'px').join(' ');
-    g.scrollTop = s0 + (s1 - s0) * k;
-  }, land).cancel;
+  weekAnim.cancel = tween(WEEK_SLIDE_MS + 50 * (m - 1), k => frame(k), land).cancel;
 }
-// scrolling the calendar: a week per swipe. A scroll that starts inside a day with more tasks than fit scrolls that day's list instead.
+/* The weeks just before and after the view are built ahead (.nb .above / .below), once things are quiet after a redraw
+   or a slide: out of the layout, just past the top and bottom edges, where the grid clips them. A step then only has
+   to turn the arriving one into an ordinary week. A full redraw (renderCal) drops them. */
+let nbTimer = 0;
+const laterNeighbours = () => { clearTimeout(nbTimer); nbTimer = setTimeout(buildNeighbours, 60); };
+function buildNeighbours() {
+  const g = $('#grid');
+  if (weekAnim || drag || calStale || ui.dayView || admOpen || !g.clientHeight) return;
+  const days = viewDays(g); if (days.length !== ui.weeks * 7) return;
+  const rows = rowHeights(); g.style.setProperty('--nbh', (rows.reduce((x, y) => x + y, 0) / rows.length).toFixed(1) + 'px');
+  for (const [side, ws] of [['above', addDays(ui.viewStart, -7)], ['below', addDays(ui.viewStart, 7 * ui.weeks)]]) {
+    if (g.querySelector(`:scope > .day.nb.${side}`)) continue;
+    const { days: dh, bars: bh } = calWeeksHTML(ws, 1, side === 'above' ? 0 : 1);   // (above: its first day says the month)
+    const f = document.createRange().createContextualFragment(dh + bh);
+    for (const el of f.children) { el.classList.add('nb', side); el.style.gridRow = '1 / -1'; if (weekPull) el.style.translate = `0 ${-weekPull}px`; }
+    const bars = [...f.querySelectorAll('.cfb')];
+    g.appendChild(f);
+    barWidths(bars);
+  }
+}
+// the pull: while a swipe builds up, the days (and the week beyond, built ahead) follow it with resistance, without
+// the grid's edges moving, so the coming week shows; let go early and they spring back (settle)
+let weekPull = 0;
+function setPull(px, settle) {
+  const g = $('#grid'); weekPull = px;
+  g.classList.toggle('settle', !!settle);
+  const tr = px ? `0 ${-px}px` : '';
+  for (const el of g.children) if (el.classList.contains('day') || el.classList.contains('cfb')) el.style.translate = tr;
+}
+// scrolling the calendar: a week per swipe. The swipe pulls the days along (setPull); once it has scrolled WEEK_PULL
+// px, the calendar takes the same step as ‹ › and the arrow keys, on from where the pull got to. A scroll that starts
+// inside a day with more tasks than fit scrolls that day's list instead; once the list has reached its end, a fresh
+// push (not the swipe's momentum) and another WEEK_PULL change the week.
 const weekWheel = wheelSteps({
   pull: WEEK_PULL,
   skip: e => ui.dayView || e.ctrlKey || drag,                            // day view, pinch-zoom, or mid drag-and-drop
@@ -168,10 +304,11 @@ const weekWheel = wheelSteps({
     const it = e.target.closest && e.target.closest('.items');
     return !(it && (dy > 0 ? it.scrollTop + it.clientHeight < it.scrollHeight - 1 : it.scrollTop > 0));
   },
+  reclaim: WEEK_PULL,
   busy: () => !!weekAnim,
-  step: weekShift,
-  follow: acc => { const g = $('#grid'); g.classList.remove('settle'); g.style.transform = `translateY(${-acc * 0.35}px)`; },   // with resistance
-  back: () => { const g = $('#grid'); g.classList.add('settle'); g.style.transform = ''; weekWheel.reset(); },               // let go too early
+  step: dir => weekShift(dir),                                            // the same slide as ‹ › and the arrow keys
+  follow: acc => setPull(acc * 0.35),                                    // with resistance
+  back: () => { setPull(0, true); weekWheel.reset(); },                   // let go too early: springs back
 });
 $('main').addEventListener('wheel', weekWheel, { passive: false });
 // chips ([id, html]) in order, each run of ones selected in the sidebar wrapped in one .selrun, which draws a single
@@ -307,7 +444,7 @@ function hideLinkLine() {
   $$('#grid .chip.linkfrom').forEach(c => c.classList.remove('linkfrom'));
 }
 function showLinkLines(c) {
-  const others = c.isConnected ? c.dataset.links.split(' ').map(id => grid.querySelector(`.chip[data-id="${id}"]`)).filter(Boolean) : [];
+  const others = c.isConnected ? c.dataset.links.split(' ').map(id => grid.querySelector(`.day:not(.nb) .chip[data-id="${id}"]`)).filter(Boolean) : [];
   if (!others.length) return;
   // bring the linked tasks into view in their days' lists
   const scrolls = others.map(o => {

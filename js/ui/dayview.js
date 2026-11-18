@@ -195,7 +195,7 @@ function renderDayTimeline(box) {
       return `<div class="dv-blk ${k.done ? 'done' : ''} ${short ? 'short' : ''} ${tiny ? 'tiny' : ''}" data-id="${k.id}" data-s="${b.start}" data-d="${b.dur}"
           style="--c:${esc(colorOf(b.it.t))};top:${top}px;height:${h}px;left:calc(${b.col} * 100% / ${b.ncol} + 3px);width:calc(100% / ${b.ncol} - 6px)">
         <div class="h t"></div>
-        <div class="bi"><input type="checkbox" data-act="done" data-id="${k.id}" ${k.done ? 'checked' : ''}><span class="tt">${esc(k.title)}</span>${noteMark(k)}<span class="tmi">${fmtTime(b.start)}</span></div>
+        <div class="bi"><input type="checkbox" data-act="done" data-id="${k.id}" ${k.done ? 'checked' : ''}><span class="tt">${esc(k.title)}</span>${noteMark(k)}${tryBadge(k)}<span class="tmi">${fmtTime(b.start)}</span></div>
         <div class="tm">${fmtSpan(b.start, b.dur)} · ${esc(b.it.t.name)}</div>
         <button class="ic x" data-act="unplan" data-id="${k.id}" title="Unschedule">${ICON.x}</button>
         <div class="h b"></div></div>`;

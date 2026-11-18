@@ -90,6 +90,8 @@
 .dv-blk.short .tmi{display:block}
 .dv-blk .bi .nti{flex:none;margin:3px 0 0 -1px}   /* notes mark (ui/notes.js): beside the title, never cut off with it */
 .dv-blk.short .bi .nti{margin-top:0}
+.dv-blk .bi .try{flex:none;margin:1px 0 0}   /* "try N" (tryBadge, ui/calendar.js): likewise */
+.dv-blk.short .bi .try{margin-top:0}
 .dv-blk.short .tm{display:none}
 .dv-blk.tiny{padding-top:0;padding-bottom:0;font-size:11.5px;line-height:1.1}
 .dv-blk.tiny input{width:11px;height:11px;margin:0}

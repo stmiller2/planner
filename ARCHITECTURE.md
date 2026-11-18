@@ -63,7 +63,8 @@ js/ui/  (each view draws its part of the page and handles its own events)
   sidebar.js            tree, gear menus (task / thread / project / failed attempt), link menu, new-task boxes,
                         click-to-insert, drag and drop, quickAct; markFailed + its follow-up prompt (#ask, hideAsk); multi-select `sel` (⌘ / Shift-click, revealChips) and #selbar
                         (renderSelBar / selAct)
-  calendar.js           renderCal, fitRows, week scrolling, day drops, selRuns, next-day link lines; failChip, tryBadge
+  calendar.js           renderCal (calWeeksHTML), fitRows (weekNeeds + fitSizes), week scrolling (weekShift), day drops, selRuns, next-day link lines;
+                        failChip, tryBadge
   conflicts.js          sidebar conflicts + form, dragging conflict bars, conflict hover
   dialogs.js            Help and Settings
   timeline-data.js      admireData(): lanes, spans, per-day counts. Unordered threads are `loose` lanes drawn on
@@ -77,7 +78,7 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         ntWants: short day-view blocks get the note too
   scratch.js            scratch board (third column of #app): edits, resize, open / close (prefs scratchCal,
                         scratchDay, scratchRemember, scratchOpen), width ui.scw / --scw
-  app.js                render(), header (view switcher, ‹ Today ›, weekShift / daySlide), sidebar width, theme,
+  app.js                render(), renderWeeks() (header + calendar only), header (view switcher, ‹ Today ›, weekShift / daySlide), sidebar width, theme,
                         global click / change / dblclick / keydown dispatch (data-act="…"), contextmenu → task menu
 js/storage.js           start(), loading + saving in the three storage modes, conflicts, backups
 js/main.js              calls start(); loaded last
@@ -227,6 +228,30 @@ Four places can need text when something changes. Update them only where the cha
 - Non-passive `wheel` listeners only on the calendar (`main`) and day-view timeline (`.dv-main`); keep natively
   scrolling lists free of them.
 - Redraws preserve each calendar day's and list's scroll position (renderCal).
+- Week steps (weekShift, navToday): the slide works like the day view's. It adds only the arriving weeks to the days
+  already shown (`calWeeksHTML`, each week self-contained: its conflicts get their lines within the week), lays the
+  strip out once, and moves days and conflict bars into place with transforms each frame (days and bars are kept as
+  layers: css `#grid .day`). Only days of rows changing height get a new height. Landing drops the weeks that left
+  and renumbers grid rows (no redraw); if anything changed mid-slide (renderCal waits: `weekAnim.stale`) it redraws
+  in full. The result must equal a full redraw (labels via `firstLabels`). The new view's heights come from the strip
+  (`weekNeeds` -> `fitSizes`, the sizing fitRows uses), so the landing matches the slide's last frame. Keep it that
+  way: no full redraw or reflowing resize per frame, and row sizing only in fitSizes. Heights must not depend on the
+  row's own height: in a day only `.items` may shrink (`.dn` / `.cf-gap` are flex: none), `.items` keeps its
+  scrollbar room (scrollbar-gutter), and the grid is measured with overflow hidden. Other week changes use
+  `renderWeeks()` (header + calendar, not the sidebar).
+- The weeks just before and after the view are built ahead (`buildNeighbours`, shortly after each redraw or slide):
+  `.day.nb` / `.cfb.nb`, `.above` / `.below`, positioned out of the layout just past the grid's clipped edges. A step
+  turns the arriving week into an ordinary one instead of building it. Anything reading the view's days must skip `.nb` (`viewDays()`, which also sorts them by
+  date: page order isn't date order after a slide). Days give an explicit column span (`c / c+1`): a positioned
+  grid item with only a start line stretches to the grid's edge.
+- Calendar swipes: the swipe pulls the days along with resistance (`setPull`, 0.35: the days and the week built
+  beyond move, not the grid, so the coming week shows; let go early and they spring back). Past WEEK_PULL px it
+  takes the same step as ‹ › and the arrow keys (`weekShift(dir)`, plain ease-out), on from where the pull got to.
+- Calendar wheel: a gesture starting over a day's list that can scroll scrolls the list; once the list is at its end,
+  the gesture is taken over (`reclaim` in wheelSteps, ui/dom.js), locked like after a step: only a fresh push (speed
+  rising, not the swipe's momentum) and one more pull then change the week.
+- A conflict bar's room (`.cf-gap`, `daySlots` in renderCal) is kept only on the days the bar covers, tall enough
+  for the lowest bar over that day.
 - The calendar's gap must open where the drop would actually land, which for a day holding failed attempts is not
   index order: ask `dayDropBefore(day, ids)` (core/model.js), never work it out from the chips on screen.
 - A failed attempt's chip is draggable only while its task is unscheduled, and dropping it back on itself cancels
@@ -254,13 +279,24 @@ Data is never in the repo (.gitignore). `start()` (js/storage.js) picks a mode:
 The online version is `server` mode too: worker/index.js speaks the same /api/data protocol and adds
 `X-Planner-Hosted` / `X-Planner-User`, read into `server.hosted` / `server.user`. Code that differs online checks
 `MODE === 'server' && server.hosted` (Help, Settings > Data file: account, Export / Import, Sign out; the conflict
-prompt's wording). Online only, changes that couldn't be saved (signed out: Access answers with a redirect, seen
+prompt's wording; the account button in the header, `#acctBtn`, shown by `server.open`, its menu `openAccount` in
+ui/app.js). Online only, changes that couldn't be saved (signed out: Access answers with a redirect, seen
 as `opaqueredirect`; offline; tab closed) are kept in localStorage `planner.pending` and offered back on the next
 load (`keepPending` / `offerPending`). Version tags come from `X-Planner-Version` when present (`server.tagOf`).
 
 Shared logic (read, reject invalid JSON, save 350 ms after a change, "changed on disk" prompt, reload on focus) is
 written once; the `server` and `folder` objects only implement read / write / poll. `backups/` in the data folder
 keeps one copy per day (last 14), made by the server or, in fs mode, the page.
+
+## Settings
+
+The Settings-window preferences (`setting: true` in UI_PREFS, js/core/prefs.js) are saved in the plan as
+`state.settings`, so they follow the plan to every browser and device; the rest of `ui` (layout, theme) stays in each
+browser's localStorage. The plan's copy wins: `render()` applies it first (`planSettings` -> `settingsFromPlan`), so
+code (and tests) must change a setting through `applySetting`, which writes it to the plan (`settingsToPlan`) and
+saves; setting `ui.x` directly is undone by the next redraw. A plan without settings takes the browser's when it's
+opened (`adopt`). Undo / redo leave settings alone (`keepSettings`); an imported file without settings keeps the
+current ones. New setting: add it to UI_PREFS with `setting: true`; nothing else is needed for it to travel.
 
 ## Online (Cloudflare)
 
@@ -308,7 +344,8 @@ separate; Export / Import (Settings > Data file) moves a plan between them.
    `npx wrangler dev`, then http://localhost:8787 (signed in as test@localhost, with a test database kept in
    .wrangler/). The first time, and after adding a migration, run `npx wrangler d1 migrations apply planner --local`
    before `wrangler dev`.
-3. If the change adds a file to migrations/: run `npx wrangler d1 migrations apply planner --remote` before pushing.
+3. If the change adds a file to migrations/: run `npx wrangler d1 migrations apply planner --remote` before pushing
+   (a push deploys code only; it never changes the database). Most changes don't touch migrations/.
    A migration must also work with the code that is live until the push deploys: add tables or columns; don't
    rename or drop them in the same change.
 4. Commit and push to main. Workers Builds deploys it in a minute or two; the dashboard (Workers & Pages > planner >

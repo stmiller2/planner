@@ -144,3 +144,21 @@ test('loading keeps task notes, and drops empty or non-text ones', () => {
   assert.ok(!('notes' in P.findTask('b').task));
   assert.ok(!('notes' in P.findTask('c').task));
 });
+
+test('settings travel with the plan: kept by loading, applied from it, written back, not undone', () => {
+  const P = load(plan([TH('t', [T('a', '2026-11-02')])], { settings: { clock: '24', weekStart: 0, snap: 7, junk: 1 } }), { prefs: { clock: '12' } });
+  assert.deepStrictEqual(j(P.state.settings), { clock: '24', weekStart: 0, snap: 7, junk: 1 });   // loading keeps them as they are
+  assert.deepStrictEqual(j(P.settingsFromPlan()).sort(), ['clock', 'weekStart']);              // applied (snap 7 isn't a valid value)
+  assert.strictEqual(P.ui.clock, '24'); assert.strictEqual(P.ui.snap, 15);
+  assert.strictEqual(JSON.parse(P.store['planner.ui']).clock, '24');                           // and kept in this browser too
+  assert.deepStrictEqual(j(P.settingsFromPlan()), []);                                         // nothing left to apply
+  P.run("mutate(() => { findTask('a').task.title = 'b'; })");
+  P.run("ui.clock = '12'"); assert.strictEqual(P.settingsToPlan(), true);                      // changed here: the plan gets it
+  assert.strictEqual(P.state.settings.clock, '12'); assert.ok(!('junk' in P.state.settings));
+  assert.strictEqual(P.settingsToPlan(), false);                                               // (unchanged: no save needed)
+  P.run('undo()');                                                                             // undoing the edit…
+  assert.strictEqual(P.findTask('a').task.title, 'a');
+  assert.strictEqual(P.state.settings.clock, '12');                                            // …leaves the settings alone
+  const Q = load({ projects: [], settings: 'nope' });
+  assert.ok(!('settings' in Q.state));
+});

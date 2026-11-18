@@ -81,6 +81,12 @@ select{border:1px solid var(--line);background:var(--panel);border-radius:7px;pa
 .switch input:checked + .track::after{transform:translateX(12px)}
 .switch input:checked ~ span:last-child{color:var(--ink)}
 .switch input:focus-visible + .track{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+/* online: the account button (first letter of the signed-in address) and its menu (openAccount) */
+#acctBtn{flex:none;width:26px;height:26px;margin-left:4px;border:0;border-radius:50%;background:var(--accent);color:#fff;font-size:12.5px;font-weight:650;cursor:pointer;display:grid;place-items:center;padding:0;line-height:1}
+#acctBtn[hidden]{display:none}
+#acctBtn:hover{filter:brightness(1.1)}
+#menu .acct-hd{padding:6px 9px 7px;font-size:11px;color:var(--muted)}
+#menu .acct-hd b{display:block;margin-top:2px;font-size:13px;font-weight:600;color:var(--ink);word-break:break-all}
 #status{border:0;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;padding:4px 6px;border-radius:6px;white-space:nowrap}
 #status:hover{background:var(--hover)}
 #status::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--muted)}

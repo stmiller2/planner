@@ -3,20 +3,35 @@ main{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden
 #dow,#grid{display:grid}
 #dow{border-bottom:1px solid var(--line);background:var(--panel);position:relative;z-index:2}
 #dow div{padding:6px 8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;overflow:hidden;white-space:nowrap}
-#grid{flex:1;overflow:auto;min-height:0;will-change:transform}
-#grid.settle{transition:transform .18s ease-out,opacity .18s ease-out}
+#grid{flex:1;overflow:hidden;min-height:0;position:relative}
+/* a pull let go too early springs back (setPull) */
+#grid.settle>.day,#grid.settle>.cfb{transition:translate .18s ease-out}
+/* the weeks either side, built ahead (buildNeighbours): out of the layout, just past the top / bottom edge */
+#grid>.nb{position:absolute;left:0;right:0}
+#grid>.day.nb{height:var(--nbh,200px)}
+#grid>.nb.below{top:100%}
+#grid>.nb.above{top:calc(-1 * var(--nbh,200px))}
+/* week slides (weekShift) move days and conflict bars as layers: kept as layers, so a slide's start and landing don't
+   repaint the whole calendar */
+#grid .day,#grid .cfb{will-change:transform}
 .day{border-right:1px solid var(--cal-line);border-bottom:1px solid var(--cal-line);padding:4px 5px 8px;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;position:relative}
-.day:nth-child(7n){border-right:0}
+.day.l7{border-right:0}
 .day.we{background:var(--weekend)}
 .day.more::after{content:'';position:absolute;left:0;right:0;bottom:0;height:22px;pointer-events:none;background:linear-gradient(to bottom,transparent,var(--bg))}
 .day.we.more::after{background:linear-gradient(to bottom,transparent,var(--weekend))}
 .dn{font-size:12px;font-weight:600;color:var(--cal-num);padding:1px 2px 4px;display:flex;align-items:center;gap:6px}
+/* the date and the room kept under conflict bars never shrink, however full the week: only the task list gives way
+   (fitRows / weekNeeds measure from where the list starts, so that must not depend on the row's height) */
+.day>.dn,.day>.cf-gap{flex:none}
 .dn .n{padding:0 6px;border-radius:10px;line-height:19px}
 .day.past .dn{color:var(--muted);font-weight:500}
 .day.today .dn .n{background:var(--today);color:#fff}
 .day.over{background:color-mix(in srgb,var(--accent) 10%,transparent);box-shadow:inset 0 0 0 2px var(--accent)}
 /* isolation: the list is its own stacking context, so macOS overlay scrollbars draw in front of its rows */
 .items{display:flex;flex-direction:column;gap:4px;flex:1 1 auto;min-height:0;overflow-y:auto;padding:3px;margin:-3px;scrollbar-width:thin;isolation:isolate}
+/* with always-visible scrollbars, keep a full list's scrollbar room in every list: chips then wrap the same whether or not
+   the list scrolls, so a week's height (weekNeeds) doesn't depend on its row's (no effect with macOS's overlay scrollbars) */
+.items{scrollbar-gutter:stable}
 /* --cs: a thread's color as used for chip edge strips, checkboxes, highlight rings and the sidebar's dots / bars.
    Same as the thread color in light mode; toned down in dark mode so bright colors don't glare. */
 .thread,.chip,.grp,.dv-th,.dv-item,.dv-blk,#dvtip,#tpop,#ntip{--cs:var(--c)}
@@ -107,5 +122,5 @@ body.dragging .chip.failed:not([draggable="true"]){cursor:inherit}
 .try{display:inline-block;font-size:9.5px;font-weight:650;line-height:14px;padding:0 4px;border-radius:7px;margin-left:5px;vertical-align:1px;white-space:nowrap;
   color:var(--fail);background:color-mix(in srgb,var(--fail) 12%,transparent);text-decoration:none}
 .ts .try{margin-left:0}
-:root[data-theme="dark"] :is(.chip,.dv-item) .try{color:#8c1d16;background:rgba(255,255,255,.45)}
+:root[data-theme="dark"] :is(.chip,.dv-item,.dv-blk) .try{color:#8c1d16;background:rgba(255,255,255,.45)}
 .task>.try{flex:none;margin-left:0}
