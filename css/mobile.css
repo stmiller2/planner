@@ -14,18 +14,20 @@ body.mobile .views .ic{width:32px;height:30px}
 body.mobile :is(#prev,#next,.spacer,.dvcount,.hright){display:none}
 body.mobile #range{order:1;flex:1;min-width:0;padding-left:0;overflow:hidden;text-overflow:ellipsis}
 body.mobile #todayBtn{order:2}
+body.mobile #app.admon #range{visibility:visible}   /* (the Timeline's title: setRange) */
 body.mobile header [data-tip]::after{display:none}
 
 /* drawers: the sidebar (calendar, Timeline) or day view's task list (day view), from the left over a dimmed page.
-   #dayview has no z-index here, so its list can sit above #mScrim (and the calendar under day view is hidden instead) */
-body.mobile :is(aside,.dv-side){position:fixed;top:0;left:0;bottom:0;width:min(86vw,360px);z-index:45;transform:translateX(-102%);
+   #dayview and #admire have no z-index here, so their lists can sit above #mScrim (what's under them is hidden instead) */
+body.mobile :is(aside,.dv-side,.adm-side){position:fixed;top:0;left:0;bottom:0;width:min(86vw,360px);z-index:45;transform:translateX(-102%);
   transition:transform .22s cubic-bezier(.2,.8,.2,1);border-right:1px solid var(--line)}
-body.mobile #app.mdrawer:is(:not(.dayon),.admon) aside,body.mobile #app.mdrawer.dayon:not(.admon) .dv-side{transform:none;box-shadow:0 0 30px rgba(0,0,0,.25)}
+body.mobile #app.mdrawer:not(.dayon,.admon) aside,body.mobile #app.mdrawer.dayon:not(.admon) .dv-side,body.mobile #app.mdrawer.admon .adm-side{transform:none;box-shadow:0 0 30px rgba(0,0,0,.25)}
 body.mobile #mScrim{display:block;position:fixed;inset:0;z-index:44;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .22s}
 body.mobile #app.mdrawer #mScrim{opacity:1;pointer-events:auto}
-body.mobile .m-foot{display:flex;flex:none;align-items:center;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
-.m-foot .seg button{padding:4px 8px}
-.m-foot .m-wkl{font-size:12px;color:var(--muted)}
+body.mobile .m-foot{display:flex;flex-direction:column;gap:6px;flex:none;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.m-foot .m-row{display:flex;align-items:center;gap:6px}
+.m-foot .seg button{padding:4px 11px}
+.m-foot .m-wkl{flex:1;font-size:12.5px;color:var(--muted)}
 .m-foot .m-sp{flex:1}
 .m-foot .ic{width:32px;height:32px}
 .m-foot .ic svg{width:17px;height:17px}
@@ -68,3 +70,32 @@ body.mobile :is(.dv-blk,.dv-item,.dv-cfb,.dv-cfp){touch-action:pan-y;cursor:defa
 body.mobile .dv-blk :is(.h,.x){display:none}
 body.mobile .dv-item .acts{display:flex}
 body.mobile [draggable="true"]{-webkit-user-drag:none}
+
+/* Timeline: the chart across the full width (timeline.js leaves no room for the list, which is the drawer here) */
+body.mobile #admire{z-index:auto}
+body.mobile #app.admon :is(main,#dayview){visibility:hidden}
+body.mobile .adm-wrap{padding:10px 8px 28px}
+body.mobile .adm-top{justify-content:space-between;margin:0 2px 10px;flex-wrap:nowrap}
+body.mobile .adm-ctl{flex-wrap:nowrap;width:100%;justify-content:space-between;gap:8px}
+body.mobile .adm-ctl .switch{padding:4px 2px;font-size:12px}
+body.mobile .adm-ctl .seg button{padding:5px 9px;font-size:12px}
+body.mobile .adm-tl{grid-template-columns:minmax(0,1fr);padding:8px 10px 2px;border-radius:16px;box-shadow:0 14px 34px -22px rgba(0,0,0,.4)}
+body.mobile .adm-row+.adm-row{padding-top:14px}
+body.mobile .adm-row{padding-bottom:12px}
+body.mobile .adm-mon{font-size:12.5px}
+body.mobile .adm-day{font-size:10.5px}
+body.mobile :is(.adm-sres,.adm-wres){display:none}
+body.mobile .adm-foot{text-align:center;margin-top:14px}
+body.mobile #admtip{width:min(330px,calc(100vw - 16px))}
+/* the list, as a drawer */
+body.mobile .adm-side{max-height:none !important;background:var(--panel);padding:0 12px calc(12px + env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain}
+body.mobile .adm-side::before{content:'Timeline';position:sticky;top:0;z-index:1;display:block;margin:0 -12px 6px;padding:16px 16px 8px;background:var(--panel);
+  font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+body.mobile .adm-li{font-size:14px;line-height:20px;min-height:34px;padding:7px 6px 7px 0;border-radius:8px}
+body.mobile .adm-li .tw,body.mobile .adm-li .cnt{line-height:20px}
+body.mobile .adm-li .tw{width:26px;margin:-7px -4px -7px -4px;padding:7px 0;text-align:center;font-size:10px}
+body.mobile .adm-li .sw{margin-top:6px}
+body.mobile .adm-li .cnt{font-size:12.5px}
+body.mobile .adm-li.pj{font-size:15px;margin-top:10px}
+body.mobile .adm-li.pj:first-child{margin-top:0}
+body.mobile .adm-sum{font-size:12.5px;padding:10px 6px 0}

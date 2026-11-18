@@ -49,7 +49,7 @@ let admD = null;
 function renderAdmire() {
   const el = $('#admire'); if (!admOpen || !el) return;
   const anim = admAnimate; admAnimate = false;
-  const keepTop = el.scrollTop;
+  const keepTop = el.scrollTop, keepSide = ($('.adm-side', el) || {}).scrollTop || 0;
   admHideTip(true);
   const D = admD = admireDataFor(`${admRange}|${ui.admPlanned}|${todayISO()}`);
   // a lane inside a folded one (in the list or the timeline)
@@ -69,8 +69,9 @@ function renderAdmire() {
   el.innerHTML = `<div class="adm-wrap">${top}<div class="adm-tl"></div>${foot}</div>`;
   const tl = $('.adm-tl', el), cs = getComputedStyle(tl);
   const W = tl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  const LW = Math.round(ui.admSide ? clamp(ui.admSide, 120, Math.max(160, W * .5)) : clamp(W * .19, 150, 240)), GAP = 16, avail = Math.max(140, W - LW - GAP);
-  const N = diffDays(D.R1, D.R0) + 1, weeksTotal = N / 7, MIN_DW = 16, MAX_DW = 92;
+  // (mobile: the list is a drawer, mobile.js, and days stay wide enough to tap: two weeks a row on a phone)
+  const LW = MOBILE ? 0 : Math.round(ui.admSide ? clamp(ui.admSide, 120, Math.max(160, W * .5)) : clamp(W * .19, 150, 240)), GAP = MOBILE ? 0 : 16, avail = Math.max(140, W - LW - GAP);
+  const N = diffDays(D.R1, D.R0) + 1, weeksTotal = N / 7, MIN_DW = MOBILE ? 22 : 16, MAX_DW = 92;
   // one row while days can stay at least MIN_DW wide; past that, as few rows as that allows, with the weeks shared
   // out evenly (12 weeks in 2 rows = 6 + 6, not 10 + 2; 25 in 4 = 7 + 6 + 6 + 6)
   const nRows = Math.ceil(weeksTotal / Math.max(1, Math.floor(avail / (7 * MIN_DW))));
@@ -420,7 +421,8 @@ function renderAdmire() {
     <div class="adm-sres" style="left:${(parseFloat(cs.paddingLeft) + LW + GAP / 2 - 4.5).toFixed(1)}px"></div>`;
   // the list never runs taller than the timeline beside it (or the window); past that it scrolls
   const side = $('.adm-side', tl), main = $('.adm-main', tl);
-  side.style.maxHeight = Math.max(120, Math.min(main.offsetHeight, el.clientHeight - 24)) + 'px';
+  if (!MOBILE) side.style.maxHeight = Math.max(120, Math.min(main.offsetHeight, el.clientHeight - 24)) + 'px';
+  side.scrollTop = keepSide;
   el.scrollTop = anim ? 0 : keepTop;
 }
 
@@ -477,8 +479,10 @@ function admHideTip(now) {
   const go = () => { clearTimeout(admTipTimer); admTipWant = null; if (admTipFor) hoverGone('adm'); admTipFor = null; admTip.style.display = 'none'; $$('#admire .tipon').forEach(x => x.classList.remove('tipon')); };
   if (now) go(); else { clearTimeout(admTipTimer); admTipWant = null; admTipHide = setTimeout(go, 160); }
 }
-$('#admire').addEventListener('mouseover', e => { const a = e.target.closest('[data-tip]'); if (a) admShowTip(a); });
+// (mobile: taps open these lists and pick things out instead, mobile.js; a tap's emulated mouse events are ignored)
+$('#admire').addEventListener('mouseover', e => { if (MOBILE) return; const a = e.target.closest('[data-tip]'); if (a) admShowTip(a); });
 $('#admire').addEventListener('mouseout', e => {
+  if (MOBILE) return;
   const a = e.target.closest('[data-tip]'); if (!a) return;
   const to = e.relatedTarget; if (to && (a.contains(to) || admTip.contains(to))) return;
   admHideTip(false);
@@ -487,6 +491,7 @@ admTip.addEventListener('mouseenter', () => clearTimeout(admTipHide));
 admTip.addEventListener('mouseleave', e => { const to = e.relatedTarget; if (to && admTipFor && admTipFor.contains(to)) return; admHideTip(false); });
 $('#admire').addEventListener('scroll', () => admHideTip(true));
 $('#admire').addEventListener('mouseover', e => {
+  if (MOBILE) return;
   const t = e.target.closest('.adm-li[data-lk], .adm-dot, .adm-bar, .adm-tag'), host = t && (t.dataset.lk ? t : t.closest('[data-lk]')), k = host && host.dataset.lk;
   const tl = $('#admire .adm-tl'); if (!tl || tl.dataset.spot === (k || '')) return;
   tl.dataset.spot = k || '';
@@ -497,7 +502,8 @@ $('#admire').addEventListener('mouseover', e => {
 });
 $('#admire').addEventListener('click', e => {
   const f = e.target.closest('[data-admfold]');
-  if (f) { const k = f.dataset.admfold; admCollapsed.has(k) ? admCollapsed.delete(k) : admCollapsed.add(k); renderAdmire(); return; }
+  // (mobile: just the arrow folds; tapping the name jumps to it, mobile.js)
+  if (f && (!MOBILE || e.target.closest('.tw'))) { const k = f.dataset.admfold; admCollapsed.has(k) ? admCollapsed.delete(k) : admCollapsed.add(k); renderAdmire(); return; }
   const b = e.target.closest('#admRange button');
   if (b) { admRange = b.dataset.v === 'all' ? 'all' : +b.dataset.v; admAnimate = true; renderAdmire(); }
 });

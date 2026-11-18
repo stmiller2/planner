@@ -40,6 +40,7 @@ function renderHeader() {
 }
 // the dates in view, beside ‹ Today ›: the calendar's weeks, or day view's day(s) (`first` = day view's first day)
 function setRange(first = ui.dayView) {
+  if (MOBILE && admOpen) { $('#range').textContent = 'Timeline'; return; }   // (mobile: the header's title; css/mobile.css shows it)
   if (first) { $('#range').textContent = dvTitle(first); return; }
   const end = addDays(ui.viewStart, ui.weeks * 7 - 1);
   const s = parseD(ui.viewStart), e = parseD(end);

@@ -1,12 +1,14 @@
 'use strict';
 /* Mobile mode (a phone-sized window: MOBILE_MQ). The same app with a different shell, layered on the desktop code:
-   one column; the sidebar (calendar, Timeline) or day view's task list (day view) slides in as a drawer from the ☰
-   button; one-line title-only chips; full days show "…" instead of scrolling; the calendar pages sideways ui.weeks at a
+   one column; the sidebar (calendar), day view's task list (day view) or the Timeline's list of projects and threads
+   (Timeline) slides in as a drawer from the ☰ button; one-line title-only chips; full days show "…" instead of scrolling; the calendar pages sideways ui.weeks at a
    time; day view shows one day and swipes sideways a day at a time. No drag and drop or hover: a tap on a day opens it,
-   a tap on a task in day view opens its menu (which has Mark done here). Styles: css/mobile.css, all under body.mobile.
+   a tap on a task in day view opens its menu (which has Mark done here); in the
+   Timeline the chart takes the full width and a tap on a dot or day opens its list at once. Styles: css/mobile.css, all under body.mobile.
    Hooks elsewhere check MOBILE: chip / failChip / archived chips and fitRows (calendar.js), buildNeighbours and the
    calendar wheel (calendar.js), dayN (dayview.js), the day-view click / drag handlers (dayview-edit.js), setSbw and
-   navStep / navToday (app.js), openTaskMenu (sidebar.js), the notes hover (notes.js). */
+   navStep / navToday (app.js), openTaskMenu (sidebar.js), the notes hover (notes.js), renderAdmire's widths and the
+   list's fold arrows (timeline.js). */
 const MOBILE_MQ = matchMedia('(max-width: 700px), (pointer: coarse) and (max-height: 500px)');
 let MOBILE = MOBILE_MQ.matches;
 document.body.classList.toggle('mobile', MOBILE);
@@ -22,7 +24,8 @@ MOBILE_MQ.addEventListener('change', () => {
 /* ---------- header and drawers ---------- */
 $('header').insertAdjacentHTML('afterbegin', `<button class="ic" id="mBurger" aria-label="Menu">${svg('<path d="M4 6h16M4 12h16M4 18h16"/>')}</button>`);
 $('#app').insertAdjacentHTML('beforeend', '<div id="mScrim"></div>');
-// the drawer is the sidebar in the calendar and the Timeline, day view's task list in day view (css/mobile.css)
+// the drawer is the sidebar in the calendar, day view's task list in day view, the Timeline's list in the Timeline
+// (css/mobile.css)
 function mDrawer(open) { $('#app').classList.toggle('mdrawer', !!open); if (open) mFootSync(); }
 $('#mBurger').onclick = () => mDrawer(!$('#app').classList.contains('mdrawer'));
 $('#mScrim').onclick = () => mDrawer(false);
@@ -31,8 +34,8 @@ document.addEventListener('click', e => { if (MOBILE && e.target.closest && e.ta
 // the sidebar drawer's footer stands in for the header's right side: weeks shown, save status, style, Settings, Help,
 // account (online). Its buttons click the header's own (data-m), so those stay the only code for them.
 $('aside').insertAdjacentHTML('beforeend', `<div class="m-foot">
-  <div class="seg m-wk">${[1, 2, 3, 4, 5].map(n => `<button data-n="${n}">${n}</button>`).join('')}</div><span class="m-wkl">weeks</span>
-  <span class="m-sp"></span><button class="m-status" data-m="status"></button>
+  <div class="m-row"><span class="m-wkl">Weeks shown</span><div class="seg m-wk">${[1, 2, 3, 4, 5].map(n => `<button data-n="${n}">${n}</button>`).join('')}</div></div>
+  <div class="m-row"><button class="m-status" data-m="status"></button><span class="m-sp"></span>
   <button class="ic" data-m="themeBtn" aria-label="Style"></button><button class="ic" data-m="setBtn" aria-label="Settings"></button>
   <button class="btn" data-m="helpBtn" aria-label="Help">?</button><button class="m-acct" data-act="acct" aria-label="Account" hidden></button></div>`);
 function mFootSync() {
@@ -120,15 +123,22 @@ function mDir(s, W) {
   if (flick) return Math.sign(s.vx) === Math.sign(s.dx) ? -Math.sign(s.dx) : 0;
   return Math.abs(s.dx) > W * M_TURN ? -Math.sign(s.dx) : 0;
 }
+// follow one touch: its move / end listeners go on the touched element itself, which keeps getting the touch's events
+// even when a redraw takes it out of the page (they'd no longer bubble to its old ancestors)
+function mFollow(e, move, end) {
+  const tg = e.target;
+  const fin = ev => { tg.removeEventListener('touchmove', move); tg.removeEventListener('touchend', fin); tg.removeEventListener('touchcancel', fin); end(ev.type === 'touchcancel'); };
+  tg.addEventListener('touchmove', move, { passive: false });
+  tg.addEventListener('touchend', fin); tg.addEventListener('touchcancel', fin);
+}
 let mSw = null;   // a touch on the calendar that may become a swipe
 $('main').addEventListener('touchstart', e => {
-  mSw = null;
-  if (!MOBILE || ui.dayView || admOpen || mAnim || mPg || e.touches.length !== 1) return;
-  mSw = mTouch(e);
+  if (!MOBILE || ui.dayView || admOpen || mAnim || mPg || mSw || e.touches.length !== 1) return;
+  mSw = mTouch(e); mFollow(e, mCalMove, mCalEnd);
 }, { passive: true });
-$('main').addEventListener('touchmove', e => {
+function mCalMove(e) {
   if (!mSw) return;
-  if (e.touches.length !== 1) { mSw = null; if (mPg && !mAnim) mTurn(0); return; }
+  if (e.touches.length !== 1) { const s = mSw; mSw = null; if (s.axis === 'x' && mPg && !mAnim) mTurn(0); return; }
   const t = e.touches[0], dx = t.clientX - mSw.x0, dy = t.clientY - mSw.y0;
   if (!mSw.axis) {
     if (Math.hypot(dx, dy) < 8) return;
@@ -138,15 +148,13 @@ $('main').addEventListener('touchmove', e => {
   if (mSw.axis !== 'x' || !mPg) return;
   if (e.cancelable) e.preventDefault();
   mSw.dx = mPg.dx = dx; mVel(mSw, dx); mSetX(dx);
-}, { passive: false });
-const mCalEnd = () => {
+}
+function mCalEnd(cancelled) {
   const s = mSw; mSw = null;
   if (!s || s.axis !== 'x' || !mPg || mAnim) return;
   mSwipedAt = Date.now();
-  mTurn(mDir(s, mPg.W));
-};
-$('main').addEventListener('touchend', mCalEnd);
-$('main').addEventListener('touchcancel', () => { const s = mSw; mSw = null; if (s && s.axis === 'x' && mPg && !mAnim) mTurn(0); });
+  mTurn(cancelled ? 0 : mDir(s, mPg.W));
+}
 
 /* ---------- day view ---------- */
 // sideways swipes over the timeline: the day before and after follow the finger (enterStrip / setStripX, dayview.js);
@@ -154,32 +162,29 @@ $('main').addEventListener('touchcancel', () => { const s = mSw; mSw = null; if 
 let mDs = null;
 const dvBox = $('#dayview');
 dvBox.addEventListener('touchstart', e => {
-  mDs = null;
-  if (!MOBILE || !ui.dayView || admOpen || dayAnim || dv || e.touches.length !== 1 || !e.target.closest('.dv-main')) return;
-  mDs = mTouch(e);
+  if (!MOBILE || !ui.dayView || admOpen || dayAnim || dv || mDs || e.touches.length !== 1 || !e.target.closest('.dv-main')) return;
+  mDs = mTouch(e); mFollow(e, mDayMove, mDayEnd);
 }, { passive: true });
-dvBox.addEventListener('touchmove', e => {
-  if (!mDs) return;
+function mDayMove(e) {
+  if (!mDs || mDs.axis === 'y') return;   // (an up / down drag: the hours scroll as usual)
   const t = e.touches[0], dx = t.clientX - mDs.x0, dy = t.clientY - mDs.y0;
   if (!mDs.axis) {
     if (Math.hypot(dx, dy) < 8) return;
     mDs.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-    if (mDs.axis === 'y') { mDs = null; return; }   // the hours scroll as usual
+    if (mDs.axis === 'y') return;
     enterStrip();
   }
   if (!dayStrip) return;
   if (e.cancelable) e.preventDefault();
   mDs.dx = clamp(dx, -dayStrip.W, dayStrip.W); mVel(mDs, dx);
   setStripX(dayStrip.W - mDs.dx);
-}, { passive: false });
-const mDayEnd = () => {
+}
+function mDayEnd(cancelled) {
   const s = mDs; mDs = null;
-  if (!s || !dayStrip || dayAnim) return;
-  const dir = mDir(s, dayStrip.W);
+  if (!s || s.axis !== 'x' || !dayStrip || dayAnim) return;
+  const dir = cancelled ? 0 : mDir(s, dayStrip.W);
   if (dir) daySlide(dir); else glide(dayStrip.W, 180, () => exitStrip(null));
-};
-dvBox.addEventListener('touchend', mDayEnd);
-dvBox.addEventListener('touchcancel', () => { mDs = null; if (dayStrip && !dayAnim) glide(dayStrip.W, 180, () => exitStrip(null)); });
+}
 // a tap on a task (timeline block or list item) opens its menu; on a failed attempt, the attempt's menu.
 // (stopPropagation: the document's click handler would close the menu straight away)
 dvBox.addEventListener('click', e => {
@@ -191,3 +196,30 @@ dvBox.addEventListener('click', e => {
   else return;
   e.stopPropagation();
 });
+
+/* ---------- Timeline ---------- */
+// a tap on a dot, a day in the wave or the "without a date" line opens its list straight away (on desktop it waits for
+// the pointer to rest); a tap anywhere else closes it. A tap on a name in the drawer's list closes the drawer and
+// brings that thread or project into view, picked out as hovering it would (its arrow still folds it: timeline.js)
+$('#admire').addEventListener('click', e => {
+  if (!MOBILE) return;
+  const li = e.target.closest('.adm-side .adm-li');
+  if (li) { if (!e.target.closest('.tw')) { mDrawer(false); mAdmSpot(li.dataset.lk, li.classList.contains('pj')); } return; }
+  const a = e.target.closest('[data-tip]');
+  if (a) { clearTimeout(admTipTimer); admTipWant = null; admPlaceTip(a); }
+  else admHideTip(true);
+  // and picks out the thread under the tap (a dot, bar or name), or nothing
+  const t = e.target.closest('.adm-dot, .adm-bar, .adm-tag'), host = t && (t.dataset.lk ? t : t.closest('[data-lk]'));
+  mAdmSpot(host ? host.dataset.lk : null, false, false);
+});
+// pick out thread / project k (null: nothing), as hovering it does on desktop; scroll: bring its first lane into view
+function mAdmSpot(k, proj, scroll = true) {
+  const tl = $('#admire .adm-tl'); if (!tl) return;
+  $$('.hl, .hl2', tl).forEach(x => x.classList.remove('hl', 'hl2'));
+  tl.dataset.spot = k || ''; if (!k) return;
+  const q = `[data-lk="${CSS.escape(k)}"]`;
+  $$(q, tl).forEach(x => x.classList.add('hl'));
+  if (proj) $$(`[data-pk="${CSS.escape(k)}"]:not(.hl)`, tl).forEach(x => x.classList.add('hl2'));
+  const first = $('.adm-main ' + q, tl) || (proj && $(`.adm-main [data-pk="${CSS.escape(k)}"]`, tl));
+  if (first && scroll) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}

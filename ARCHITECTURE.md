@@ -62,7 +62,9 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         the sidebar, or day view's list in day view) with a footer standing in for the header's right
                         side; "…" for full days (`mClip`); tap a day → openDay; sideways paging of ui.weeks weeks
                         (`mPages` / `mTurn` / `mPage`); day-view touch swipes (enterStrip / setStripX / daySlide);
-                        tap a day-view task → its menu. Loaded right after dom.js
+                        tap a day-view task → its menu; Timeline: the list (.adm-side) is the drawer, a tap opens a
+                        dot's / day's list at once and picks out its thread (`mAdmSpot`), a name in the drawer jumps
+                        to its lane. Loaded right after dom.js
   dragdrop.js           HTML5 drag state `drag` (drag.ids = a dragged selection), shared by sidebar and calendar;
                         Option-drop; gapH, drag.h / drag.ch (gap heights), dragSrc (dimmed source rows / chips)
   archive.js            Archive window
@@ -169,7 +171,7 @@ for live preview) must call `touch()`.
 | loading / saving online, accounts | `load` / `save` / `signedInEmail` (worker/index.js), `server` (js/storage.js); keep /api/data the same as serve_planner.py |
 | which files go online | `FILES` / `DIRS` in worker/build.js |
 | reading old files | `migrate` / `migThread` (core/model.js) |
-| mobile layout or touch | ui/mobile.js, css/mobile.css; hooks that check `MOBILE`: `chip` / `failChip` / archived chips (`mChip`), `fitRows`, `buildNeighbours`, `weekWheel` (calendar.js), `dayN` (dayview.js, one day), the day-view click / pointerdown handlers (dayview-edit.js), `setSbw`, `navStep` / `navToday`, `setRange` (app.js), `openTaskMenu` (Mark done), the notes hover (notes.js) |
+| mobile layout or touch | ui/mobile.js, css/mobile.css; hooks that check `MOBILE`: `chip` / `failChip` / archived chips (`mChip`), `fitRows`, `buildNeighbours`, `weekWheel` (calendar.js), `dayN` (dayview.js, one day), the day-view click / pointerdown handlers (dayview-edit.js), `setSbw`, `navStep` / `navToday`, `setRange` (app.js), `openTaskMenu` (Mark done), the notes hover (notes.js), `renderAdmire` (no list column, wider days), the Timeline's hover handlers and fold arrows (timeline.js) |
 
 Styles for each are in the matching css/ file.
 
@@ -254,7 +256,8 @@ Four places can need text when something changes. Update them only where the cha
 - Mobile (`MOBILE`): no drag and drop, no hover, no week slide. Day view always shows one day: read `dayN()`, never
   `ui.dayCount`, for what's on screen. Touch gestures attach their move / end listeners to the touched element
   (`mFollow`), because a redraw mid-gesture (enterStrip) removes it from the page and its events stop bubbling.
-  `#dayview` has no z-index on mobile (so its list drawer can sit above #mScrim); the calendar under it is hidden.
+  `#dayview` and `#admire` have no z-index on mobile (so their list drawers can sit above #mScrim); what's under them
+  is hidden instead. The Timeline ignores mouseover on mobile: a tap's emulated mouse events would undo what the tap picked out.
   Conflict bars' top (CF_TOP) assumes a day's padding and `.dn` height, which mobile.css keeps.
 - Calendar swipes: the swipe pulls the days along with resistance (`setPull`, 0.35: the days and the week built
   beyond move, not the grid, so the coming week shows; let go early and they spring back). Past WEEK_PULL px it
