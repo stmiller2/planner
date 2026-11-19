@@ -35,7 +35,7 @@ body.mobile #app.mdrawer:not(.admon) aside,body.mobile #app.mdrawer.admon .adm-s
 body.mobile #mScrim{display:block;position:fixed;inset:0;z-index:44;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .22s}
 body.mobile #app.mdrawer #mScrim{opacity:1;pointer-events:auto}
 body.mobile .m-bar{display:flex;flex-direction:column;gap:8px;flex:none;order:-1;padding:calc(10px + env(safe-area-inset-top)) 10px 12px;border-bottom:1px solid var(--line)}
-body.mobile aside .m-bar + .sb-head{padding-top:18px}   /* (some room between the bar and the projects) */
+body.mobile aside .m-bar + .sb-head{padding-top:30px}   /* (some room between the bar and the projects) */
 .m-bar .m-row{display:flex;align-items:center;gap:6px}
 .m-bar .seg button{padding:4px 11px}
 .m-bar .m-wkl{flex:1;font-size:12.5px;color:var(--muted)}
@@ -60,7 +60,7 @@ body.mobile #menu::before{content:'';position:absolute;top:6px;left:50%;width:36
 .m-mh-t span{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.mobile #ntip{z-index:60;max-width:calc(100vw - 16px)}
 /* the warning bar and toasts: across the screen (centred with left:50%, they could only be half its width) */
-body.mobile :is(#warn,#toast){left:8px;right:8px;transform:none;max-width:none}
+body.mobile :is(#warn,#toast){left:8px;right:8px;transform:none;max-width:none;z-index:50}   /* (over the drawer: what was done there can be undone there) */
 body.mobile #warn{bottom:calc(10px + env(safe-area-inset-bottom));max-height:45dvh;overflow-y:auto}
 body.mobile #warn .msg{flex:1;min-width:0}
 body.mobile #toast{top:68px}
@@ -87,6 +87,9 @@ body.mobile .grp{border-radius:3px}
 body.mobile .m-hid{display:none !important}
 body.mobile .m-more{flex:none;height:11px;font-size:13px;line-height:6px;color:var(--muted);text-align:center;font-weight:700;letter-spacing:.15em}
 /* no room below the one chip shown: over its bottom corner */
+/* (a bigger target than it looks) */
+body.mobile .m-more{position:relative}
+body.mobile .m-more::before{content:'';position:absolute;inset:-8px -6px}
 body.mobile .m-more.on{position:absolute;right:2px;bottom:2px;height:auto;padding:1px 3px 5px;line-height:6px;border-radius:5px;background:var(--bg);z-index:1}
 body.mobile #grid .cfb{pointer-events:none;font-size:10px}   /* (taps reach the day under the bar) */
 body.mobile .cfb .h{display:none}
@@ -144,7 +147,6 @@ body.mobile .adm-sum{font-size:12.5px;padding:10px 6px 0}
 body.mobile #tree{padding:0}
 .mt{padding:2px 8px 18px}
 .mt-row{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 10px 0 4px;border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
-.mt-row:active,.mt-task:active,.mt-run:active{background:var(--hover)}
 .mt-chev{flex:none;width:22px;height:22px;display:grid;place-items:center;color:var(--muted)}
 .mt-chev svg{width:16px;height:16px;transition:transform .22s cubic-bezier(.2,.8,.2,1)}
 .mt-node:not(.closed)>.mt-row .mt-chev svg{transform:rotate(90deg)}
@@ -173,6 +175,29 @@ body.mobile #tree{padding:0}
 .mt-d:empty{display:none}
 .mt-run{padding:8px 10px 8px 33px;border-radius:9px;font-size:13px;color:var(--muted);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .mt-empty{padding:8px 10px;font-size:13px;color:var(--muted)}
+/* "Add task" at the end of each thread (and of day view's list) */
+.mt-add{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px 8px 6px;border:0;border-radius:9px;background:none;font:inherit;font-size:14px;color:var(--muted);text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mt-add svg{flex:none;width:18px;height:18px;padding:2px;box-sizing:border-box;stroke-width:2.2}
+.dv-madd{margin-top:4px}
+/* linked tasks, as in the desktop's sidebar: a bar down the chain, a box round the numbers of each same-day run,
+   a short line from one box to the next across a next-day link */
+.mt-task{position:relative}
+.mt-task.g::before{content:'';position:absolute;left:-9px;top:0;bottom:0;width:3px;background:var(--c)}
+.mt-task.gs::before{top:10px;border-radius:2px 2px 0 0}
+.mt-task.ge::before{bottom:10px;border-radius:0 0 2px 2px}
+.mt-n.nb{position:relative;align-self:stretch;margin:-9px 0;padding:10px 3px 0;min-width:16px;text-align:center;box-sizing:border-box}
+.mt-n.nb::before{content:'';position:absolute;inset:0;border-left:1.5px solid color-mix(in srgb,var(--c) 65%,transparent);border-right:1.5px solid color-mix(in srgb,var(--c) 65%,transparent);pointer-events:none}
+.mt-n.nbs::before{top:6px;border-top:1.5px solid color-mix(in srgb,var(--c) 65%,transparent);border-radius:5px 5px 0 0}
+.mt-n.nbe::before{bottom:6px;border-bottom:1.5px solid color-mix(in srgb,var(--c) 65%,transparent);border-radius:0 0 5px 5px}
+.mt-n.nbs.nbe::before{border-radius:5px}
+.mt-n.cin::after,.mt-n.cout::after{content:'';position:absolute;left:calc(50% - .75px);height:6px;border-left:1.5px solid color-mix(in srgb,var(--c) 65%,transparent);pointer-events:none}
+.mt-n.cin::after{top:0}
+.mt-n.cout::after{bottom:0}
+/* reordering in the tree: the lifted row's copy (.m-ghost), its old place dimmed, a line where it would go */
+.mt-ghost{background:var(--panel);border-radius:9px}
+#tree .mt-task.dragsrc{opacity:.35}
+#mTreeLine{position:fixed;z-index:71;display:none;height:2px;border-radius:1px;background:var(--accent);pointer-events:none}
+#mTreeLine::before{content:'';position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
 @media (prefers-reduced-motion: reduce){.mt-body,.mt-in,.mt-chev svg{transition:none}}
 
 /* typing a date or a name (mAsk, mobile.js): a card at the top, clear of the keyboard */
@@ -183,6 +208,8 @@ body.mobile #tree{padding:0}
 .ma-h{font-size:17px;font-weight:700}
 .ma-sub{margin-top:2px;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ma-in{display:block;width:100%;margin-top:12px;padding:10px 12px;font-size:17px;border:1px solid var(--line);border-radius:10px;background:var(--bg);outline:none}
+.ma-sel{display:block;width:100%;max-width:100%;margin-top:12px;padding:9px 30px 9px 12px;font-size:16px;color:var(--text);text-overflow:ellipsis;border:1px solid var(--line);border-radius:10px;
+  background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;-webkit-appearance:none;appearance:none}
 .ma-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
 .ma-hint{min-height:18px;margin:6px 2px 0;font-size:13px;color:var(--muted)}
 .ma-hint.bad{color:var(--danger)}
@@ -223,3 +250,11 @@ body.mobile .dv-side.rm{box-shadow:inset 0 3px 0 var(--danger),0 -10px 30px -14p
 .ma-btns .mn-del{color:var(--danger)}
 /* a box to type in smaller than 16px makes iPhones zoom the page when it's focused */
 body.mobile :is(input:not([type=checkbox]):not([type=color]):not([type=range]),textarea,select){font-size:16px}
+
+/* a week opened to show all its tasks (tap "…"): the others shrink; "Show less" at its foot puts them back */
+#grid.m-anim{transition:grid-template-rows .3s cubic-bezier(.2,.8,.2,1)}
+body.mobile #grid .day.m-foc{padding-bottom:32px}
+body.mobile .m-less{grid-column:1 / -1;align-self:end;justify-self:center;z-index:4;display:flex;align-items:center;gap:4px;margin-bottom:4px;padding:4px 12px 4px 9px;border:1px solid var(--line);border-radius:99px;
+  background:var(--panel);box-shadow:0 2px 8px rgba(0,0,0,.14);font:inherit;font-size:12px;font-weight:600;color:var(--text);-webkit-tap-highlight-color:transparent}
+body.mobile .m-less svg{width:14px;height:14px}
+@media (prefers-reduced-motion: reduce){#grid.m-anim{transition:none}}

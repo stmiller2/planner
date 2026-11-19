@@ -223,13 +223,19 @@ const orderSwitch = (act, id, on, off) => `<label class="switch mtog ${off ? 'di
 const menuBtn = (act, id, icon, label) => `<button data-act="${act}" data-id="${id}"><span class="k">${icon}</span>${label}</button>`;
 function openThreadMenu(id, btn) {
   const f = findThread(id); if (!f) return;
-  menu.innerHTML = menuBtn('add-sub', id, ICON.plus, 'Subthread') + orderSwitch('t-order', id, !isLoose(f.p, f.t), !!f.p.unordered)
+  // (mobile, from a long press on the thread in the drawer: a title bar, and adding a task and renaming, as there's
+  // no row to type in)
+  menu.innerHTML = (MOBILE ? mMenuHeadOf(f.t.name, [f.p.name, ...f.path.slice(0, -1)].join(' › '), colorOf(f.t)) + menuBtn('m-add-k', id, ICON.plus, 'Add task') + menuBtn('m-ren-t', id, M_PENCIL, 'Rename…') : '')
+    + menuBtn('add-sub', id, ICON.plus, MOBILE ? 'Add subthread' : 'Subthread') + orderSwitch('t-order', id, !isLoose(f.p, f.t), !!f.p.unordered)
     + '<hr>' + menuBtn('arch-t', id, ICON.archive, 'Archive') + menuBtn('del-t', id, ICON.trash, 'Delete');
   placeMenu(btn);
 }
 function openProjectMenu(id, btn) {
   const p = state.projects.find(x => x.id === id); if (!p) return;
-  menu.innerHTML = orderSwitch('p-order', id, !p.unordered, false)
+  const pi = state.projects.indexOf(p);   // (mobile, from a long press on the project in the drawer: what its row's buttons do on desktop)
+  menu.innerHTML = (MOBILE ? mMenuHeadOf(p.name, 'Project') + menuBtn('add-thread', id, ICON.plus, 'Add thread') + menuBtn('m-ren-p', id, M_PENCIL, 'Rename…')
+      + (pi > 0 ? menuBtn('p-up', id, ICON.up, 'Move up') : '') + (pi < state.projects.length - 1 ? menuBtn('p-down', id, ICON.down, 'Move down') : '') + '<hr>' : '')
+    + orderSwitch('p-order', id, !p.unordered, false)
     + '<hr>' + menuBtn('arch-p', id, ICON.archive, 'Archive') + menuBtn('del-p', id, ICON.trash, 'Delete');
   placeMenu(btn);
 }

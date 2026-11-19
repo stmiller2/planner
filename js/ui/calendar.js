@@ -114,7 +114,7 @@ function fitRows() {
   const H = grid.clientHeight; if (!H) return;
   // mobile: weeks sized for what they hold, titles wrapping where there's room (mFit); days that still can't show all
   // their tasks end in "…" (mClip)
-  if (MOBILE) { grid.style.gridTemplateRows = mFit(days, H).tpl; mClip(grid); return; }
+  if (MOBILE) { grid.style.gridTemplateRows = mFit(days, H).tpl; if (!grid.classList.contains('m-anim')) mClip(grid); mFocusBar(grid); return; }
   grid.style.gridTemplateRows = fitSizes(weekNeeds(days), H).tpl;
   days.forEach(d => markMore(d.querySelector('.items')));
 }
@@ -170,6 +170,7 @@ const rowHeights = () => { const ds = viewDays(); return Array.from({ length: Ma
    that are in neither view (a slide of more weeks than are shown) pass by at an average height. */
 function weekShift(dir, m = 1) {
   if (weekAnim) weekAnim.finish();
+  if (MOBILE) mFocus = null;   // (a week opened up to show all its tasks goes back to its usual size: mFocusSet)
   clearTimeout(nbTimer);
   const g = $('#grid'), pulled = weekPull;   // how far a swipe's pull already moved it: the slide goes on from there
   setPull(0);

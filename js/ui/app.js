@@ -109,6 +109,9 @@ document.addEventListener('click', e => {
     case 'k-notes': closeMenu(); if (MOBILE) mNotes(id); else editNotes(id, menuTask); break;   // (mobile: a card of its own, mobile.js)
     case 'k-day': { closeMenu(); const f = findTask(id); if (f && f.task.date) { if (admOpen) closeAdmire(); openDay(f.task.date); } break; }   // (mobile's task menu)
     case 'k-resched': closeMenu(); mReschedule(id); break;   // (mobile's task menu, mobile.js)
+    case 'm-add-k': closeMenu(); mAddTask(id); break;          // (mobile's thread / project menus)
+    case 'm-ren-t': closeMenu(); mRenameAny('t', id); break;
+    case 'm-ren-p': closeMenu(); mRenameAny('p', id); break;
     case 'k-rename': closeMenu(); mRename(id); break;
     case 'k-time': closeMenu(); openTimePop(id, 0, 0); break;   // (placed by css/mobile.css)
     case 'k-done': { closeMenu(); const f = findTask(id); if (f) mutate(() => f.task.done = !f.task.done); break; }   // (mobile's task menu)

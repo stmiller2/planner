@@ -84,7 +84,7 @@ function mBarSync() {
 }
 $('aside .m-bar').addEventListener('click', e => {
   const w = e.target.closest('.m-wk button');
-  if (w) { setPull(0); setWeekCount(+w.dataset.n); mBarSync(); return; }
+  if (w) { setPull(0); mFocus = null; setWeekCount(+w.dataset.n); mBarSync(); return; }
   const b = e.target.closest('[data-m]'); if (!b) return;
   $('#' + b.dataset.m).click(); mBarSync();
 });
@@ -198,7 +198,36 @@ let mNeed = [];
 function mFit(days, H) {
   days.forEach(d => mUnclip(d.querySelector('.items')));
   mNeed = weekNeeds(days);
-  return fitSizes(mNeed, H);
+  const n = mNeed.length, f = mFocus ? days.findIndex(d => d.dataset.date === mFocus) : -1;
+  if (mFocus && f < 0) mFocus = null;
+  days.forEach((d, i) => d.classList.toggle('m-foc', f >= 0 && Math.floor(i / 7) === Math.floor(f / 7)));   // (room kept at its foot for "Show less")
+  let px;
+  if (f < 0 || n < 2) px = fitSizes(mNeed, H).px;
+  else {   // a week opened up (mFocusSet): all it needs (and room for its "Show less"), the others crushed to share the rest
+    const w = Math.floor(f / 7), fh = Math.max(0, Math.min(mNeed[w] + M_BAR, H - M_CRUSH * (n - 1)));
+    const rest = fitSizes(mNeed.filter((_, i) => i !== w), H - fh).px;
+    px = [...rest.slice(0, w), fh, ...rest.slice(w)];
+  }
+  return { px, tpl: px.map(h => h.toFixed(1) + 'px').join(' ') };   // (px, not fr: rows can then ease from one size to another)
+}
+/* Opening up a week: a tap on a "…" makes its week as tall as all its tasks need, the other weeks crushed down to their
+   day numbers and a chip or so (M_CRUSH), with a "Show less" at its foot to put things back. Changing weeks (or how
+   many are shown) puts them back too. The rows ease to their new sizes (.m-anim); the "…" are worked out once they're there. */
+const M_CRUSH = 52, M_BAR = 30;   // M_BAR: .day.m-foc's extra padding (mobile.css)
+let mFocus = null, mAnimT = 0;   // mFocus: the first day of the week opened up
+function mFocusSet(ws) {
+  mFocus = ws; const g = $('#grid');
+  clearTimeout(mAnimT);
+  if (!MOTION()) { fitRows(); return; }
+  g.classList.add('m-anim'); fitRows();
+  mAnimT = setTimeout(() => { g.classList.remove('m-anim'); mClip(g); }, 320);
+}
+// the "Show less" under the week opened up (a grid item along the bottom of its row)
+function mFocusBar(g) {
+  const old = g.querySelector(':scope > .m-less'); if (old) old.remove();
+  if (!mFocus) return;
+  const d = g.querySelector(`:scope > .day:not(.nb)[data-date="${mFocus}"]`); if (!d) return;
+  g.insertAdjacentHTML('beforeend', `<button class="m-less" style="grid-row:${d.style.gridRowStart}">${svg('<path d="m6 15 6-6 6 6"/>')}Show less</button>`);
 }
 // the weeks built ahead (buildNeighbours): each as tall as it will be once a step brings it into view (fitted with the
 // weeks it joins), so the step doesn't resize it as it lands
@@ -216,7 +245,12 @@ function mNbFit(g) {
 // view (its number does too, through its data-act). (stopPropagation: the document's click handler would close the menu)
 let mSwipedAt = 0;
 $('#grid').addEventListener('click', e => {
-  if (!MOBILE || Date.now() - mSwipedAt < 400 || e.target.closest('[data-act], input, button')) return;
+  if (!MOBILE || Date.now() - mSwipedAt < 400) return;
+  if (e.target.closest('.m-less')) { mFocusSet(null); return; }
+  const more = e.target.closest('.m-more');
+  // ("…" in a week already opened up: some day still holds more than fits, so that day in day view)
+  if (more) { const day = more.closest('.day'); if (day) { if (day.classList.contains('m-foc')) openDay(day.dataset.date); else mFocusSet(weekStartOf(day.dataset.date)); } return; }
+  if (e.target.closest('[data-act], input, button')) return;
   const c = e.target.closest('.chip[data-id], .chip[data-fid]');
   if (c) {
     const at = { x: e.clientX, y: e.clientY };
@@ -242,7 +276,7 @@ function mCalMove(e) {
   if (!s.axis) {
     if (Math.hypot(dx, dy) < 8) return;
     s.axis = Math.abs(dy) >= Math.abs(dx) ? 'y' : 'x';
-    if (s.axis === 'y') { clearTimeout(nbTimer); buildNeighbours(); s.R = rowHeights()[0] || 100; }
+    if (s.axis === 'y') { if (mFocus) { mFocus = null; mFocusBar($('#grid')); } clearTimeout(nbTimer); buildNeighbours(); s.R = rowHeights()[0] || 100; }
   }
   if (s.axis !== 'y') return;
   if (e.cancelable) e.preventDefault();
@@ -290,8 +324,12 @@ function mDayEnd(cancelled) {
 // a tap on a task (timeline block or list item) opens its menu; on a failed attempt, the attempt's menu.
 // (stopPropagation: the document's click handler would close the menu straight away)
 dvBox.addEventListener('click', e => {
-  if (!MOBILE || e.target.closest('input, button, .inl, [data-act]')) return;
-  const el = e.target.closest('.dv-blk, .dv-item'); if (!el) return;
+  if (!MOBILE) return;
+  if (e.target.closest('.dv-madd')) { mAddTask(null, ui.dayView); return; }
+  if (e.target.closest('input, button, .inl, [data-act]')) return;
+  const el = e.target.closest('.dv-blk, .dv-item');
+  // a tap on the timeline's blank space puts the sheet away (all the way down)
+  if (!el) { if (e.target.closest('.dv-main') && !e.target.closest('.dv-conf') && mSheetH > M_PEEK + 2) mSheetSet(M_PEEK); return; }
   const at = { x: e.clientX, y: e.clientY };
   if (el.dataset.fid) openFailMenu(el.dataset.fid, at);
   else if (el.dataset.id) openTaskMenu(el.dataset.id, null, at, el);
@@ -365,7 +403,7 @@ function mAdmSpot(k, proj, scroll = true) {
    unfolds it (ui.collapsed, as on desktop) in place, without a redraw: every body is drawn, and a folded one shrinks to
    nothing (css .mt-body, grid rows 1fr → 0fr) while its chevron turns. A tap on a task opens its menu. Runs of done
    tasks fold into "+ N completed" as on desktop (Settings), opened through the same dr-toggle. */
-const M_CHEV = svg('<path d="m9 6 6 6-6 6"/>');
+const M_CHEV = svg('<path d="m9 6 6 6-6 6"/>'), M_PLUS = svg('<path d="M12 5v14M5 12h14"/>');
 const mNode = (id, cls, head, body, style = '') => `<div class="mt-node ${cls} ${ui.collapsed[id] ? 'closed' : ''}" data-mt="${id}" ${style}>
   <div class="mt-row" data-mtog="${id}"><span class="mt-chev">${M_CHEV}</span>${head}</div><div class="mt-body"><div class="mt-in">${body}</div></div></div>`;
 function mTree() {
@@ -391,12 +429,22 @@ function mThread(p, t) {
     }
     body += mTask(t, L[i].obj, loose); i++;
   }
+  body += `<button class="mt-add" data-tid="${t.id}">${M_PLUS}<span>Add task</span></button>`;   // (new tasks go at the end; a long press moves them)
   return mNode(t.id, 'mt-t', `<span class="mt-dot"></span><span class="mt-nm">${esc(t.name)}</span><span class="mt-cnt">${ks.length ? `${done}/${ks.length}` : ''}</span>`,
-    body || '<div class="mt-empty">No tasks yet</div>', `style="--c:${esc(colorOf(t))}"`);
+    body, `style="--c:${esc(colorOf(t))}"`);
 }
-const mTask = (t, k, loose) => `<div class="mt-task ${k.done ? 'done' : ''}" data-id="${k.id}"><span class="mt-ck">${k.done ? ICON.check : ''}</span>${loose ? '' : `<span class="mt-n">${t.tasks.indexOf(k) + 1}</span>`}<span class="mt-tt">${esc(k.title)}${noteMark(k)}</span><span class="mt-d">${k.done ? '' : k.date ? fmtRelative(k.date) : 'no date'}</span></div>`;
+// a task's row. Linked tasks as on desktop (renderTaskRow): a bar down the chain's left, and a box round its numbers that
+// runs through same-day links and starts afresh at a next-day one, a short line joining the boxes
+function mTask(t, k, loose) {
+  const i = t.tasks.indexOf(k), nx = t.tasks[i + 1], chain = !!(k.linkToPrev || (nx && nx.linkToPrev));
+  const cls = ['mt-task', k.done && 'done', chain && 'g', chain && !k.linkToPrev && 'gs', chain && !(nx && nx.linkToPrev) && 'ge'].filter(Boolean).join(' ');
+  const num = ['mt-n', loose && 'nn', chain && 'nb', chain && k.linkToPrev !== 'sameDay' && 'nbs', chain && !(nx && nx.linkToPrev === 'sameDay') && 'nbe',
+    k.linkToPrev === 'nextDay' && 'cin', nx && nx.linkToPrev === 'nextDay' && 'cout'].filter(Boolean).join(' ');
+  return `<div class="${cls}" data-id="${k.id}"><span class="mt-ck">${k.done ? ICON.check : ''}</span>${loose && !chain ? '' : `<span class="${num}">${loose ? '' : i + 1}</span>`}<span class="mt-tt">${esc(k.title)}${noteMark(k)}</span><span class="mt-d">${k.done ? '' : k.date ? fmtRelative(k.date) : 'no date'}</span></div>`;
+}
 $('#tree').addEventListener('click', e => {
   if (!MOBILE) return;
+  const add = e.target.closest('.mt-add'); if (add) { mAddTask(add.dataset.tid); return; }
   const r = e.target.closest('[data-mtog]');
   if (r) { const id = r.dataset.mtog, n = r.parentElement, shut = !n.classList.contains('closed'); n.classList.toggle('closed', shut); ui.collapsed[id] = shut; saveUI(); return; }
   const k = e.target.closest('.mt-task[data-id]');
@@ -477,12 +525,52 @@ function mReschedule(id) {
       mUndo(v ? `Moved to ${fmtShort(v)}` : 'Unscheduled');
     } });
 }
-function mRename(id) {
-  const f = findTask(id); if (!f) return;
-  const cur = f.task.title;
-  mAsk({ title: 'Rename', value: cur, placeholder: 'Task name', read: s => ({ ok: !!s.trim(), value: s.trim() }),
-    done: v => { const g = findTask(id); if (g && v !== cur) { mutate(() => { g.task.title = v; }); mUndo('Renamed'); } } });
+// Rename…: a task ('k'), thread ('t') or project ('p'); also what naming a new thread or project opens (startRename)
+function mRenameAny(kind, id) {
+  let cur, set, what;
+  if (kind === 'p') { const p = state.projects.find(x => x.id === id); if (!p) return; cur = p.name; what = 'Project name'; set = v => mutate(() => { p.name = v; }); }
+  else if (kind === 't') { const f = findThread(id); if (!f) return; cur = f.t.name; what = 'Thread name'; set = v => mutate(() => { f.t.name = v; }); }
+  else { const f = findTask(id); if (!f) return; cur = f.task.title; what = 'Task name'; set = v => mutate(() => { f.task.title = v; }); }
+  mAsk({ title: 'Rename', value: cur, placeholder: what, read: t => ({ ok: !!t.trim(), value: t.trim() }), done: v => { if (v !== cur) { set(v); mUndo('Renamed'); } } });
 }
+const mRename = id => mRenameAny('k', id);
+/* Adding tasks (the drawer's "Add task" under a thread, the thread's menu, or "Add task to this day" in day view's
+   sheet): a name, which thread (that one, or the last one added to), and a date if wanted (typed as anywhere else).
+   Undated, it goes at the end of the thread (addTasks); dated, where that date falls among the thread's tasks
+   (addDayTasks). Add keeps the box open for the next one; Done closes it. */
+let mLastTid = null;
+function mAddTask(tid, day) {
+  const list = allThreads(); if (!list.length) { toast('Add a project and a thread first.'); return; }
+  const first = day && dayTasks(day)[0];
+  tid = tid || (mLastTid && findThread(mLastTid) ? mLastTid : first ? first.t.id : list[0].t.id);
+  const box = $('#mAsk'), card = $('.ma-card', box);
+  card.innerHTML = `<div class="ma-h">New task</div>
+    <select class="ma-sel">${list.map(({ p, t, path }) => `<option value="${t.id}" ${t.id === tid ? 'selected' : ''}>${esc(t.name + '  ·  ' + [p.name, ...path.slice(0, -1)].join(' › '))}</option>`).join('')}</select>
+    <input class="ma-in" placeholder="Task name" spellcheck="true" enterkeyhint="done">
+    <input class="ma-in ma-when" placeholder="Date (optional): fri, 11/26, +3" spellcheck="false" autocomplete="off" enterkeyhint="done">
+    <div class="ma-hint"></div>
+    <div class="ma-btns"><button class="btn ma-no">Done</button><button class="btn primary ma-ok">Add</button></div>`;
+  const sel = $('.ma-sel', card), name = $('.ma-in', card), when = $('.ma-when', card), hint = $('.ma-hint', card);
+  if (day) when.value = fmtShort(day);
+  let added = null;
+  const date = () => parseDateText(when.value);   // '' = none, null = can't read it
+  const check = () => { const d = date(); hint.classList.toggle('bad', d === null); hint.textContent = d === null ? 'try Nov 26, 11/26, fri, td, tm, +3' : added ? `Added “${added}”` : d ? dayLabel(d) : 'No date: at the end of the thread'; return d; };
+  const add = () => {
+    const d = check(), v = name.value.trim(); if (d === null || !v) { if (!v) name.focus(); return; }
+    const t = sel.value, f = findThread(t); if (!f) return;
+    mLastTid = t; ui.collapsed[t] = false; ui.collapsed[f.p.id] = false; saveUI();
+    if (d) addDayTasks(t, [v], null, d); else { addTasks(t, [v], null); addOpen = focusAdd = null; }
+    added = v; name.value = ''; check(); name.focus();
+  };
+  const close = () => { box.classList.remove('on'); name.blur(); when.blur(); if (added) mUndo(`Added “${added}”`); };
+  when.oninput = () => { added = null; check(); };
+  name.onkeydown = when.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } else if (e.key === 'Escape') close(); };
+  card.onclick = e => { if (e.target.closest('.ma-ok')) add(); else if (e.target.closest('.ma-no')) close(); };
+  box.onclick = e => { if (e.target === box) close(); };
+  closeMenu(); box.classList.add('on'); check();
+  setTimeout(() => name.focus(), 30);
+}
+const mDayAddBtn = () => `<button class="mt-add dv-madd">${M_PLUS}<span>Add task to this day</span></button>`;
 
 /* ---------- long press: lift a task and drag it ---------- */
 /* Hold a task still for M_HOLD ms and it lifts (a little buzz where the phone can): calendar chips go to another day
@@ -492,12 +580,12 @@ function mRename(id) {
    view drag: dv, dvMove / dvUp, dayview-edit.js, fed from these touches). Let go without moving: its menu instead.
    A finger that moves before then is a swipe or a scroll, and nothing lifts. The browser's own long-press menu, and
    the click after a long press, are swallowed. */
-const M_HOLD = 380, M_LIFTABLE = '#grid .day:not(.nb) .chip[data-id], #grid .day:not(.nb) .chip[data-fid], #dayview .dv-blk[data-id], #dayview .dv-item[data-id]';
+const M_HOLD = 380, M_LIFTABLE = '#grid .day:not(.nb) .chip[data-id], #grid .day:not(.nb) .chip[data-fid], #dayview .dv-blk[data-id], #dayview .dv-item[data-id], #tree .mt-task[data-id], #tree .mt-row[data-mtog]';
 let mLp = null, mLpAt = 0, mLpEat = null;   // mLpEat: the click a held-and-let-go task may still get, to swallow
 document.body.insertAdjacentHTML('beforeend', `<div id="mDropOff">${ICON.nodate}<span>Drop here to unschedule</span></div>`);
 window.addEventListener('touchstart', e => {
   if (mLp) mLpEnd(true);
-  if (!MOBILE || e.touches.length !== 1 || mEdge || mClose || !e.target.closest) return;
+  if (!MOBILE || e.touches.length !== 1 || mEdge || !e.target.closest) return;   // (mClose may be set: a touch on the open drawer)
   const el = e.target.closest(M_LIFTABLE); if (!el || e.target.closest('input, button, .inl')) return;
   if (el.dataset.fid && !el.matches('[draggable="true"]')) return;   // a failed attempt whose task is on a day again (failChip)
   const t = e.touches[0];
@@ -517,27 +605,93 @@ function mLift() {
   s.on = true; mSw = null; mDs = null;   // (not a swipe after all)
   if (navigator.vibrate) navigator.vibrate(12);
   closeMenu(); admHideTip(true);
-  if (s.el.closest('#grid')) mCalLift(s); else mDvLift(s);
+  if (s.el.closest('#tree')) mClose = null;   // (the drawer stays put)
+  if (s.el.matches('.mt-row')) {   // a project or thread in the drawer: its menu
+    s.row = true; const id = s.el.dataset.mtog;
+    if (s.el.parentElement.classList.contains('mt-p')) openProjectMenu(id, s.el); else openThreadMenu(id, s.el);
+  } else if (s.el.closest('#tree')) mTreeLift(s);
+  else if (s.el.closest('#grid')) mCalLift(s); else mDvLift(s);
 }
 function mLpMove(e) {
   const s = mLp; if (!s) return;
   const t = e.touches[0]; s.x = t.clientX; s.y = t.clientY;
   if (!s.on) { if (Math.hypot(s.x - s.x0, s.y - s.y0) > 6) { clearTimeout(s.timer); mLp = null; } return; }
+  if (s.row) return;
   if (e.cancelable) e.preventDefault();   // (nothing scrolls under a lifted task)
   s.moved = s.moved || Math.hypot(s.x - s.x0, s.y - s.y0) > 6;
-  if (s.cal) mCalDrag(s); else mDvDrag(s);
+  if (s.tree) mTreeDrag(s); else if (s.cal) mCalDrag(s); else mDvDrag(s);
 }
 function mLpEnd(cancelled) {
   const s = mLp; mLp = null; if (!s) return;
   clearTimeout(s.timer);
   if (!s.on) return;
   mLpAt = Date.now();
-  if (s.cal) mCalDrop(s, cancelled); else mDvDrop(s, cancelled);
+  if (s.row) { mLpEat = { el: s.el, until: Date.now() + 450 }; return; }   // (its menu is open; the click would fold it)
+  if (s.tree) mTreeDrop(s, cancelled); else if (s.cal) mCalDrop(s, cancelled); else mDvDrop(s, cancelled);
   if (!cancelled && !s.moved) {   // held and let go in place: its menu (and not the click that may follow)
     mLpEat = { el: s.el, until: Date.now() + 450 };
     const at = { x: s.x, y: s.y }, el = s.el;
     if (el.dataset.fid) openFailMenu(el.dataset.fid, at); else if (findTask(el.dataset.id)) openTaskMenu(el.dataset.id, null, at, el.isConnected ? el : null);
   }
+}
+// the drawer's tree: a task lifted moves up and down (to another place in its thread, or another thread); a line shows
+// where it would go, snapping to the ends of a linked chain, which moves whole (moveTasksTo, as dropping it in the
+// desktop's sidebar); near the top or bottom, the list scrolls
+document.body.insertAdjacentHTML('beforeend', '<div id="mTreeLine"></div>');
+function mTreeLift(s) {
+  const el = s.el, r = el.getBoundingClientRect();
+  s.tree = true; s.dy = s.y0 - r.top; s.ids = movingIds(el.dataset.id, false);
+  s.ghost = el.cloneNode(true); s.ghost.classList.add('m-ghost', 'mt-ghost');
+  Object.assign(s.ghost.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+  s.ghost.style.setProperty('--c', getComputedStyle(el).getPropertyValue('--c'));
+  document.body.appendChild(s.ghost);
+  s.src = s.ids.map(k => $(`#tree .mt-task[data-id="${k}"]`)).filter(Boolean); s.src.forEach(x => x.classList.add('dragsrc'));
+  document.body.classList.add('m-lifting');
+}
+function mTreeDrag(s) {
+  s.ghost.style.top = (s.y - s.dy) + 'px';
+  const tree = $('#tree'), tr = tree.getBoundingClientRect(), Z = 48;
+  s.scrollV = s.y < tr.top + Z ? -(tr.top + Z - s.y) : s.y > tr.bottom - Z ? s.y - (tr.bottom - Z) : 0;
+  if (s.scrollV && !s.scrollRaf) {
+    const step = () => { s.scrollRaf = 0; if (mLp !== s || !s.scrollV) return; tree.scrollTop += Math.sign(s.scrollV) * Math.min(14, Math.ceil(Math.abs(s.scrollV) / 3)); mTreeAim(s); s.scrollRaf = requestAnimationFrame(step); };
+    s.scrollRaf = requestAnimationFrame(step);
+  }
+  mTreeAim(s);
+}
+function mTreeAim(s) {
+  const shown = el => !el.closest('.mt-node.closed > .mt-body');
+  let best = null;
+  for (const row of $$('#tree .mt-task[data-id]')) {
+    if (s.ids.includes(row.dataset.id) || !shown(row)) continue;
+    const r = row.getBoundingClientRect(); if (!r.height) continue;
+    for (const [side, y] of [['before', r.top], ['after', r.bottom]]) { const d = Math.abs(s.y - y); if (!best || d < best.d) best = { d, side, row }; }
+  }
+  for (const add of $$('#tree .mt-add[data-tid]')) {   // the end of a thread (an empty one too)
+    if (!shown(add)) continue; const r = add.getBoundingClientRect(); if (!r.height) continue;
+    const d = Math.abs(s.y - (r.top + r.height / 2)); if (!best || d < best.d) best = { d, add };
+  }
+  let spot = null, at = null;
+  if (best && best.d < 60) {
+    if (best.add) { spot = { tid: best.add.dataset.tid, refId: null, side: 'after' }; const r = best.add.getBoundingClientRect(); at = { y: r.top, left: r.left, width: r.width }; }
+    else {
+      const g = findTask(best.row.dataset.id);
+      if (g) {
+        const [a, b] = runOf(g.t, g.i), anchor = g.t.tasks[best.side === 'before' ? a : b], el = $(`#tree .mt-task[data-id="${anchor.id}"]`) || best.row, r = el.getBoundingClientRect();
+        spot = { tid: g.t.id, refId: anchor.id, side: best.side }; at = { y: best.side === 'before' ? r.top : r.bottom, left: r.left, width: r.width };
+      }
+    }
+    if (spot && ((spot.refId && s.ids.includes(spot.refId)) || isNoopTasks(s.el.dataset.id, false, spot))) spot = null;
+  }
+  s.spot = spot;
+  const line = $('#mTreeLine');
+  if (spot) Object.assign(line.style, { display: 'block', top: (at.y - 1) + 'px', left: at.left + 'px', width: at.width + 'px' }); else line.style.display = 'none';
+}
+function mTreeDrop(s, cancelled) {
+  cancelAnimationFrame(s.scrollRaf); s.scrollV = 0;
+  s.ghost.remove(); s.src.forEach(x => x.classList.remove('dragsrc')); document.body.classList.remove('m-lifting'); $('#mTreeLine').style.display = 'none';
+  if (cancelled || !s.moved || !s.spot) return;
+  const g0 = stateGen; moveTasksTo(s.el.dataset.id, false, s.spot);
+  if (stateGen !== g0) { if (navigator.vibrate) navigator.vibrate(8); mUndo('Task moved'); }
 }
 // calendar: a copy of the chip follows the finger; the chips of what moves with it dim where they are
 function mCalLift(s) {
@@ -606,10 +760,9 @@ function mDvDrop(s, cancelled) {
 
 /* ---------- the task menu ---------- */
 // its title bar: which task (and where it sits); it's also where the menu is swiped down from
-function mMenuHead(f) {
-  const where = [f.t.name, f.task.date ? fmtShort(f.task.date) : 'no date'].join(' · ');
-  return `<div class="m-mh" style="--c:${esc(colorOf(f.t))}"><span class="m-mh-d"></span><div class="m-mh-t"><b>${esc(f.task.title)}</b><span>${esc(where)}</span></div></div>`;
-}
+function mMenuHead(f) { return mMenuHeadOf(f.task.title, [f.t.name, f.task.date ? fmtShort(f.task.date) : 'no date'].join(' · '), colorOf(f.t)); }
+// the same for a thread or project (no color: no dot)
+const mMenuHeadOf = (title, sub, color) => `<div class="m-mh" ${color ? `style="--c:${esc(color)}"` : ''}>${color ? '<span class="m-mh-d"></span>' : ''}<div class="m-mh-t"><b>${esc(title)}</b><span>${esc(sub)}</span></div></div>`;
 /* While a menu is open, a tap anywhere outside it only closes it: nothing under the tap reacts. A tap on another task
    (chip, block, list item, the drawer's tree) still goes to it, so its menu takes this one's place. A swipe that
    starts outside closes it too, and lets the swipe through. */

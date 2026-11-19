@@ -66,7 +66,14 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         (`mBackMove` / `mBackEnd`, the calendar drawn under it: #app.m-backing); the sidebar's top bar
                         (.m-bar) stands in for the header's right side; the sidebar's own tree (`mTree`: rows fold in
                         place, no redraw); week heights (`mFit`: what each week needs, as desktop's fitSizes; the
-                        weeks built ahead sized to match, `mNbFit`) and "…" for full days (`mClip`, chip by chip); tap a chip → its menu (with Open day),
+                        weeks built ahead sized to match, `mNbFit`) and "…" for full days (`mClip`, chip by chip); a tap
+                        on "…" opens up its week (`mFocus` / `mFocusSet`: that week as tall as it needs, the others
+                        down to M_CRUSH, the rows easing over via #grid.m-anim; "Show less" at its foot, `mFocusBar`;
+                        "…" in the opened week → that day in day view; a step to other weeks puts it back); the drawer's
+                        tree: "Add task" at each thread's end and in day view's sheet (`mAddTask`: name, thread, optional
+                        date), linked tasks drawn as on desktop (`mTask`: chain bar, number boxes), a long press on a
+                        project or thread → its menu (with Add…, Rename… via `mRenameAny`), on a task → reorder
+                        (`mTreeLift` / `mTreeDrag` / `mTreeAim` / `mTreeDrop` → moveTasksTo, #mTreeLine); tap a chip → its menu (with Open day),
                         elsewhere in a day → openDay; a tap on any task gets a little press (`mTapFx`); a long press
                         lifts a task (`mLift`): calendar chips by touch (`mCalLift` / `mCalDrag` / `mCalDrop` →
                         calGapAt / calDropOn; over the header: unschedule, #mDropOff; at the edges: weekShift), day
@@ -76,7 +83,8 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         a sheet with a title bar (`mMenuHead`), swiped down to close, and while it's open a tap
                         outside it only closes it (`mMenuEat`); notes in a card of their own (`mNotes`); swipe up / down → setPull / weekShift (`mSw`); day-view touch swipes (enterStrip /
                         setStripX / daySlide); day view's list as a bottom sheet (`mSheetSet`, set per day on entering
-                        day view by `mSheetAuto`, dragged by .m-grab / its heading);
+                        day view by `mSheetAuto`, dragged by .m-grab / its heading; a tap on the timeline's blank
+                        space puts it down);
                         tap a day-view task → its menu; Timeline: the list (.adm-side) is the drawer, a tap opens a
                         dot's / day's list at once and picks out its thread (`mAdmSpot`), a name in the drawer jumps
                         to its lane. Loaded right after dom.js
@@ -186,7 +194,7 @@ for live preview) must call `touch()`.
 | loading / saving online, accounts | `load` / `save` / `signedInEmail` (worker/index.js), `server` (js/storage.js); keep /api/data the same as serve_planner.py |
 | which files go online | `FILES` / `DIRS` in worker/build.js |
 | reading old files | `migrate` / `migThread` (core/model.js) |
-| mobile layout or touch | ui/mobile.js, css/mobile.css; hooks that check `MOBILE`: `renderTree` (→ `mTree`), `openTaskMenu` (title bar, Mark done, Open day, Reschedule…, Set a time…, Rename…, View/edit notes: `k-day` / `k-resched` / `k-time` / `k-rename`, and `k-notes` → mNotes, in app.js), `buildNeighbours` (→ mNbFit), `renderDay` (the sheet's count), dvMove / dvAutoScroll (the list is a sheet along the bottom: `overSide` by y), the calendar's hover highlight, `chip` / `failChip` / archived chips (`mChip`), `fitRows`, `buildNeighbours`, `weekShift` (equal rows, "…" on arriving weeks) (calendar.js), `dayN` (dayview.js, one day), `openDay` (`mSheetAuto` when entering day view), the sheet's handle in `buildDaySkeleton`, the day-view click / pointerdown handlers (dayview-edit.js), `setSbw`, `setRange` (app.js: months only; "Timeline"), `openTaskMenu` (Mark done), the notes hover (notes.js), `renderAdmire` (no list column, wider days), the Timeline's hover handlers and fold arrows (timeline.js) |
+| mobile layout or touch | ui/mobile.js, css/mobile.css; hooks that check `MOBILE`: `renderTree` (→ `mTree`), `openThreadMenu` / `openProjectMenu` (title bar, Add task / Add thread, Rename…: `m-add-k`, `m-ren-t`, `m-ren-p` in app.js), `startRename` (dom.js: no row to type in → `mRenameAny`, so new threads and projects ask for a name), `renderDayList` (`mDayAddBtn`), `openTaskMenu` (title bar, Mark done, Open day, Reschedule…, Set a time…, Rename…, View/edit notes: `k-day` / `k-resched` / `k-time` / `k-rename`, and `k-notes` → mNotes, in app.js), `buildNeighbours` (→ mNbFit), `renderDay` (the sheet's count), dvMove / dvAutoScroll (the list is a sheet along the bottom: `overSide` by y), the calendar's hover highlight, `chip` / `failChip` / archived chips (`mChip`), `fitRows`, `buildNeighbours`, `weekShift` (equal rows, "…" on arriving weeks) (calendar.js), `dayN` (dayview.js, one day), `openDay` (`mSheetAuto` when entering day view), the sheet's handle in `buildDaySkeleton`, the day-view click / pointerdown handlers (dayview-edit.js), `setSbw`, `setRange` (app.js: months only; "Timeline"), `openTaskMenu` (Mark done), the notes hover (notes.js), `renderAdmire` (no list column, wider days), the Timeline's hover handlers and fold arrows (timeline.js) |
 
 Styles for each are in the matching css/ file.
 
@@ -276,7 +284,10 @@ Four places can need text when something changes. Update them only where the cha
   box typed into on mobile must be 16px or more (mobile.css does it for all), or iPhones zoom the page on focus. Week heights come from `mFit` both in fitRows and in weekShift's
   newRows, so a slide lands where a redraw would; it measures with the "…" taken off (`mUnclip`), so call mClip after.
   The weeks built ahead get an inline height (and, above, top) from mNbFit; weekShift clears both when one joins the
-  view, as a leftover top shifts its days out of their row.
+  view, as a leftover top shifts its days out of their row. With a week opened up (`mFocus`), fitRows also adds
+  "Show less" (`mFocusBar`, a grid item in that week's row) and its days carry `.m-foc` (32px kept at their foot,
+  M_BAR in mFit); weekShift clears mFocus first. During the rows' ease (.m-anim), fitRows skips mClip; mFocusSet runs
+  it once they've arrived.
   The sidebar's tree on mobile is `mTree`, not renderTree's: code reaching for `#tree .task` rows finds none there. Day view always shows one day: read `dayN()`, never
   `ui.dayCount`, for what's on screen. Touch gestures attach their move / end listeners to the touched element
   (`mFollow`), because a redraw mid-gesture (enterStrip) removes it from the page and its events stop bubbling.

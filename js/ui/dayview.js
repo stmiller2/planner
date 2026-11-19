@@ -143,7 +143,7 @@ function renderDayList(box, only, cur = ui.dayView) {
       <div class="dv-dh"><b>${DOW[dd.getDay()]} ${dd.getDate()}</b><span>${MON[dd.getMonth()]}${day === today ? ' · today' : ''}</span><span class="cnt">${n ? plural(n, 'task') : ''}</span></div>
       ${cfp}${sec || '<div class="dv-empty small">Nothing scheduled.</div>'}</section>`;
   });
-  listEl.innerHTML = html;
+  listEl.innerHTML = html + (MOBILE ? mDayAddBtn() : '');   // (mobile: + Add task, at the end)
   listEl.scrollTop = keepTop;
   const inp = box.querySelector('.dvadd');
   if (inp) { inp.value = keep; if (!rendering || dvAdd) inp.focus(); }

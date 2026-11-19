@@ -127,7 +127,8 @@ document.addEventListener('pointerdown', e => {
   if (inp && e.target !== inp && !e.target.closest('.dclr')) inp.blur();
 }, true);
 function startRename(kind, id, el) {
-  el = el || $(`[data-act="rename-${kind}"][data-id="${id}"]`); if (!el) return;
+  el = el || $(`[data-act="rename-${kind}"][data-id="${id}"]`);
+  if (!el) { if (MOBILE && ['k', 't', 'p'].includes(kind)) mRenameAny(kind, id); return; }   // (mobile's tree has no names to type over: a box instead)
   let cur, commit;
   if (kind === 'p') { const p = state.projects.find(x => x.id === id); cur = p.name; commit = v => mutate(() => p.name = v); }
   else if (kind === 't') { const f = findThread(id); cur = f.t.name; commit = v => mutate(() => f.t.name = v); }
