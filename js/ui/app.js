@@ -45,7 +45,10 @@ function setRange(first = ui.dayView) {
   const end = addDays(ui.viewStart, ui.weeks * 7 - 1);
   const s = parseD(ui.viewStart), e = parseD(end);
   // (mobile: just the months, and the year when it isn't this one: the day numbers say the rest)
-  if (MOBILE) { const y = e.getFullYear() !== new Date().getFullYear() ? ' ' + e.getFullYear() : ''; $('#range').textContent = (s.getMonth() === e.getMonth() ? MON[s.getMonth()] : `${MON[s.getMonth()]} – ${MON[e.getMonth()]}`) + y; return; }
+  if (MOBILE) {   // (a year that isn't this one: in full after one month, short after two, "Jan – Feb ’27", to fit)
+    const one = s.getMonth() === e.getMonth(), y = e.getFullYear() === new Date().getFullYear() ? '' : one ? ' ' + e.getFullYear() : ' ’' + String(e.getFullYear()).slice(2);
+    $('#range').textContent = (one ? MON[s.getMonth()] : `${MON[s.getMonth()]} – ${MON[e.getMonth()]}`) + y; return;
+  }
   $('#range').textContent = `${MON[s.getMonth()]} ${s.getDate()}${s.getFullYear() !== e.getFullYear() ? ', ' + s.getFullYear() : ''} – ${MON[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
 }
 

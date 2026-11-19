@@ -77,12 +77,12 @@ body.mobile #dow div{padding:4px 0;text-align:center;font-size:10px;letter-spaci
 body.mobile .day{padding:4px 2px 2px}   /* (the top padding and .dn's height match CF_TOP, where conflict bars start) */
 body.mobile .dn{padding-left:0;padding-right:0}
 body.mobile .dn .n{padding:0 4px}
-body.mobile .items{overflow:hidden;gap:3px;padding:0;margin:0;scrollbar-gutter:auto}
+body.mobile .items{overflow:hidden;gap:2px;padding:0;margin:0;scrollbar-gutter:auto}
 body.mobile .day.more::after{display:none}
 /* chips: the title on one line, cut off at the day's edge */
-/* (a little taller than they need to be, to be easy to tap and hold) */
-body.mobile .chip.m{display:block;padding:3px 2px 3px 4px;border-left-width:2px;border-radius:4px;cursor:default;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-body.mobile .chip.m .tt{font-size:11px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:clip}
+/* the title on up to two lines, cut off below that (a word too long for the day breaks, hyphenated where it can) */
+body.mobile .chip.m{display:block;padding:1px 1px 1px 3px;border-left-width:2px;border-radius:3px;cursor:default;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.mobile .chip.m .tt{font-size:10.5px;line-height:13px;max-height:26px;padding:1px 0;box-sizing:content-box;overflow:hidden;white-space:normal;overflow-wrap:break-word;-webkit-hyphens:auto;hyphens:auto}
 body.mobile .grp{border-radius:3px}
 body.mobile .m-hid{display:none !important}
 body.mobile .m-more{flex:none;height:11px;font-size:13px;line-height:6px;color:var(--muted);text-align:center;font-weight:700;letter-spacing:.15em}
@@ -202,7 +202,6 @@ body.mobile #tpop .tp-k{display:none}   /* (keyboard hints; a tap outside saves)
 
 /* a lifted task (long press: mLift, mobile.js) */
 .m-ghost{position:fixed;z-index:70;pointer-events:none;margin:0;overflow:hidden;transform:scale(1.04) rotate(-1deg);box-shadow:0 10px 24px rgba(0,0,0,.28);opacity:.96;transition:transform .15s}
-.m-ghost .tt{white-space:nowrap !important}
 .m-lifted{scale:1.03;box-shadow:0 10px 24px rgba(0,0,0,.25) !important;z-index:5;transition:scale .15s,box-shadow .15s}
 body.m-lifting,body.m-lifting *{-webkit-user-select:none;user-select:none}
 /* over the header while a chip is lifted: drop it there to unschedule */

@@ -1,14 +1,15 @@
 ## Experiment planner
 
-Vibe-coded experiment planner I use to help schedule lab work. Code is all AI-generated javascript that I haven’t read and can’t vouch for, put here for version control or if anyone else wants to use it feel free.
-
-“Help” section in the app explains how to use it.
+Vibe-coded experiment planner I use to help schedule lab work. “Help” section in the app explains how to use it.
 
 Can be accessed online from https://planner.stmiller2.workers.dev; contact me to get your email added for access. If you'd rather try it first or just run it locally, you can follow the steps below to run it off your laptop.
 
-### Install
+### Install instructions for running locally
 
-It runs off a local server on your computer bound to <http://localhost:47823/>. You need Python 3.7 or newer to run the server.
+It can be run off a local server on your computer bound to <http://localhost:47823/>.
+
+(You can also skip the server stuff and just open `Planner.html` directly in a browser, but it only saves automatically in Chrome or Edge. In other browsers, you'll need to export and import your `planner.json` by hand [this is why I prefer to use the server])
+
 To install:
    ```
    git clone https://github.com/stmiller2/planner Planner
@@ -21,9 +22,7 @@ Start the server, which from then on automatically runs when you log in:
 
 Open <http://localhost:47823/>.
 
-(You can also open `Planner.html` directly in a browser, but it only saves automatically in Chrome or Edge. In other browsers, you'll need to export and import your `planner.json` by hand [this is why I prefer to use the server])
-
-Your tasks are saved under `PlannerData/planner.json` in your home folder by default but this can be changed in settings.
+Your tasks are saved under `PlannerData/planner.json` in your home folder by default, but this can be changed in settings.
 
 Update with `git pull` (or replace the app folder with the new ZIP), then rerun the install script.
 

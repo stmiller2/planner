@@ -2,7 +2,7 @@
 /* Mobile mode (a phone-sized window: MOBILE_MQ). The same app with a different shell, layered on the desktop code:
    one column; a drawer from the left (the ☰ button, or a swipe in from the screen's left edge; swipe it back to close)
    holding the sidebar (calendar: its own tree, mTree, folded by tapping rows) or the Timeline's list of
-   projects and threads; title-only chips on one line, in weeks as tall as they need (mFit); full days show "…"
+   projects and threads; title-only chips on up to two lines, in weeks as tall as they need (mFit); full days show "…"
    instead of scrolling; a swipe up / down steps the calendar's weeks as the desktop's scroll does;
    day view shows one day, swipes sideways a day at a time, goes back to the calendar by a back button where ☰ was or
    a swipe in from the left edge (it has no drawer), and has

@@ -193,7 +193,8 @@ function weekShift(dir, m = 1) {
   $$(`:scope > .nb${ready ? ':not(.' + side + ')' : ''}`, g).forEach(el => el.remove());   // the rest aren't needed
   if (dir < 0) for (const el of g.children) if (!el.classList.contains('nb') && el.style.gridRowStart) el.style.gridRow = String(parseInt(el.style.gridRowStart, 10) + m);
   if (ready) {   // it joins the grid as an ordinary week
-    $$(':scope > .nb', g).forEach(el => { el.classList.remove('nb', 'above', 'below'); el.style.gridRow = String(dir > 0 ? n + 1 : 1); });
+    // (and drops the size it was built at, mobile: mNbFit; a leftover top would shift it out of its row)
+    $$(':scope > .nb', g).forEach(el => { el.classList.remove('nb', 'above', 'below'); el.style.gridRow = String(dir > 0 ? n + 1 : 1); el.style.top = el.style.height = ''; });
   } else {
     const { days: dh, bars: bh } = calWeeksHTML(dir > 0 ? addDays(oldStart, 7 * n) : ui.viewStart, m, dir > 0 ? n : 0);
     const oldBars = new Set(g.querySelectorAll('.cfb'));

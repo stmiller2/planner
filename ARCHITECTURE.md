@@ -40,7 +40,7 @@ css/  (one file per area; later files override earlier ones)
   dialogs.css           warning bar, toast, modals, Settings, Archive, task notes
   timeline.css          Timeline view and its hover list
   mobile.css            mobile mode (all under body.mobile; loaded last): one column, 60px header, drawer, day view's
-                        bottom sheet (--sheet-h), one-line chips, "…"
+                        bottom sheet (--sheet-h), chips of up to two lines, "…"
 
 js/core/  (no DOM; also loaded by the unit tests)
   util.js               esc, ids, date strings, formatting, colors, plural, clamp
@@ -275,6 +275,8 @@ Four places can need text when something changes. Update them only where the cha
   Notes on mobile never use #ntip: it closes on any page scroll, which an iPhone's keyboard causes as it opens. Any
   box typed into on mobile must be 16px or more (mobile.css does it for all), or iPhones zoom the page on focus. Week heights come from `mFit` both in fitRows and in weekShift's
   newRows, so a slide lands where a redraw would; it measures with the "…" taken off (`mUnclip`), so call mClip after.
+  The weeks built ahead get an inline height (and, above, top) from mNbFit; weekShift clears both when one joins the
+  view, as a leftover top shifts its days out of their row.
   The sidebar's tree on mobile is `mTree`, not renderTree's: code reaching for `#tree .task` rows finds none there. Day view always shows one day: read `dayN()`, never
   `ui.dayCount`, for what's on screen. Touch gestures attach their move / end listeners to the touched element
   (`mFollow`), because a redraw mid-gesture (enterStrip) removes it from the page and its events stop bubbling.
