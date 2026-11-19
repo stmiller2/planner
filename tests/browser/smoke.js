@@ -27,6 +27,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await page.goto(URL);
     const state = () => page.evaluate(() => JSON.parse(JSON.stringify(state)));
     const task = id => page.evaluate(id => { const f = findTask(id); return f && { ...f.task, thread: f.t.id }; }, id);
+    // a change to the selection redraws the calendar just after the click (paintSel's setTimeout 0, sidebar.js): wait
+    // for that redraw (a timer queued after it runs after it) and a frame, so what's measured next isn't replaced under us
+    const selPainted = () => page.evaluate(() => new Promise(r => setTimeout(() => requestAnimationFrame(() => r()), 0)));
 
     await check('loads the data and shows the calendar', async () => {
       await page.waitForFunction(() => document.querySelector('#status').textContent === 'Saved');
@@ -481,6 +484,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await check('several selected tasks dragged onto a calendar day all get that date (one undo step)', async () => {
       const was = [(await task('a7')).date, (await task('l3')).date];
       for (const id of ['a7', 'l3', 'l4']) await page.click(`.task[data-id="${id}"] .title`, { modifiers: ['Meta'] });
+      await selPainted();
       const s = await page.locator('.task[data-id="l3"] .title').boundingBox(), d = await page.locator('#grid .day[data-date="2026-11-10"]').boundingBox();
       await page.mouse.move(s.x + 10, s.y + s.height / 2); await page.mouse.down();
       for (let i = 1; i <= 10; i++) { await page.mouse.move(s.x + (d.x + 20 - s.x) * i / 10, s.y + (d.y + 30 - s.y) * i / 10); await sleep(20); }
@@ -499,8 +503,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.strictEqual(await page.locator('#tree .task.sel').count(), 0);
     });
     await check('⌘ / Shift-click on calendar chips selects; dragging a selected chip takes the whole selection', async () => {
-      await page.click('#grid .chip[data-id="a4"] .tt', { modifiers: ['Meta'] });
-      await page.click('#grid .chip[data-id="m2"] .tt', { modifiers: ['Meta'] });
+      await page.keyboard.press('Escape'); await selPainted();   // (a clean start, even if the check before stopped partway)
+      await page.click('#grid .chip[data-id="a4"] .tt', { modifiers: ['Meta'] }); await selPainted();
+      await page.click('#grid .chip[data-id="m2"] .tt', { modifiers: ['Meta'] }); await selPainted();
       assert.deepStrictEqual(await page.$$eval('#tree .task.sel', rs => rs.map(r => r.dataset.id)).then(x => x.sort()), ['a4', 'm2']);
       await sleep(100); assert.strictEqual(await page.locator('#grid .selrun .chip[data-id="m2"]').count(), 1);
       const s = await page.locator('#grid .chip[data-id="m2"] .tt').boundingBox(), d = await page.locator('#grid .day[data-date="2026-11-13"]').boundingBox();

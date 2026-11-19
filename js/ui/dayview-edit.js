@@ -280,7 +280,7 @@ function dvMove(e, rested) {   // rested: called by dvRest once the pointer has 
   }
   const dur = dv.p0 ? dv.p0.dur : DEFAULT_DUR;
   const side = $('#dayview .dv-side').getBoundingClientRect();
-  const overSide = e.clientX < side.right;
+  const overSide = MOBILE ? e.clientY > side.top : e.clientX < side.right;   // (mobile: the list is the sheet along the bottom)
   // a list item dragged within the list: reorder (a gap opens where it will go; over the gap, its target holds)
   if (!(dv.listTarget && dvGap.over(e))) dv.listTarget = dv.mode === 'place' && overSide ? dvListTarget(e) : null;
   else dv.listTarget.ids = movingIds(dv.id, splitHeld(e));   // (over its gap: Option may have changed what moves)
@@ -403,9 +403,15 @@ function dvAutoScroll() {
   dvAuto = null;
   const e = dvLastE; if (!dv || !dv.started || !e) return;
   const list = $('#dayview .dv-list');
-  const sc = dv.mode === 'place' && list && e.clientX < list.getBoundingClientRect().right ? list : $('#dayview .dv-scroll');
+  const sideTop = MOBILE ? $('#dayview .dv-side').getBoundingClientRect().top : 0;   // (mobile: the list's sheet, along the bottom)
+  const inList = list && (MOBILE ? e.clientY > sideTop : e.clientX < list.getBoundingClientRect().right);
+  const sc = dv.mode === 'place' && inList ? list : $('#dayview .dv-scroll');
   if (!sc) return;
-  const r = sc.getBoundingClientRect(), Z = 40;
+  let r = sc.getBoundingClientRect(); const Z = 40;
+  if (MOBILE && sc !== list) {   // the timeline ends where the sheet starts; over the sheet, it stays still
+    if (e.clientY > sideTop) return;
+    r = { left: r.left, right: r.right, top: r.top, bottom: Math.min(r.bottom, sideTop) };
+  }
   if (e.clientX < r.left || e.clientX > r.right) return;
   const v = e.clientY < r.top + Z ? -(r.top + Z - e.clientY) : e.clientY > r.bottom - Z ? e.clientY - (r.bottom - Z) : 0;
   if (!v) return;

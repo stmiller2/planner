@@ -112,8 +112,9 @@ function fitRows() {
   if (weekAnim) return;
   const grid = $('#grid'), days = viewDays(grid); if (!days.length) return;
   const H = grid.clientHeight; if (!H) return;
-  // mobile: equal weeks; days that can't show all their tasks end in "…" (mClip)
-  if (MOBILE) { grid.style.gridTemplateRows = `repeat(${Math.floor(days.length / 7)}, minmax(0,1fr))`; mClip(grid); return; }
+  // mobile: weeks sized for what they hold, titles wrapping where there's room (mFit); days that still can't show all
+  // their tasks end in "…" (mClip)
+  if (MOBILE) { grid.style.gridTemplateRows = mFit(days, H).tpl; mClip(grid); return; }
   grid.style.gridTemplateRows = fitSizes(weekNeeds(days), H).tpl;
   days.forEach(d => markMore(d.querySelector('.items')));
 }
@@ -200,7 +201,8 @@ function weekShift(dir, m = 1) {
     barWidths([...g.querySelectorAll('.cfb')].filter(b => !oldBars.has(b)));
   }
   firstLabels(g);
-  const newRows = fitSizes((nat || weekNeeds(viewDays(g))).slice(ni, ni + n), g.clientHeight).px;
+  // (mobile: sized as fitRows sizes them there, mFit)
+  const newRows = MOBILE ? mFit(viewDays(g).slice(ni * 7, (ni + n) * 7), g.clientHeight).px : fitSizes((nat || weekNeeds(viewDays(g))).slice(ni, ni + n), g.clientHeight).px;
   const avg = [...oldRows, ...newRows].reduce((x, y) => x + y, 0) / (2 * n);
   const hOf = (rows, at, i) => i >= at && i < at + n ? rows[i - at] : null;
   const a = [], b = [];
@@ -223,6 +225,7 @@ function weekShift(dir, m = 1) {
     if (el.classList.contains('day')) rows[r].days.push(el); else if (el.classList.contains('cfb')) rows[r].bars.push(el);
   }
   g.style.gridTemplateRows = R.map(h => h + 'px').join(' ');
+  if (MOBILE) mClip(g);   // (arriving weeks built just now get their "…")
   g.classList.add('sliding'); g.scrollTop = 0;
   if (hl) setHL(hl, true);
   const frame = (k, all) => {
@@ -271,7 +274,7 @@ let nbTimer = 0;
 const laterNeighbours = () => { clearTimeout(nbTimer); nbTimer = setTimeout(buildNeighbours, 60); };
 function buildNeighbours() {
   const g = $('#grid');
-  if (MOBILE || weekAnim || drag || calStale || ui.dayView || admOpen || !g.clientHeight) return;   // (mobile pages sideways: mPages)
+  if (weekAnim || drag || calStale || ui.dayView || admOpen || !g.clientHeight) return;
   const days = viewDays(g); if (days.length !== ui.weeks * 7) return;
   const rows = rowHeights(); g.style.setProperty('--nbh', (rows.reduce((x, y) => x + y, 0) / rows.length).toFixed(1) + 'px');
   for (const [side, ws] of [['above', addDays(ui.viewStart, -7)], ['below', addDays(ui.viewStart, 7 * ui.weeks)]]) {
@@ -283,6 +286,7 @@ function buildNeighbours() {
     g.appendChild(f);
     barWidths(bars);
   }
+  if (MOBILE) mClip(g);   // (their days end in "…" too)
 }
 // the pull: while a swipe builds up, the days (and the week beyond, built ahead) follow it with resistance, without
 // the grid's edges moving, so the coming week shows; let go early and they spring back (settle)
@@ -299,7 +303,7 @@ function setPull(px, settle) {
 // push (not the swipe's momentum) and another WEEK_PULL change the week.
 const weekWheel = wheelSteps({
   pull: WEEK_PULL,
-  skip: e => MOBILE || ui.dayView || e.ctrlKey || drag,                            // day view, pinch-zoom, or mid drag-and-drop
+  skip: e => ui.dayView || e.ctrlKey || drag,                            // day view, pinch-zoom, or mid drag-and-drop
   axis: e => [wheelPx(e, e.deltaY), 0],
   ignore: e => Math.abs(e.deltaX) > Math.abs(e.deltaY),                  // sideways: nothing to do
   claim: (e, dy) => {
@@ -368,7 +372,8 @@ function setHL(id, force) {
 
 // hover a task in one place -> highlight it in the other
 const grid = $('#grid');
-grid.addEventListener('mouseover', e => { if (drag) return; const c = e.target.closest('.chip'); setHL(c ? c.dataset.id || c.dataset.kid || null : null); });
+// (mobile: none, as a tap's emulated mouseover would leave the chip lit)
+grid.addEventListener('mouseover', e => { if (drag || MOBILE) return; const c = e.target.closest('.chip'); setHL(c ? c.dataset.id || c.dataset.kid || null : null); });
 grid.addEventListener('mouseleave', () => setHL(null));
 // ⌘ / Ctrl / Shift-click a chip: select it, as in the sidebar (Shift: every chip between, day by day; selClick in sidebar.js)
 grid.addEventListener('mousedown', e => {   // (Shift-click would otherwise select the text in between)
@@ -420,7 +425,11 @@ grid.addEventListener('drop', e => {
   const day = dropDay(e); if (!drag || drag.kind !== 'task' || !day) return;
   e.preventDefault();
   if (failBail(e)) { drag = null; calGap.hide(); return; }   // dropped back on its own chip: nothing to do
-  const id = drag.id, many = drag.ids, split = splitHeld(e), date = day.dataset.date; drag = null;
+  calDropOn(day, splitHeld(e));
+});
+// the drop of `drag` on a day (also a touch drag's, mobile.js): the task moves there and the chips slide into place
+function calDropOn(day, split) {
+  const id = drag.id, many = drag.ids, date = day.dataset.date; drag = null;
   // chips now (the dropped ones at the gap), and which day each was on
   const before = snapRects(CAL_CHIPS, chipKey), dayOf = new Map($$(CAL_CHIPS).map(c => [chipKey(c), c.closest('.day').dataset.date]));
   const gr = calGap.el && calGap.el.getBoundingClientRect();
@@ -429,7 +438,7 @@ grid.addEventListener('drop', e => {
   if (many) selDate(many, date, split);   // a selection from the sidebar: every task to that day
   else moveTask(id, date, split);
   flipTo(CAL_CHIPS, chipKey, before, { fade: true, same: (el, k) => dayOf.get(k) === el.closest('.day').dataset.date });
-});
+}
 
 /* Next-day links: resting on a chip that's linked to the task before or after it (on another day) for LINK_HOVER_MS
    draws a dotted line from it to each linked task: straight runs along the calendar's lines, rounded where they

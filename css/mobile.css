@@ -1,48 +1,58 @@
 /* Mobile mode (body.mobile, set by js/ui/mobile.js for a phone-sized window). Loaded last, so it overrides the rest. */
-#mBurger,#mScrim,.m-foot{display:none}
+#mBurger,#mScrim,.m-bar{display:none}
 body.mobile{touch-action:manipulation}   /* (no double-tap zoom delay) */
-body.mobile #app{grid-template-columns:minmax(0,1fr);height:100dvh}
+body.mobile #app{grid-template-columns:minmax(0,1fr);grid-template-rows:60px minmax(0,1fr);height:100dvh}
+body.mobile :is(#dayview,#admire){top:60px}   /* (below the taller header) */
 body.mobile :is(#scratch,.sc-rz,#resizer,.sb-tab){display:none !important}
 
-/* header: ☰ · dates · Today · view switcher (the rest is in the drawer's footer) */
-body.mobile header{gap:6px;padding:0 6px 0 4px}
-body.mobile #mBurger{display:inline-grid;width:36px;height:36px;flex:none;color:var(--ink)}
-body.mobile #mBurger svg{width:22px;height:22px}
+/* header: ☰ · dates · Today · view switcher (the rest is in the drawer's top bar), sized for thumbs */
+body.mobile header{gap:8px;padding:0 8px 0 4px}
+body.mobile #mBurger{display:inline-grid;width:44px;height:44px;flex:none;color:var(--ink);border-radius:10px}
+body.mobile #mBurger svg{width:24px;height:24px}
+body.mobile #mBurger:hover{background:transparent}   /* (a tap leaves :hover on: no grey square) */
 body.mobile .brand{width:auto;min-width:0;order:3}
 body.mobile .brand .bname{display:none}
-body.mobile .views .ic{width:32px;height:30px}
+body.mobile .views{padding:3px;gap:3px;border-radius:12px}
+body.mobile .views .ic{width:44px;height:40px;border-radius:9px}
+body.mobile .views .ic svg{width:22px;height:22px}
+body.mobile .views .ic:not(.on):hover{background:transparent}
 body.mobile :is(#prev,#next,.spacer,.dvcount,.hright){display:none}
-body.mobile #range{order:1;flex:1;min-width:0;padding-left:0;overflow:hidden;text-overflow:ellipsis}
-body.mobile #todayBtn{order:2}
+body.mobile #range{order:1;flex:1;min-width:0;padding-left:0;overflow:hidden;text-overflow:ellipsis;font-size:16px}
+body.mobile #todayBtn{order:2;height:38px;padding:0 12px;font-size:14px;font-weight:550;border-radius:10px}
 body.mobile #app.admon #range{visibility:visible}   /* (the Timeline's title: setRange) */
 body.mobile header [data-tip]::after{display:none}
 
-/* drawers: the sidebar (calendar, Timeline) or day view's task list (day view), from the left over a dimmed page.
-   #dayview and #admire have no z-index here, so their lists can sit above #mScrim (what's under them is hidden instead) */
-body.mobile :is(aside,.dv-side,.adm-side){position:fixed;top:0;left:0;bottom:0;width:min(86vw,360px);z-index:45;transform:translateX(-102%);
+/* the drawer: the sidebar (calendar, day view) or the Timeline's list, from the left over a dimmed page (swiped in and
+   out too: mobile.js). #admire has no z-index here, so its list can sit above #mScrim (what's under it is hidden instead) */
+body.mobile :is(aside,.adm-side){position:fixed;top:0;left:0;bottom:0;width:min(86vw,360px);z-index:45;transform:translateX(-102%);
   transition:transform .22s cubic-bezier(.2,.8,.2,1);border-right:1px solid var(--line)}
-body.mobile #app.mdrawer:not(.dayon,.admon) aside,body.mobile #app.mdrawer.dayon:not(.admon) .dv-side,body.mobile #app.mdrawer.admon .adm-side{transform:none;box-shadow:0 0 30px rgba(0,0,0,.25)}
+body.mobile #app.mdrawer:not(.admon) aside,body.mobile #app.mdrawer.admon .adm-side{transform:none;box-shadow:0 0 30px rgba(0,0,0,.25)}
 body.mobile #mScrim{display:block;position:fixed;inset:0;z-index:44;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .22s}
 body.mobile #app.mdrawer #mScrim{opacity:1;pointer-events:auto}
-body.mobile .m-foot{display:flex;flex-direction:column;gap:6px;flex:none;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
-.m-foot .m-row{display:flex;align-items:center;gap:6px}
-.m-foot .seg button{padding:4px 11px}
-.m-foot .m-wkl{flex:1;font-size:12.5px;color:var(--muted)}
-.m-foot .m-sp{flex:1}
-.m-foot .ic{width:32px;height:32px}
-.m-foot .ic svg{width:17px;height:17px}
-.m-foot .m-status{border:0;background:none;color:var(--muted);font-size:12px;padding:4px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.m-foot .m-acct{flex:none;width:28px;height:28px;border:0;border-radius:50%;background:var(--accent);color:#fff;font-size:12.5px;font-weight:650;display:grid;place-items:center;padding:0}
-.m-foot .m-acct[hidden]{display:none}
+body.mobile .m-bar{display:flex;flex-direction:column;gap:8px;flex:none;order:-1;padding:calc(10px + env(safe-area-inset-top)) 10px 10px;border-bottom:1px solid var(--line)}
+.m-bar .m-row{display:flex;align-items:center;gap:6px}
+.m-bar .seg button{padding:4px 11px}
+.m-bar .m-wkl{flex:1;font-size:12.5px;color:var(--muted)}
+.m-bar .m-sp{flex:1}
+.m-bar .ic{width:36px;height:36px}
+.m-bar .ic svg{width:17px;height:17px}
+.m-bar .m-status{border:0;background:none;color:var(--muted);font-size:12px;padding:4px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-bar .m-acct{flex:none;width:28px;height:28px;border:0;border-radius:50%;background:var(--accent);color:#fff;font-size:12.5px;font-weight:650;display:grid;place-items:center;padding:0}
+.m-bar .m-acct[hidden]{display:none}
 
 /* menus: a sheet along the bottom, above the drawers */
 body.mobile #menu{left:8px !important;right:8px;top:auto !important;bottom:calc(8px + env(safe-area-inset-bottom));min-width:0;max-height:70dvh;overflow-y:auto;z-index:60;font-size:15px;border-radius:12px}
 body.mobile #menu button{padding:10px 12px}
 body.mobile #ntip{z-index:60;max-width:calc(100vw - 16px)}
+/* the warning bar and toasts: across the screen (centred with left:50%, they could only be half its width) */
+body.mobile :is(#warn,#toast){left:8px;right:8px;transform:none;max-width:none}
+body.mobile #warn{bottom:calc(10px + env(safe-area-inset-bottom));max-height:45dvh;overflow-y:auto}
+body.mobile #warn .msg{flex:1;min-width:0}
+body.mobile #toast{top:68px}
 body.mobile .card,body.mobile .card.wide{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:18px 16px}
 body.mobile .card.framed{padding:0}
 
-/* calendar: nothing scrolls; sideways swipes turn the page (mobile.js) */
+/* calendar: nothing in it scrolls; swipes up / down step the weeks (mobile.js) */
 body.mobile main{position:relative;touch-action:none}
 body.mobile #app.dayon main{visibility:hidden}
 body.mobile #dow div{padding:4px 0;text-align:center;font-size:10px;letter-spacing:.03em}
@@ -54,16 +64,26 @@ body.mobile .day.more::after{display:none}
 /* chips: the title on one line, cut off at the day's edge */
 body.mobile .chip.m{display:block;padding:1px 1px 1px 3px;border-left-width:2px;border-radius:3px;cursor:default;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 body.mobile .chip.m .tt{font-size:10.5px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:clip}
+/* weeks with room (mFit, mobile.js): the whole title, wrapped (a word too long for the day breaks where it must) */
+body.mobile .day.wrap .chip.m .tt{white-space:normal;overflow-wrap:break-word;-webkit-hyphens:auto;hyphens:auto;line-height:13px;padding:1px 0}
 body.mobile .grp{border-radius:3px}
 body.mobile .m-hid{display:none !important}
 body.mobile .m-more{flex:none;height:11px;font-size:13px;line-height:6px;color:var(--muted);text-align:center;font-weight:700;letter-spacing:.15em}
-body.mobile :is(#grid,.mpage) .cfb{pointer-events:none;font-size:10px}   /* (taps reach the day under the bar) */
+body.mobile #grid .cfb{pointer-events:none;font-size:10px}   /* (taps reach the day under the bar) */
 body.mobile .cfb .h{display:none}
-/* the pages either side while swiping */
-.mpage{position:absolute;display:grid;overflow:hidden;background:var(--bg)}
 
-/* day view: the timeline, one day, full width */
+/* day view: the timeline, one day, full width, with room kept below it for the task list's sheet when it's down */
 body.mobile #dayview{right:0;grid-template-columns:minmax(0,1fr);z-index:auto}
+body.mobile .dv-main{padding-bottom:52px}   /* (M_PEEK, mobile.js) */
+/* the task list: a sheet along the bottom, as tall as --sheet-h (set and dragged in mobile.js) */
+.m-grab{display:none}
+body.mobile .dv-side{position:fixed;left:0;right:0;bottom:0;height:var(--sheet-h,52px);z-index:30;border:0;border-top:1px solid var(--line);
+  border-radius:16px 16px 0 0;box-shadow:0 -10px 30px -14px rgba(0,0,0,.35);padding-bottom:env(safe-area-inset-bottom);
+  transition:height .3s cubic-bezier(.2,.8,.2,1)}
+body.mobile .dv-side.m-dragging{transition:none}
+body.mobile .m-grab{display:block;flex:none;height:20px;touch-action:none;cursor:grab}
+body.mobile .m-grab i{display:block;width:40px;height:5px;margin:8px auto 0;border-radius:3px;background:color-mix(in srgb,var(--muted) 50%,transparent)}
+body.mobile .dv-side .sb-head{flex:none;padding-top:2px;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
 body.mobile .dv-grid{margin-right:8px}
 body.mobile .dv-main{touch-action:pan-y}
 body.mobile :is(.dv-blk,.dv-item,.dv-cfb,.dv-cfp){touch-action:pan-y;cursor:default;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -99,3 +119,76 @@ body.mobile .adm-li .cnt{font-size:12.5px}
 body.mobile .adm-li.pj{font-size:15px;margin-top:10px}
 body.mobile .adm-li.pj:first-child{margin-top:0}
 body.mobile .adm-sum{font-size:12.5px;padding:10px 6px 0}
+
+/* the sidebar's tree (mTree, mobile.js): rows to tap, folding in place */
+body.mobile #tree{padding:0}
+.mt{padding:2px 8px 18px}
+.mt-row{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 10px 0 4px;border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+.mt-row:active,.mt-task:active,.mt-run:active{background:var(--hover)}
+.mt-chev{flex:none;width:22px;height:22px;display:grid;place-items:center;color:var(--muted)}
+.mt-chev svg{width:16px;height:16px;transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+.mt-node:not(.closed)>.mt-row .mt-chev svg{transform:rotate(90deg)}
+.mt-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mt-cnt{flex:none;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mt-p+.mt-p{border-top:1px solid var(--line2);margin-top:6px;padding-top:6px}
+.mt-p>.mt-row{font-size:16.5px;font-weight:700;min-height:48px}
+.mt-t>.mt-row{font-size:15px;font-weight:580;min-height:42px}
+.mt-dot{flex:none;width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 22%,transparent)}
+/* folding: the body's one grid row goes from its full height to nothing, its content fading with it */
+.mt-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .26s cubic-bezier(.2,.8,.2,1)}
+.mt-node.closed>.mt-body{grid-template-rows:0fr}
+.mt-in{min-height:0;overflow:hidden;transition:opacity .2s}
+.mt-node.closed>.mt-body>.mt-in{opacity:0}
+.mt-p>.mt-body>.mt-in{padding-left:6px}
+/* under a thread: a guide line in its color, sub-threads and tasks along it */
+.mt-t>.mt-body>.mt-in{margin-left:14px;padding-left:8px;border-left:2px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.mt-task{display:flex;align-items:flex-start;gap:9px;padding:9px 10px 9px 6px;border-radius:9px;font-size:14.5px;line-height:20px;cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+.mt-ck{flex:none;width:18px;height:18px;margin-top:1px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--c) 70%,var(--muted));display:grid;place-items:center;color:#fff}
+.mt-ck svg{width:12px;height:12px;stroke-width:3}
+.mt-task.done .mt-ck{background:var(--c);border-color:var(--c)}
+.mt-n{flex:none;min-width:14px;margin-top:1px;font-size:11.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.mt-tt{flex:1;min-width:0;overflow-wrap:break-word}
+.mt-task.done .mt-tt{color:var(--muted);text-decoration:line-through}
+.mt-d{flex:none;margin-top:1px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.mt-d:empty{display:none}
+.mt-run{padding:8px 10px 8px 33px;border-radius:9px;font-size:13px;color:var(--muted);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mt-empty{padding:8px 10px;font-size:13px;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){.mt-body,.mt-in,.mt-chev svg{transition:none}}
+
+/* typing a date or a name (mAsk, mobile.js): a card at the top, clear of the keyboard */
+#mAsk{position:fixed;inset:0;z-index:65;display:none;background:rgba(0,0,0,.3);padding:calc(10px + env(safe-area-inset-top)) 8px 0}
+#mAsk.on{display:block}
+.ma-card{background:var(--panel);border-radius:14px;padding:16px 16px 14px;box-shadow:0 14px 40px rgba(0,0,0,.3);animation:maIn .18s cubic-bezier(.2,.8,.2,1)}
+@keyframes maIn{from{opacity:0;transform:translateY(-8px)}}
+.ma-h{font-size:17px;font-weight:700}
+.ma-sub{margin-top:2px;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ma-in{display:block;width:100%;margin-top:12px;padding:10px 12px;font-size:17px;border:1px solid var(--line);border-radius:10px;background:var(--bg);outline:none}
+.ma-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
+.ma-hint{min-height:18px;margin:6px 2px 0;font-size:13px;color:var(--muted)}
+.ma-hint.bad{color:var(--danger)}
+.ma-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.ma-chips button{border:1px solid var(--line);background:var(--bg);border-radius:16px;padding:6px 12px;font-size:14px}
+.ma-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.ma-btns .btn{padding:8px 16px;font-size:15px;border-radius:9px}
+.ma-btns .btn:disabled{opacity:.45}
+/* the undo bar (mUndo): the toast, with a button */
+body.mobile #toast{align-items:center;gap:12px;padding:8px 8px 8px 14px}
+#toast .mu-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#toast .mu-b{flex:none;border:0;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-weight:650;border-radius:8px;padding:7px 14px}
+/* "Set a time…" (the day view's time box): at the top too */
+body.mobile #tpop{left:8px !important;right:8px;top:68px !important;width:auto;padding:14px 16px;font-size:15px}
+body.mobile #tpop input{font-size:17px;padding:7px 8px}
+body.mobile #tpop .tp-k{display:none}   /* (keyboard hints; a tap outside saves) */
+
+/* a lifted task (long press: mLift, mobile.js) */
+.m-ghost{position:fixed;z-index:70;pointer-events:none;margin:0;transform:scale(1.06) rotate(-1.5deg);box-shadow:0 10px 24px rgba(0,0,0,.28);opacity:.96;transition:transform .15s}
+.m-ghost .tt{white-space:nowrap !important}
+.m-lifted{scale:1.03;box-shadow:0 10px 24px rgba(0,0,0,.25) !important;z-index:5;transition:scale .15s,box-shadow .15s}
+body.m-lifting,body.m-lifting *{-webkit-user-select:none;user-select:none}
+/* over the header while a chip is lifted: drop it there to unschedule */
+#mDropOff{position:fixed;left:0;right:0;top:0;height:60px;z-index:66;display:none;align-items:center;justify-content:center;gap:8px;
+  background:var(--panel);color:var(--muted);font-weight:600;font-size:15px;border-bottom:2px dashed var(--line);pointer-events:none;transition:background .15s,color .15s}
+#mDropOff svg{width:20px;height:20px}
+body.mobile.m-dropoff #mDropOff{display:flex}
+#mDropOff.over{background:color-mix(in srgb,var(--danger) 14%,var(--panel));color:var(--danger);border-bottom-color:var(--danger)}
+body.mobile .dv-side.rm{box-shadow:inset 0 3px 0 var(--danger),0 -10px 30px -14px rgba(0,0,0,.35)}

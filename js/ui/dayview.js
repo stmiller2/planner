@@ -32,6 +32,7 @@ function openDay(d) {
   const n = new Date(), nowM = n.getHours() * 60 + n.getMinutes();
   dvScrollTo = Math.max(0, starts.length ? Math.min(...starts) - 45 : dvDays().includes(todayISO()) ? nowM - 60 : 8 * 60 - 15);
   if (first) inserting = addOpen = null;
+  if (first && MOBILE) mSheetAuto(d);   // (mobile: how far the task list's sheet is pulled up, for this day)
   render();
 }
 function closeDay() { closeTimePop(false); ui.dayView = null; dvAdd = null; scratchForView(); render(); }
@@ -90,6 +91,7 @@ function buildDaySkeleton(box) {
   box.innerHTML = `
     <section class="dv-side">
       ${sbTab('Tasks this day')}
+      <div class="m-grab"><i></i></div>
       <div class="sb-head"><h2>Tasks this day</h2></div>
       <div class="dv-list"></div>
     </section>

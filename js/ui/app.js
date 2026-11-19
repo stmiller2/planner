@@ -44,8 +44,9 @@ function setRange(first = ui.dayView) {
   if (first) { $('#range').textContent = dvTitle(first); return; }
   const end = addDays(ui.viewStart, ui.weeks * 7 - 1);
   const s = parseD(ui.viewStart), e = parseD(end);
-  const yr = MOBILE && s.getFullYear() === e.getFullYear() && e.getFullYear() === new Date().getFullYear() ? '' : `, ${e.getFullYear()}`;   // (mobile: no room for this year's)
-  $('#range').textContent = `${MON[s.getMonth()]} ${s.getDate()}${s.getFullYear() !== e.getFullYear() ? ', ' + s.getFullYear() : ''} – ${MON[e.getMonth()]} ${e.getDate()}${yr}`;
+  // (mobile: just the months, and the year when it isn't this one: the day numbers say the rest)
+  if (MOBILE) { const y = e.getFullYear() !== new Date().getFullYear() ? ' ' + e.getFullYear() : ''; $('#range').textContent = (s.getMonth() === e.getMonth() ? MON[s.getMonth()] : `${MON[s.getMonth()]} – ${MON[e.getMonth()]}`) + y; return; }
+  $('#range').textContent = `${MON[s.getMonth()]} ${s.getDate()}${s.getFullYear() !== e.getFullYear() ? ', ' + s.getFullYear() : ''} – ${MON[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
 }
 
 /* ---------- sidebar resize ---------- */
@@ -103,6 +104,10 @@ document.addEventListener('click', e => {
     case 'unsched': moveTask(id, null); break;
     case 'kmenu': openTaskMenu(id, a); break;
     case 'k-notes': closeMenu(); editNotes(id, menuTask); break;
+    case 'k-day': { closeMenu(); const f = findTask(id); if (f && f.task.date) { if (admOpen) closeAdmire(); openDay(f.task.date); } break; }   // (mobile's task menu)
+    case 'k-resched': closeMenu(); mReschedule(id); break;   // (mobile's task menu, mobile.js)
+    case 'k-rename': closeMenu(); mRename(id); break;
+    case 'k-time': closeMenu(); openTimePop(id, 0, 0); break;   // (placed by css/mobile.css)
     case 'k-done': { closeMenu(); const f = findTask(id); if (f) mutate(() => f.task.done = !f.task.done); break; }   // (mobile's task menu)
     case 'acct': openAccount(a); break;
     case 'acct-export': closeMenu(); $('#exportBtn').click(); break;
@@ -188,7 +193,7 @@ document.addEventListener('mousedown', e => {
 }, true);
 // header: ‹ Today › (and ← / → / T) step the calendar a week or day view a day, sliding just like a scroll does
 function navStep(dir) {
-  if (!ui.dayView) return MOBILE ? mPage(dir) : weekShift(dir);   // (mobile: a page of ui.weeks weeks, sideways)
+  if (!ui.dayView) return weekShift(dir);
   if (!dv && !cfDrag) daySlide(dir);
 }
 // Today: a quick slide to it. From far away, the view first jumps to TODAY_SLIDE steps short of today and slides
@@ -207,7 +212,6 @@ function navToday() {
   if (weekAnim) weekAnim.finish();
   const w = weekStartOf(t), n = diffDays(w, ui.viewStart) / 7;
   if (!n) return;
-  if (MOBILE) { mPagerDrop(); ui.viewStart = w; return renderWeeks(); }   // (pages start on this week)
   const dir = Math.sign(n), m = Math.min(Math.abs(n), TODAY_SLIDE);
   if (Math.abs(n) > m) { ui.viewStart = addDays(w, -7 * dir * m); renderWeeks(); }
   weekShift(dir, m);
