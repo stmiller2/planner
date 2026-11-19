@@ -286,7 +286,7 @@ function buildNeighbours() {
     g.appendChild(f);
     barWidths(bars);
   }
-  if (MOBILE) mClip(g);   // (their days end in "…" too)
+  if (MOBILE) { mNbFit(g); mClip(g); }   // (mobile: each as tall as it will be in view, and its days end in "…" too)
 }
 // the pull: while a swipe builds up, the days (and the week beyond, built ahead) follow it with resistance, without
 // the grid's edges moving, so the coming week shows; let go early and they spring back (settle)

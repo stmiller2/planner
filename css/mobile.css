@@ -9,7 +9,12 @@ body.mobile :is(#scratch,.sc-rz,#resizer,.sb-tab){display:none !important}
 body.mobile header{gap:8px;padding:0 8px 0 4px}
 body.mobile #mBurger{display:inline-grid;width:44px;height:44px;flex:none;color:var(--ink);border-radius:10px}
 body.mobile #mBurger svg{width:24px;height:24px}
-body.mobile #mBurger:hover{background:transparent}   /* (a tap leaves :hover on: no grey square) */
+body.mobile #mBurger:hover,body.mobile #mBack:hover{background:transparent}   /* (a tap leaves :hover on: no grey square) */
+/* day view: a back button in ☰'s place (it has no drawer); the Timeline over it has its own, so ☰ again */
+#mBack{display:none}
+body.mobile #app.dayon:not(.admon) #mBurger{display:none}
+body.mobile #app.dayon:not(.admon) #mBack{display:inline-grid;width:44px;height:44px;flex:none;color:var(--ink);border-radius:10px}
+body.mobile #mBack svg{width:26px;height:26px}
 body.mobile .brand{width:auto;min-width:0;order:3}
 body.mobile .brand .bname{display:none}
 body.mobile .views{padding:3px;gap:3px;border-radius:12px}
@@ -29,7 +34,8 @@ body.mobile :is(aside,.adm-side){position:fixed;top:0;left:0;bottom:0;width:min(
 body.mobile #app.mdrawer:not(.admon) aside,body.mobile #app.mdrawer.admon .adm-side{transform:none;box-shadow:0 0 30px rgba(0,0,0,.25)}
 body.mobile #mScrim{display:block;position:fixed;inset:0;z-index:44;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .22s}
 body.mobile #app.mdrawer #mScrim{opacity:1;pointer-events:auto}
-body.mobile .m-bar{display:flex;flex-direction:column;gap:8px;flex:none;order:-1;padding:calc(10px + env(safe-area-inset-top)) 10px 10px;border-bottom:1px solid var(--line)}
+body.mobile .m-bar{display:flex;flex-direction:column;gap:8px;flex:none;order:-1;padding:calc(10px + env(safe-area-inset-top)) 10px 12px;border-bottom:1px solid var(--line)}
+body.mobile aside .m-bar + .sb-head{padding-top:18px}   /* (some room between the bar and the projects) */
 .m-bar .m-row{display:flex;align-items:center;gap:6px}
 .m-bar .seg button{padding:4px 11px}
 .m-bar .m-wkl{flex:1;font-size:12.5px;color:var(--muted)}
@@ -43,6 +49,15 @@ body.mobile .m-bar{display:flex;flex-direction:column;gap:8px;flex:none;order:-1
 /* menus: a sheet along the bottom, above the drawers */
 body.mobile #menu{left:8px !important;right:8px;top:auto !important;bottom:calc(8px + env(safe-area-inset-bottom));min-width:0;max-height:70dvh;overflow-y:auto;z-index:60;font-size:15px;border-radius:12px}
 body.mobile #menu button{padding:10px 12px}
+/* the task menu's title bar (mMenuHead), with the handle it's swiped down by above it */
+body.mobile #menu{padding-top:14px;animation:mMenuIn .2s cubic-bezier(.2,.8,.2,1)}
+body.mobile #menu::before{content:'';position:absolute;top:6px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:color-mix(in srgb,var(--muted) 45%,transparent)}
+@keyframes mMenuIn{from{transform:translateY(24px);opacity:0}}
+.m-mh{display:flex;align-items:flex-start;gap:10px;padding:4px 12px 10px;margin-bottom:4px;border-bottom:1px solid var(--line2)}
+.m-mh-d{flex:none;width:10px;height:10px;margin-top:5px;border-radius:50%;background:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 22%,transparent)}
+.m-mh-t{min-width:0;display:flex;flex-direction:column;gap:1px}
+.m-mh-t b{font-size:15.5px;font-weight:650;line-height:1.3;overflow-wrap:break-word}
+.m-mh-t span{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.mobile #ntip{z-index:60;max-width:calc(100vw - 16px)}
 /* the warning bar and toasts: across the screen (centred with left:50%, they could only be half its width) */
 body.mobile :is(#warn,#toast){left:8px;right:8px;transform:none;max-width:none}
@@ -55,32 +70,37 @@ body.mobile .card.framed{padding:0}
 /* calendar: nothing in it scrolls; swipes up / down step the weeks (mobile.js) */
 body.mobile main{position:relative;touch-action:none}
 body.mobile #app.dayon main{visibility:hidden}
+/* swiping back from day view (mBackMove, mobile.js): the calendar shows under it, kept beneath it by a z-index */
+body.mobile #app.dayon.m-backing main{visibility:visible}
+body.mobile #app.m-backing #dayview{z-index:6;box-shadow:-10px 0 30px rgba(0,0,0,.18)}
 body.mobile #dow div{padding:4px 0;text-align:center;font-size:10px;letter-spacing:.03em}
 body.mobile .day{padding:4px 2px 2px}   /* (the top padding and .dn's height match CF_TOP, where conflict bars start) */
 body.mobile .dn{padding-left:0;padding-right:0}
 body.mobile .dn .n{padding:0 4px}
-body.mobile .items{overflow:hidden;gap:2px;padding:0;margin:0;scrollbar-gutter:auto}
+body.mobile .items{overflow:hidden;gap:3px;padding:0;margin:0;scrollbar-gutter:auto}
 body.mobile .day.more::after{display:none}
 /* chips: the title on one line, cut off at the day's edge */
-body.mobile .chip.m{display:block;padding:1px 1px 1px 3px;border-left-width:2px;border-radius:3px;cursor:default;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-body.mobile .chip.m .tt{font-size:10.5px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:clip}
-/* weeks with room (mFit, mobile.js): the whole title, wrapped (a word too long for the day breaks where it must) */
-body.mobile .day.wrap .chip.m .tt{white-space:normal;overflow-wrap:break-word;-webkit-hyphens:auto;hyphens:auto;line-height:13px;padding:1px 0}
+/* (a little taller than they need to be, to be easy to tap and hold) */
+body.mobile .chip.m{display:block;padding:3px 2px 3px 4px;border-left-width:2px;border-radius:4px;cursor:default;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.mobile .chip.m .tt{font-size:11px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:clip}
 body.mobile .grp{border-radius:3px}
 body.mobile .m-hid{display:none !important}
 body.mobile .m-more{flex:none;height:11px;font-size:13px;line-height:6px;color:var(--muted);text-align:center;font-weight:700;letter-spacing:.15em}
+/* no room below the one chip shown: over its bottom corner */
+body.mobile .m-more.on{position:absolute;right:2px;bottom:2px;height:auto;padding:1px 3px 5px;line-height:6px;border-radius:5px;background:var(--bg);z-index:1}
 body.mobile #grid .cfb{pointer-events:none;font-size:10px}   /* (taps reach the day under the bar) */
 body.mobile .cfb .h{display:none}
 
 /* day view: the timeline, one day, full width, with room kept below it for the task list's sheet when it's down */
 body.mobile #dayview{right:0;grid-template-columns:minmax(0,1fr);z-index:auto}
-body.mobile .dv-main{padding-bottom:52px}   /* (M_PEEK, mobile.js) */
+body.mobile .dv-main{padding-bottom:76px}   /* (M_PEEK, mobile.js) */
 /* the task list: a sheet along the bottom, as tall as --sheet-h (set and dragged in mobile.js) */
 .m-grab{display:none}
-body.mobile .dv-side{position:fixed;left:0;right:0;bottom:0;height:var(--sheet-h,52px);z-index:30;border:0;border-top:1px solid var(--line);
+body.mobile .dv-side{position:fixed;left:0;right:0;bottom:0;height:var(--sheet-h,76px);z-index:30;border:0;border-top:1px solid var(--line);
   border-radius:16px 16px 0 0;box-shadow:0 -10px 30px -14px rgba(0,0,0,.35);padding-bottom:env(safe-area-inset-bottom);
   transition:height .3s cubic-bezier(.2,.8,.2,1)}
 body.mobile .dv-side.m-dragging{transition:none}
+body.mobile #dayview.m-sheetmin .dv-list{visibility:hidden}   /* (all the way down: the heading, and room below it for the phone's own swipes) */
 body.mobile .m-grab{display:block;flex:none;height:20px;touch-action:none;cursor:grab}
 body.mobile .m-grab i{display:block;width:40px;height:5px;margin:8px auto 0;border-radius:3px;background:color-mix(in srgb,var(--muted) 50%,transparent)}
 body.mobile .dv-side .sb-head{flex:none;padding-top:2px;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
@@ -88,7 +108,7 @@ body.mobile .dv-grid{margin-right:8px}
 body.mobile .dv-main{touch-action:pan-y}
 body.mobile :is(.dv-blk,.dv-item,.dv-cfb,.dv-cfp){touch-action:pan-y;cursor:default;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 body.mobile .dv-blk :is(.h,.x){display:none}
-body.mobile .dv-item .acts{display:flex}
+body.mobile .dv-item .acts{display:none}   /* (a tap on the item opens its menu) */
 body.mobile [draggable="true"]{-webkit-user-drag:none}
 
 /* Timeline: the chart across the full width (timeline.js leaves no room for the list, which is the drawer here) */
@@ -181,7 +201,7 @@ body.mobile #tpop input{font-size:17px;padding:7px 8px}
 body.mobile #tpop .tp-k{display:none}   /* (keyboard hints; a tap outside saves) */
 
 /* a lifted task (long press: mLift, mobile.js) */
-.m-ghost{position:fixed;z-index:70;pointer-events:none;margin:0;transform:scale(1.06) rotate(-1.5deg);box-shadow:0 10px 24px rgba(0,0,0,.28);opacity:.96;transition:transform .15s}
+.m-ghost{position:fixed;z-index:70;pointer-events:none;margin:0;overflow:hidden;transform:scale(1.04) rotate(-1deg);box-shadow:0 10px 24px rgba(0,0,0,.28);opacity:.96;transition:transform .15s}
 .m-ghost .tt{white-space:nowrap !important}
 .m-lifted{scale:1.03;box-shadow:0 10px 24px rgba(0,0,0,.25) !important;z-index:5;transition:scale .15s,box-shadow .15s}
 body.m-lifting,body.m-lifting *{-webkit-user-select:none;user-select:none}
@@ -192,3 +212,15 @@ body.m-lifting,body.m-lifting *{-webkit-user-select:none;user-select:none}
 body.mobile.m-dropoff #mDropOff{display:flex}
 #mDropOff.over{background:color-mix(in srgb,var(--danger) 14%,var(--panel));color:var(--danger);border-bottom-color:var(--danger)}
 body.mobile .dv-side.rm{box-shadow:inset 0 3px 0 var(--danger),0 -10px 30px -14px rgba(0,0,0,.35)}
+
+/* notes (mNotes, mobile.js): in the card at the top */
+.ma-card .m-mh{padding:0 0 10px;margin:0 0 10px}
+.mn-b{max-height:55dvh;overflow:auto;white-space:pre-wrap;overflow-wrap:break-word;font-size:16px;line-height:1.45;padding:2px 2px 4px}
+.mn-b a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+.mn-k{margin-top:8px;font-size:12.5px;color:var(--muted)}
+.mn-ta{display:block;width:100%;min-height:110px;resize:none;padding:10px 12px;font:inherit;font-size:16px;line-height:1.45;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;outline:none}
+.mn-ta:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
+.ma-btns .m-sp{flex:1}
+.ma-btns .mn-del{color:var(--danger)}
+/* a box to type in smaller than 16px makes iPhones zoom the page when it's focused */
+body.mobile :is(input:not([type=checkbox]):not([type=color]):not([type=range]),textarea,select){font-size:16px}

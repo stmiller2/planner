@@ -81,7 +81,8 @@ function renderDay() {
   const ds = dvDays();
   setRange();
   const lbl = ds.length > 1 ? `Tasks these ${ds.length} days` : 'Tasks this day';
-  box.querySelector('.dv-side .sb-head h2').textContent = lbl; box.querySelector('.dv-side .sb-tab span').textContent = lbl;
+  const nT = MOBILE ? dayTasks(ds[0]).length : 0;   // (mobile: the sheet's heading says how many, as it's often pulled down)
+  box.querySelector('.dv-side .sb-head h2').textContent = lbl + (nT ? ` · ${nT}` : ''); box.querySelector('.dv-side .sb-tab span').textContent = lbl;
   $$('#dvcount button').forEach(b => b.classList.toggle('on', +b.dataset.n === ui.dayCount));
   renderDayList(box);
   renderDayTimeline(box);

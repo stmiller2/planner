@@ -159,13 +159,14 @@ function openTaskMenu(id, btn, at, el) {
   const f = findTask(id); if (!f) return;
   menuTask = el || (btn && btn.closest(TASK_EL)) || null;
   const fails = (f.task.fails || []).slice().reverse();   // newest first
-  // (mobile: chips have no checkbox, so it's here; and the task's day, which a tap on a chip no longer opens)
-  menu.innerHTML = (MOBILE ? menuBtn('k-done', id, f.task.done ? ICON.undone : ICON.check, f.task.done ? 'Mark not done' : 'Mark done')
+  // (mobile: a title bar naming the task (also the handle to swipe the menu away); Mark done, as chips have no
+  // checkbox; the task's day, which a tap on a chip no longer opens; and what's typed or set on desktop in place)
+  menu.innerHTML = (MOBILE ? mMenuHead(f) + menuBtn('k-done', id, f.task.done ? ICON.undone : ICON.check, f.task.done ? 'Mark not done' : 'Mark done')
       + (f.task.date && ui.dayView !== f.task.date ? menuBtn('k-day', id, ICON.day, `Open ${fmtShort(f.task.date)}`) : '')
       + menuBtn('k-resched', id, ICON.calendar, 'Reschedule…')
       + (ui.dayView && f.task.date === ui.dayView ? menuBtn('k-time', id, ICON.day, planOf(f.task) ? 'Change time…' : 'Set a time…') : '')
       + menuBtn('k-rename', id, M_PENCIL, 'Rename…') + '<hr>' : '')
-    + menuBtn('k-notes', id, ICON.notes, f.task.notes ? 'Edit notes' : 'Add notes')
+    + menuBtn('k-notes', id, ICON.notes, f.task.notes ? (MOBILE ? 'View/edit notes' : 'Edit notes') : 'Add notes')
     + (f.task.date ? menuBtn('k-unsched', id, ICON.nodate, 'Unschedule') + menuBtn('k-fail', id, ICON.failed, 'Mark failed') : '')
     + (fails.length ? '<hr>' + unfailBtn(f.task, fails[0], true) + fails.map(x => failRmBtn(x, fails.length > 1)).join('') : '')
     + '<hr>' + menuBtn('arch-k', id, ICON.archive, 'Archive') + menuBtn('del-k', id, ICON.trash, 'Delete');

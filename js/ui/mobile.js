@@ -1,11 +1,12 @@
 'use strict';
 /* Mobile mode (a phone-sized window: MOBILE_MQ). The same app with a different shell, layered on the desktop code:
    one column; a drawer from the left (the ☰ button, or a swipe in from the screen's left edge; swipe it back to close)
-   holding the sidebar (calendar, day view: its own tree, mTree, folded by tapping rows) or the Timeline's list of
-   projects and threads; title-only chips, on one line or wrapped where a week has room (mFit); full days show "…"
+   holding the sidebar (calendar: its own tree, mTree, folded by tapping rows) or the Timeline's list of
+   projects and threads; title-only chips on one line, in weeks as tall as they need (mFit); full days show "…"
    instead of scrolling; a swipe up / down steps the calendar's weeks as the desktop's scroll does;
-   day view shows one day, swipes sideways a day at a time, and has its task list in a sheet along the bottom that's
-   dragged up and down by its handle. No hover: a tap on a day opens it, a tap on a task anywhere opens its menu (which
+   day view shows one day, swipes sideways a day at a time, goes back to the calendar by a back button where ☰ was or
+   a swipe in from the left edge (it has no drawer), and has
+   its task list in a sheet along the bottom that's dragged up and down by its handle. No hover: a tap on a day opens it, a tap on a task anywhere opens its menu (which
    has Mark done, Open day, Reschedule…, Set a time…, Rename… here), with a little press to show it took (mTapFx);
    a long press lifts a task to drag it (calendar chips, day-view blocks and list items: mLift); changes made here can
    be undone from a bar at the top (mUndo), as a phone has no ⌘Z; in the Timeline the chart takes the full width and a tap on a dot or day
@@ -52,10 +53,13 @@ function mFollow(e, move, end) {
 }
 
 /* ---------- header and drawer ---------- */
-$('header').insertAdjacentHTML('afterbegin', `<button class="ic" id="mBurger" aria-label="Menu">${svg('<path d="M4 6h16M4 12h16M4 18h16"/>')}</button>`);
+$('header').insertAdjacentHTML('afterbegin', `<button class="ic" id="mBurger" aria-label="Menu">${svg('<path d="M4 6h16M4 12h16M4 18h16"/>')}</button>`
+  + `<button class="ic" id="mBack" aria-label="Back to the calendar">${svg('<path d="m15 18-6-6 6-6"/>')}</button>`);
+// day view has no drawer: in ☰'s place, a way back to the calendar (css shows one or the other)
+$('#mBack').onclick = () => { closeMenu(); closeDay(); };
 $('#app').insertAdjacentHTML('beforeend', '<div id="mScrim"></div>');
-// the drawer: the sidebar, or in the Timeline its own list (css/mobile.css)
-const mDrawerEl = () => admOpen ? $('#admire .adm-side') : $('aside');
+// the drawer: the sidebar, or in the Timeline its own list (css/mobile.css); none in day view (its list is the sheet)
+const mDrawerEl = () => admOpen ? $('#admire .adm-side') : ui.dayView ? null : $('aside');
 const mIsOpen = () => $('#app').classList.contains('mdrawer');
 function mDrawer(open) { $('#app').classList.toggle('mdrawer', !!open); if (open) { mFloatGone(); mBarSync(); } }
 // what floats over the page (the Timeline's list for a dot, a menu) would sit above the drawer: it goes when the drawer comes
@@ -106,7 +110,11 @@ function mDrawerLet(open) {   // let go: back to the stylesheet, which animates 
 window.addEventListener('touchstart', e => {
   mEdge = mClose = null;
   if (!MOBILE || e.touches.length !== 1 || $('#modal').style.display === 'grid' || menu.style.display === 'block') return;
-  const el = mDrawerEl(); if (!el) return;
+  const el = mDrawerEl();
+  if (!el) {   // day view (no drawer): in from the edge goes back to the calendar instead
+    if (ui.dayView && !admOpen && !dayAnim && !dv && e.touches[0].clientX <= M_EDGE) { mEdge = mTouch(e); mEdge.W = innerWidth; mFollow(e, mBackMove, mBackEnd); }
+    return;
+  }
   if (!mIsOpen()) {
     if (e.touches[0].clientX > M_EDGE) return;
     mEdge = mTouch(e); mEdge.W = el.offsetWidth; mFollow(e, mEdgeMove, mEdgeEnd);
@@ -125,6 +133,31 @@ function mEdgeEnd(cancelled) {
   const s = mEdge; mEdge = null; if (!s || s.axis !== 'x') return;
   mDrawerLet(!cancelled && (mFlick(s) ? s.vx > 0 : s.dx > s.W * 0.35));
 }
+/* Back from day view by swiping in from the left edge: day view slides right with the finger, the calendar showing under
+   it (drawn now: it isn't kept up to date while day view covers it), as an iPhone's back swipe does. Let go past about
+   a third of the way, or with a flick, and it carries on and day view closes; otherwise it slides back. (While it's
+   out, #dayview has a z-index, so the calendar's bars and weekday row stay under it: css #app.m-backing.) */
+function mBackMove(e) {
+  const s = mEdge; if (!s) return;
+  const t = e.touches[0], dx = t.clientX - s.x0, dy = t.clientY - s.y0;
+  if (!s.axis) {
+    if (Math.hypot(dx, dy) < 8) return;
+    s.axis = dx > Math.abs(dy) ? 'x' : 'y'; if (s.axis === 'y') { mEdge = null; return; }
+    closeMenu(); closeTimePop(true); renderCal(); $('#app').classList.add('m-backing');
+  }
+  if (e.cancelable) e.preventDefault();
+  s.dx = clamp(dx, 0, s.W); mVel(s, dx);
+  dvBox.style.transition = 'none'; dvBox.style.transform = `translateX(${s.dx}px)`;
+}
+function mBackEnd(cancelled) {
+  const s = mEdge; mEdge = null; if (!s || s.axis !== 'x') return;
+  const back = !cancelled && (mFlick(s) ? s.vx > 0 : s.dx > s.W * 0.35);
+  dvBox.style.transition = 'transform .22s cubic-bezier(.2,.8,.2,1)'; dvBox.style.transform = back ? `translateX(${s.W}px)` : '';
+  setTimeout(() => {
+    if (back) closeDay();
+    dvBox.style.transition = dvBox.style.transform = ''; $('#app').classList.remove('m-backing');
+  }, 230);
+}
 function mCloseMove(e) {
   const s = mClose; if (!s) return;
   const t = e.touches[0], dx = t.clientX - s.x0, dy = t.clientY - s.y0;
@@ -137,41 +170,47 @@ function mCloseEnd(cancelled) {
   mDrawerLet(cancelled || !(mFlick(s) ? s.vx < 0 : -s.dx > s.W * 0.3));
 }
 
-/* ---------- calendar: "…" for days that are full ---------- */
-// in each day under root (the weeks built ahead too), the chips (or same-day groups) that don't fit whole are hidden
-// and a "…" takes their place
+/* ---------- calendar: week heights, and "…" for days that are full ---------- */
+/* In each day under root (the weeks built ahead too), the chips that don't fit whole are hidden, one by one (a same-day
+   group can lose its last ones), and a "…" goes below the last one shown. At least one always shows: if there isn't
+   room for it and the "…" too, the "…" sits over its corner instead (.on). */
 const M_MORE = 13;   // px kept for the "…"
+const mUnclip = it => { for (const c of it.querySelectorAll('.m-hid')) c.classList.remove('m-hid'); const m = it.querySelector(':scope > .m-more'); if (m) m.remove(); };
 function mClip(root) {
   $$('.day .items', root).forEach(it => {
-    for (const c of it.querySelectorAll(':scope > .m-hid')) c.classList.remove('m-hid');
-    const old = it.querySelector(':scope > .m-more'); if (old) old.remove();
+    mUnclip(it);
     if (it.scrollHeight <= it.clientHeight + 1) return;
-    const lim = it.getBoundingClientRect().bottom - M_MORE;
-    let cut = false;
-    for (const c of it.children) { if (!cut && c.getBoundingClientRect().bottom > lim) cut = true; if (cut) c.classList.add('m-hid'); }
-    it.insertAdjacentHTML('beforeend', '<div class="m-more">…</div>');
+    const bottom = it.getBoundingClientRect().bottom, chips = $$('.chip', it);
+    if (!chips.length) return;
+    let n = chips.findIndex(c => c.getBoundingClientRect().bottom > bottom - M_MORE);
+    if (n < 0) return;
+    n = Math.max(1, n);
+    chips.slice(n).forEach(c => c.classList.add('m-hid'));
+    for (const w of it.children) if (!w.classList.contains('chip') && !w.querySelector('.chip:not(.m-hid)')) w.classList.add('m-hid');   // (groups left empty)
+    const over = chips[n - 1].getBoundingClientRect().bottom > bottom - M_MORE;
+    it.insertAdjacentHTML('beforeend', `<div class="m-more${over ? ' on' : ''}">…</div>`);
   });
 }
-const mUnclip = it => { for (const c of it.querySelectorAll(':scope > .m-hid')) c.classList.remove('m-hid'); const m = it.querySelector(':scope > .m-more'); if (m) m.remove(); };
-/* Week heights: what each week needs (weekNeeds), shared out as on desktop (fitSizes). Titles wrap (.day.wrap) in every
-   week if that still fits; otherwise in as many weeks as fit (those that grow least first), the rest on one line; and
-   if even one line doesn't fit, rows are capped and full days end in "…" (mClip, after). days: 7 a week, in order. */
+/* Week heights: what each week needs (weekNeeds, measured with every chip shown), shared out as on desktop (fitSizes):
+   busy weeks take room the quiet ones don't need; if that's still not enough, rows are capped and full days end in
+   "…" (mClip, after). days: 7 a week, in order. mNeed: the needs of the weeks just fitted (the view's), for mNbFit. */
+let mNeed = [];
 function mFit(days, H) {
-  const n = Math.floor(days.length / 7), sum = a => a.reduce((x, y) => x + y, 0);
-  days.forEach(d => { mUnclip(d.querySelector('.items')); d.classList.remove('wrap'); });
-  const one = weekNeeds(days);
-  days.forEach(d => d.classList.add('wrap'));
-  const wrapped = weekNeeds(days);
-  let wrap = Array(n).fill(true);
-  if (sum(wrapped) > H) {
-    wrap = Array(n).fill(false);
-    let tot = sum(one);
-    [...Array(n).keys()].sort((a, b) => (wrapped[a] - one[a]) - (wrapped[b] - one[b])).forEach(w => {
-      if (tot - one[w] + wrapped[w] <= H) { wrap[w] = true; tot += wrapped[w] - one[w]; }
-    });
+  days.forEach(d => mUnclip(d.querySelector('.items')));
+  mNeed = weekNeeds(days);
+  return fitSizes(mNeed, H);
+}
+// the weeks built ahead (buildNeighbours): each as tall as it will be once a step brings it into view (fitted with the
+// weeks it joins), so the step doesn't resize it as it lands
+function mNbFit(g) {
+  const H = g.clientHeight; if (!H || !mNeed.length) return;
+  for (const side of ['above', 'below']) {
+    const els = $$(`:scope > .nb.${side}`, g), days = els.filter(x => x.classList.contains('day')).sort((a, b) => a.dataset.date < b.dataset.date ? -1 : 1);
+    if (days.length !== 7) continue;
+    const nb = weekNeeds(days)[0], px = side === 'below' ? fitSizes(mNeed.slice(1).concat(nb), H).px.slice(-1)[0] : fitSizes([nb].concat(mNeed.slice(0, -1)), H).px[0];
+    days.forEach(d => { d.style.height = px + 'px'; });
+    if (side === 'above') els.forEach(x => { x.style.top = -px + 'px'; });
   }
-  days.forEach((d, i) => d.classList.toggle('wrap', wrap[Math.floor(i / 7)]));
-  return fitSizes(wrap.map((x, w) => x ? wrapped[w] : one[w]), H);
 }
 // a tap on a task opens its menu (a failed attempt: the attempt's menu); anywhere else in a day opens the day in day
 // view (its number does too, through its data-act). (stopPropagation: the document's click handler would close the menu)
@@ -264,10 +303,14 @@ dvBox.addEventListener('click', e => {
    opens a minimized sheet halfway, or minimizes it). Entering day view (from the calendar or the view switcher, not a
    swipe to another day) sets it for that day: down to just its heading when every task has a time (the timeline shows
    them all), all the way up when none does (or there are none), halfway when some do. Its height: --sheet-h. */
-const M_PEEK = 52;   // px: just the handle and heading (the timeline keeps this much room below it: css .dv-main)
+const M_PEEK = 76;   // px: the handle and heading, and clear room below them for the phone's own swipes (the timeline keeps this much room below it: css .dv-main)
 let mSheetH = M_PEEK, mSh = null;
-const mSheetMax = () => Math.max(M_PEEK, innerHeight - $('header').offsetHeight - 10);
-function mSheetSet(h) { mSheetH = clamp(h, M_PEEK, mSheetMax()); dvBox.style.setProperty('--sheet-h', Math.round(mSheetH) + 'px'); }
+// (all the way up stops short of the header, at about 70% of the screen, so its handle stays in a thumb's reach)
+const mSheetMax = () => Math.max(M_PEEK, Math.min(innerHeight - $('header').offsetHeight - 10, Math.round(innerHeight * 0.7)));
+function mSheetSet(h) {
+  mSheetH = clamp(h, M_PEEK, mSheetMax()); dvBox.style.setProperty('--sheet-h', Math.round(mSheetH) + 'px');
+  dvBox.classList.toggle('m-sheetmin', mSheetH <= M_PEEK + 2);   // (all the way down: just the heading, no half-shown list)
+}
 function mSheetAuto(d) {
   const ks = dayTasks(d), timed = ks.filter(it => planOf(it.k)).length;
   mSheetSet(ks.length && timed === ks.length ? M_PEEK : timed ? innerHeight * 0.45 : Infinity);
@@ -503,7 +546,7 @@ function mCalLift(s) {
   drag.ch = el.offsetHeight;
   s.cal = true; s.dx = s.x0 - r.left; s.dy = s.y0 - r.top;
   s.ghost = el.cloneNode(true); s.ghost.classList.add('m-ghost');
-  Object.assign(s.ghost.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px' });
+  Object.assign(s.ghost.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });   // (the size it had)
   document.body.appendChild(s.ghost);
   dragSrc = drag.from === 'fail' ? [el] : movingIds(id, false).flatMap(k => $$(`#grid .chip[data-id="${k}"]`));
   dragSrc.forEach(x => x.classList.add('dragsrc'));
@@ -559,4 +602,86 @@ function mDvDrop(s, cancelled) {
   if (dv) dvUp(mDvE(s), cancelled || !s.moved);
   if (s.sheetWas) mSheetSet(s.sheetWas);
   if (!cancelled && s.moved && stateGen !== s.gen) mUndo('Task moved');
+}
+
+/* ---------- the task menu ---------- */
+// its title bar: which task (and where it sits); it's also where the menu is swiped down from
+function mMenuHead(f) {
+  const where = [f.t.name, f.task.date ? fmtShort(f.task.date) : 'no date'].join(' · ');
+  return `<div class="m-mh" style="--c:${esc(colorOf(f.t))}"><span class="m-mh-d"></span><div class="m-mh-t"><b>${esc(f.task.title)}</b><span>${esc(where)}</span></div></div>`;
+}
+/* While a menu is open, a tap anywhere outside it only closes it: nothing under the tap reacts. A tap on another task
+   (chip, block, list item, the drawer's tree) still goes to it, so its menu takes this one's place. A swipe that
+   starts outside closes it too, and lets the swipe through. */
+const M_TASKS = '#grid .chip[data-id], #grid .chip[data-fid], #dayview .dv-blk[data-id], #dayview .dv-blk[data-fid], #dayview .dv-item[data-id], #dayview .dv-item[data-fid], .mt-task';
+let mMenuEat = null;
+window.addEventListener('pointerdown', e => {
+  mMenuEat = null;
+  if (!MOBILE || menu.style.display !== 'block' || !e.target.closest || menu.contains(e.target) || e.target.closest(M_TASKS)) return;
+  mMenuEat = { at: Date.now(), x: e.clientX, y: e.clientY };
+  e.stopImmediatePropagation();
+}, true);
+window.addEventListener('touchmove', e => {
+  const k = mMenuEat; if (!k) return;
+  const t = e.touches[0]; if (Math.hypot(t.clientX - k.x, t.clientY - k.y) > 10) { mMenuEat = null; closeMenu(); }
+}, { capture: true, passive: true });
+window.addEventListener('click', e => {
+  const k = mMenuEat; mMenuEat = null;
+  if (!k || Date.now() - k.at > 1500) return;
+  e.preventDefault(); e.stopImmediatePropagation(); closeMenu();
+}, true);
+// swiping it down (from its title bar, or anywhere on it when it isn't scrolled) closes it; let go early, it springs back
+let mMs = null;
+menu.addEventListener('touchstart', e => {
+  if (!MOBILE || e.touches.length !== 1) return;
+  mMs = mTouch(e); mFollow(e, mMenuMove, mMenuEnd);
+}, { passive: true });
+function mMenuMove(e) {
+  const s = mMs; if (!s) return;
+  const t = e.touches[0], dx = t.clientX - s.x0, dy = t.clientY - s.y0;
+  if (!s.axis) { if (Math.hypot(dx, dy) < 6) return; s.axis = dy > Math.abs(dx) && (menu.scrollTop <= 0 || e.target.closest('.m-mh')) ? 'y' : 'n'; }
+  if (s.axis !== 'y') return;
+  if (e.cancelable) e.preventDefault();
+  s.dx = Math.max(0, dy); mVel(s, dy);
+  menu.style.transition = 'none'; menu.style.transform = `translateY(${s.dx}px)`;
+}
+function mMenuEnd(cancelled) {
+  const s = mMs; mMs = null; if (!s || s.axis !== 'y') return;
+  const h = menu.offsetHeight, shut = !cancelled && ((mFlick(s) && s.vx > 0) || s.dx > h * 0.3);
+  menu.style.transition = 'transform .2s ease-out';
+  menu.style.transform = shut ? `translateY(${h + 30}px)` : '';
+  setTimeout(() => { if (shut) closeMenu(); menu.style.transform = menu.style.transition = ''; }, 200);
+}
+
+/* ---------- notes ---------- */
+/* View/edit notes (or Add notes): a card at the top, its text readable (links work); a tap on the text edits it, in a
+   box big enough not to make the phone zoom. Saving it empty removes the notes. (The desktop's note, opened beside the
+   task, closes as soon as the page scrolls, which the phone's keyboard does as it opens.) */
+function mNotes(id, editing) {
+  const f = findTask(id); if (!f) return;
+  const box = $('#mAsk'), card = $('.ma-card', box), notes = f.task.notes || '';
+  const head = `<div class="m-mh" style="--c:${esc(colorOf(f.t))}"><span class="m-mh-d"></span><div class="m-mh-t"><b>${esc(f.task.title)}</b><span>Notes</span></div></div>`;
+  const close = () => { box.classList.remove('on'); const ta = card.querySelector('textarea'); if (ta) ta.blur(); };
+  box.onclick = e => { if (e.target === box) close(); };
+  if (!editing && notes) {
+    card.innerHTML = `${head}<div class="mn-b">${linkifyNotes(notes)}</div><div class="mn-k">Tap the notes to edit</div>
+      <div class="ma-btns"><button class="btn ma-no">Close</button><button class="btn primary mn-ed">Edit</button></div>`;
+    card.onclick = e => {
+      if (e.target.closest('a')) return;   // (a link: just opens it)
+      if (e.target.closest('.mn-b, .mn-ed')) mNotes(id, true); else if (e.target.closest('.ma-no')) close();
+    };
+  } else {
+    card.innerHTML = `${head}<textarea class="mn-ta" spellcheck="true" placeholder="Anything to remember for this task"></textarea>
+      <div class="ma-btns">${notes ? '<button class="btn mn-del">Delete</button><span class="m-sp"></span>' : ''}<button class="btn ma-no">Cancel</button><button class="btn primary ma-ok">Save</button></div>`;
+    const ta = card.querySelector('textarea'); ta.value = notes;
+    const fit = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, innerHeight * 0.45) + 'px'; };
+    ta.oninput = fit;
+    card.onclick = e => {
+      if (e.target.closest('.ma-ok')) { const v = ta.value.trim(); close(); if (v !== notes.trim()) setTaskNotes(id, v); }
+      else if (e.target.closest('.mn-del')) { close(); setTaskNotes(id, ''); mUndo('Notes deleted'); }
+      else if (e.target.closest('.ma-no')) { if (notes) mNotes(id, false); else close(); }
+    };
+    setTimeout(() => { fit(); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
+  }
+  closeMenu(); box.classList.add('on');
 }

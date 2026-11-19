@@ -103,7 +103,7 @@ document.addEventListener('click', e => {
     case 'setlink': closeMenu(); setLink(id, a.dataset.v); break;
     case 'unsched': moveTask(id, null); break;
     case 'kmenu': openTaskMenu(id, a); break;
-    case 'k-notes': closeMenu(); editNotes(id, menuTask); break;
+    case 'k-notes': closeMenu(); if (MOBILE) mNotes(id); else editNotes(id, menuTask); break;   // (mobile: a card of its own, mobile.js)
     case 'k-day': { closeMenu(); const f = findTask(id); if (f && f.task.date) { if (admOpen) closeAdmire(); openDay(f.task.date); } break; }   // (mobile's task menu)
     case 'k-resched': closeMenu(); mReschedule(id); break;   // (mobile's task menu, mobile.js)
     case 'k-rename': closeMenu(); mRename(id); break;
