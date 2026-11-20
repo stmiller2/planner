@@ -170,7 +170,7 @@ const rowHeights = () => { const ds = viewDays(); return Array.from({ length: Ma
    that are in neither view (a slide of more weeks than are shown) pass by at an average height. */
 function weekShift(dir, m = 1) {
   if (weekAnim) weekAnim.finish();
-  if (MOBILE) { mFocus = null; mFocusBar($('#grid')); }   // (a week opened up to show all its tasks goes back to its usual size: mFocusSet)
+  if (MOBILE) { if (mFocusEnd) mFocusEnd(); mFocus = null; mFocusBar($('#grid')); }   // (a week opened up to show all its tasks goes back to its usual size: mFocusSet)
   clearTimeout(nbTimer);
   const g = $('#grid'), pulled = weekPull;   // how far a swipe's pull already moved it: the slide goes on from there
   setPull(0);

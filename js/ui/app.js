@@ -86,7 +86,9 @@ document.addEventListener('click', e => {
     case 'add-thread': addThread(id); break;
     case 'add-cf': addConflict(); break;
     case 'cf-cancel': cfAdding = false; dhint.style.display = 'none'; render(); break;
-    case 'del-c': delConflict(id); break;
+    case 'del-c': closeMenu(); delConflict(id); if (MOBILE) mUndo('Conflict deleted'); break;   // (mobile: from its menu)
+    case 'm-cf-dates': mCfDates(id); break;                                   // (mobile's conflict menu, which stays open under it)
+    case 'm-ren-c': mRenameAny('c', id); break;
     case 'cf-s': case 'cf-e': {
       const c = confs().find(x => x.id === id); if (!c) break;
       if (act === 'cf-s') editDateIn(a, { value: c.start, placeholder: 'Start', commit: v => setConflictDates(id, v, c.start ? addDays(v, diffDays(c.end, c.start)) : v) });
@@ -188,7 +190,7 @@ document.addEventListener('dblclick', e => {
     clearTimeout(revealTimer); closeTimePop(false); hideTip();
     return startRename('k', tt.closest('[data-id]').dataset.id, tt);
   }
-  const a = e.target.closest('[data-act^="rename-"]'); if (!a || a.querySelector('input')) return;
+  const a = e.target.closest('[data-act^="rename-"]'); if (!a || a.querySelector('input') || (MOBILE && a.dataset.act === 'rename-c')) return;   // (mobile: a conflict's menu has Rename…)
   startRename(a.dataset.act.slice(7), a.dataset.id, a.dataset.act === 'rename-c' ? a : undefined);
 });
 // Clicking anywhere outside an open, empty new-task box closes it, but the re-render waits until the click

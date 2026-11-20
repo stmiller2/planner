@@ -84,7 +84,7 @@ function cfDragStart(e, id, mode, dayAt, redraw, d0) {
   return true;
 }
 grid.addEventListener('pointerdown', e => {
-  const b = e.target.closest('.cfb'); if (!b || e.button !== 0 || e.ctrlKey || e.target.closest('.inl')) return;
+  const b = e.target.closest('.cfb'); if (!b || MOBILE || e.button !== 0 || e.ctrlKey || e.target.closest('.inl')) return;   // (mobile: a long press, mobile.js)
   cfDragStart(e, b.dataset.cid, e.target.closest('.h.l') ? 'l' : e.target.closest('.h.r') ? 'r' : 'move', calDayAt, () => renderCal());
 });
 document.addEventListener('pointermove', e => {

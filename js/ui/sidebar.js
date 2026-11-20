@@ -243,7 +243,7 @@ function openProjectMenu(id, btn) {
 // show the menu below btn (above it if there's no room), kept inside the window; at = { x, y }: at that point instead
 function placeMenu(btn, at) {
   const r = at ? { left: at.x, top: at.y, bottom: at.y } : btn.getBoundingClientRect();
-  delete menu.dataset.for; delete menu.dataset.kid;   // (which menu it is, where that matters: openAccount, mMenuBack)
+  delete menu.dataset.for; delete menu.dataset.kid; delete menu.dataset.cid;   // (which menu it is, where that matters: openAccount, mMenuBack)
   menu.style.display = 'block';
   menu.style.left = Math.max(8, Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + 'px';
   menu.style.top = (r.bottom + menu.offsetHeight + 6 > innerHeight ? r.top - menu.offsetHeight - 4 : r.bottom + 4) + 'px';

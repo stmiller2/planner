@@ -212,7 +212,7 @@ function mCloseEnd(cancelled) {
    chips coming back fade in, chips going and a "…" that moves or goes fade out where they were (a copy, .m-fade, laid
    over the day, as the chip itself is already display: none), and a new "…" fades in. mUnclip notes what was hidden
    (mWas) before showing it all; mClip compares with that. A day drawn afresh (renderCal) just shows its state. */
-const M_MORE = 13, M_FADE = 200;   // px kept for the "…"; ms a fade takes
+const M_MORE = 13, M_PLUSH = 20, M_FADE = 200;   // px kept for the "…" (a week opened up: for its "+N more" chip); ms a fade takes
 const mWas = new WeakMap(), mSeen = new WeakSet();   // mWas: items → { hid, more } as shown before mUnclip; mSeen: items clipped before
 // el's box in day's own coordinates (what an absolutely placed copy needs)
 const mBox = (el, day) => { const r = el.getBoundingClientRect(), d = day.getBoundingClientRect(); return { l: r.left - d.left - day.clientLeft, t: r.top - d.top - day.clientTop, w: r.width, h: r.height }; };
@@ -229,37 +229,41 @@ function mFadeOut(day, el, box) {
   day.appendChild(g);
   g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: M_FADE * 0.75, easing: 'ease-out' }).onfinish = () => g.remove();
 }
-// coming back: a soft drop into place, one after another down the day (i: its place among them), over about the time
-// the rows take to ease (.m-anim), so they appear as the week opens rather than all at once
-const mFadeIn = (el, i = 0) => el.animate([{ opacity: 0, transform: 'translateY(-4px)' }, { opacity: 1, transform: 'none' }],
-  { duration: 300, delay: Math.min(i * 35, 210), easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+const mFadeIn = el => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: M_FADE, easing: 'ease-out' });
 // el has an ancestor (inside it) in set: the ancestor's fade covers it
 const mInSet = (el, set, it) => { for (let x = el.parentElement; x && x !== it; x = x.parentElement) if (set.has(x)) return true; return false; };
-function mClip(root) {
+/* mode (or mClipMode, for a call through fitRows): how the changes show. Normally (null) they fade, on days clipped
+   before; 'quiet': none do (mFocusSet works out where things end up before the rows move); 'more': only the "…" (or
+   "+N more") fades in, what goes just goes (the end of mFocusSet's ease, where it's already out of sight). A day in a
+   week opened up (.m-foc) that still can't show everything ends in a chip saying how many more ("+N more") instead of
+   the "…"; a tap on it opens that day. */
+let mClipMode = null;
+function mClip(root, mode = mClipMode) {
   $$('.day .items', root).forEach(it => {
     mUnclip(it);
-    const was = mWas.get(it), day = it.parentElement, fade = MOTION() && mSeen.has(it) && !!it.animate;
+    const was = mWas.get(it), day = it.parentElement, fade = mode !== 'quiet' && MOTION() && mSeen.has(it) && !!it.animate, chipFade = fade && mode !== 'more';
     mWas.delete(it); mSeen.add(it);
+    const foc = day.classList.contains('m-foc'), keep = foc ? M_PLUSH : M_MORE;
     let hide = new Set(), more = null;
     const chips = it.scrollHeight > it.clientHeight + 1 ? $$('.chip', it) : [];
     if (chips.length) {
       const bottom = it.getBoundingClientRect().bottom;
-      let n = chips.findIndex(c => c.getBoundingClientRect().bottom > bottom - M_MORE);
+      let n = chips.findIndex(c => c.getBoundingClientRect().bottom > bottom - keep);
       if (n >= 0) {
         n = Math.max(1, n);
         hide = new Set(chips.slice(n));
         for (const w of it.children) if (!w.classList.contains('chip') && ![...w.querySelectorAll('.chip')].some(c => !hide.has(c))) hide.add(w);   // (groups left empty)
-        more = { over: chips[n - 1].getBoundingClientRect().bottom > bottom - M_MORE };
+        more = { over: !foc && chips[n - 1].getBoundingClientRect().bottom > bottom - keep, n: chips.length - n };
       }
     }
     // what goes fades out where it is now (measured before it's hidden; a copy below the day's edge is just clipped)
-    if (fade) for (const el of hide) if (!was.hid.has(el) && !mInSet(el, hide, it)) mFadeOut(day, el, mBox(el, day));
+    if (chipFade) for (const el of hide) if (!was.hid.has(el) && !mInSet(el, hide, it)) mFadeOut(day, el, mBox(el, day));
     hide.forEach(el => el.classList.add('m-hid'));
     let mEl = null;
-    if (more) { it.insertAdjacentHTML('beforeend', `<div class="m-more${more.over ? ' on' : ''}">…</div>`); mEl = it.lastElementChild; }
+    if (more) { it.insertAdjacentHTML('beforeend', foc ? `<div class="m-more m-plus">+${more.n} more</div>` : `<div class="m-more${more.over ? ' on' : ''}">…</div>`); mEl = it.lastElementChild; }
     if (!fade) return;
-    const back = new Set([...was.hid].filter(el => !hide.has(el) && it.contains(el)));
-    let n = 0; back.forEach(el => { if (!mInSet(el, back, it)) mFadeIn(el, n++); });
+    const back = chipFade ? new Set([...was.hid].filter(el => !hide.has(el) && it.contains(el))) : new Set();
+    back.forEach(el => { if (!mInSet(el, back, it)) mFadeIn(el); });
     const old = was.more, nb = mEl && mBox(mEl, day);
     if (old && nb && Math.abs(old.box.t - nb.t) < 2 && Math.abs(old.box.l - nb.l) < 2) return;   // ("…" where it was)
     if (old) mFadeOut(day, old.el, old.box);
@@ -288,22 +292,54 @@ function mFit(days, H) {
 }
 /* Opening up a week: a tap on a "…" makes its week as tall as all its tasks need, the other weeks crushed down to their
    day numbers and a chip or so (M_CRUSH), with a "Show less" at its foot to put things back. Changing weeks (or how
-   many are shown) puts them back too. The rows ease to their new sizes (.m-anim). The "…" are worked out for where
-   the rows end up before they move (laid out there for a moment, then put back to ease over), so a week too full to
-   show everything opens only as far as it will go, its "…" already in place, and nothing is hidden again at the end. */
-const M_CRUSH = 52, M_BAR = 30;   // M_BAR: .day.m-foc's extra padding (mobile.css)
-let mFocus = null, mAnimT = 0;   // mFocus: the first day of the week opened up
+   many are shown) puts them back too. The rows ease to their new sizes (.m-anim), every day of a week alike: its foot
+   moves at one speed, softly faded (.m-moving's mask), tasks showing or going as it passes them, and a "…" riding it
+   (.m-ride) on days that have more than shows, before or after (leading it down as a week opens, chasing it up as it
+   closes). What each day shows is worked out first for where the rows end up (laid out there for a moment, then put
+   back to ease over): a growing day shows it at once, below its moving foot; a shrinking one keeps what it showed
+   until the end, when what's now below its foot goes and its "…" / "+N more" fades in as the rider fades out
+   (mFocusEnd). A week too full to show everything opens only as far as it will go. */
+const M_CRUSH = 52, M_BAR = 30, M_EASE = 250;   // M_BAR: .day.m-foc's extra padding; M_EASE: #grid.m-anim's transition (mobile.css)
+let mFocus = null, mAnimT = 0, mFocusEnd = null;   // mFocus: the first day of the week opened up; mFocusEnd: lands the ease under way
 function mFocusSet(ws) {
-  mFocus = ws; const g = $('#grid');
-  clearTimeout(mAnimT);
-  const from = g.style.gridTemplateRows;
+  const g = $('#grid');
+  if (mFocusEnd) mFocusEnd();
+  // what each day shows now: the ones whose rows shrink keep it while their foot comes up
+  const snap = new Map(viewDays(g).map(d => { const it = d.querySelector('.items'); return [d, { hid: [...it.querySelectorAll('.m-hid')], more: it.querySelector(':scope > .m-more') }]; }));
+  const from = g.style.gridTemplateRows, before = rowHeights();
+  mFocus = ws;
   g.classList.remove('m-anim');
-  fitRows();   // (the rows where they end up, and their "…")
-  if (!MOTION()) return;
-  const to = g.style.gridTemplateRows;
+  mClipMode = 'quiet'; fitRows(); mClipMode = null;   // (the rows where they end up, and what each day shows there)
+  if (!MOTION() || !from) return;
+  const to = g.style.gridTemplateRows, after = to.split(' ').map(parseFloat), moving = [];
+  viewDays(g).forEach((d, i) => {
+    const w = Math.floor(i / 7), it = d.querySelector('.items'), sn = snap.get(d) || { hid: [], more: null };
+    if (!(Math.abs(after[w] - before[w]) > 0.5)) return;
+    const end = it.querySelector(':scope > .m-more');
+    if (after[w] < before[w]) {   // shrinking: as it was, until the end
+      for (const c of it.querySelectorAll('.m-hid')) c.classList.remove('m-hid'); if (end) end.remove();
+      sn.hid.forEach(c => c.classList.add('m-hid')); if (sn.more) it.appendChild(sn.more);
+    }
+    const cur = it.querySelector(':scope > .m-more'); if (cur) cur.classList.add('m-hid');   // (the rider stands in for it)
+    d.classList.add('m-moving'); moving.push(d);
+    if (sn.more || end) {
+      d.insertAdjacentHTML('beforeend', `<div class="m-ride">…</div>`);
+      const r = d.lastElementChild; r.style.bottom = (parseFloat(getComputedStyle(d).paddingBottom) + 1) + 'px';
+      if (!sn.more) r.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 100 });   // (only coming now)
+    }
+  });
   g.style.gridTemplateRows = from; void g.offsetHeight;   // back where they were, then ease over
   g.classList.add('m-anim'); g.style.gridTemplateRows = to;
-  mAnimT = setTimeout(() => { g.classList.remove('m-anim'); mClip(g); }, 320);   // (mClip: only if a resize came mid-way)
+  mFocusEnd = () => {
+    clearTimeout(mAnimT); mFocusEnd = null; g.classList.remove('m-anim');
+    moving.forEach(d => {
+      d.classList.remove('m-moving'); if (!d.isConnected) return;   // (redrawn meanwhile: nothing to land)
+      const it = d.querySelector('.items'), m = it && it.querySelector(':scope > .m-more'); if (m) m.remove();
+      if (it) { mWas.delete(it); mClip(d, 'more'); }
+      for (const r of d.querySelectorAll(':scope > .m-ride')) { if (r.animate && MOTION()) r.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140 }).onfinish = () => r.remove(); else r.remove(); }
+    });
+  };
+  mAnimT = setTimeout(mFocusEnd, M_EASE + 20);
 }
 // the "Show less" under the week opened up (a grid item along the bottom of its row). A new one fades in once the rows
 // have eased over (css .m-less), so it doesn't show at the foot of the row's old height first; one already there stays
@@ -332,6 +368,7 @@ let mSwipedAt = 0;
 $('#grid').addEventListener('click', e => {
   if (!MOBILE || Date.now() - mSwipedAt < 400) return;
   if (e.target.closest('.m-less')) { mFocusSet(null); return; }
+  const cb = e.target.closest('.cfb'); if (cb) { openConflictMenu(cb.dataset.cid, { x: e.clientX, y: e.clientY }); e.stopPropagation(); return; }
   const more = e.target.closest('.m-more');
   // ("…" in a week already opened up: some day still holds more than fits, so that day in day view)
   if (more) { const day = more.closest('.day'); if (day) { if (day.classList.contains('m-foc')) openDay(day.dataset.date); else mFocusSet(weekStartOf(day.dataset.date)); } return; }
@@ -362,9 +399,10 @@ function mCalMove(e) {
   if (!s.axis) {
     if (Math.hypot(dx, dy) < 8) return;
     s.axis = Math.abs(dy) >= Math.abs(dx) ? 'y' : 'x';
-    // (a week opened up stays so, "Show less" pulled along with it (setPull), unless the swipe steps on: weekShift)
+    // (a week opened up: the swipe puts it back, and that's all it does)
+    if (s.axis === 'y' && mFocus) { mSw = null; mSwipedAt = Date.now(); mFocusSet(null); return; }
     // (R: how far it follows before resisting, and what a step is measured against: a week's usual share of the
-    // calendar, not an opened-up week's height)
+    // calendar)
     if (s.axis === 'y') { clearTimeout(nbTimer); buildNeighbours(); const g = $('#grid'); s.R = Math.min(rowHeights()[0] || 100, g.clientHeight / ui.weeks); }
   }
   if (s.axis !== 'y') return;
@@ -416,6 +454,7 @@ function mDayEnd(cancelled) {
 dvBox.addEventListener('click', e => {
   if (!MOBILE) return;
   if (e.target.closest('.dv-madd')) { mAddTask(null, ui.dayView); return; }
+  const cf = e.target.closest('.dv-cfb, .dv-cfp'); if (cf) { openConflictMenu(cf.dataset.cid, { x: e.clientX, y: e.clientY }); e.stopPropagation(); return; }
   if (e.target.closest('input, button, .inl, [data-act]')) return;
   const el = e.target.closest('.dv-blk, .dv-item');
   // a tap on the timeline's blank space puts the sheet away (all the way down)
@@ -541,6 +580,8 @@ function mTask(t, k, loose) {
 }
 $('#tree').addEventListener('click', e => {
   if (!MOBILE) return;
+  // (a conflict's row, anywhere on it: its menu, which has what the row's date buttons and name do on desktop)
+  const cr = e.target.closest('.cfrow[data-cid]'); if (cr) { openConflictMenu(cr.dataset.cid, { x: e.clientX, y: e.clientY }); e.preventDefault(); e.stopPropagation(); return; }
   const r = e.target.closest('[data-mtog]');
   if (r) { const id = r.dataset.mtog, n = r.parentElement, shut = !n.classList.contains('closed'); n.classList.toggle('closed', shut); ui.collapsed[id] = shut; saveUI(); return; }
   const k = e.target.closest('.mt-task[data-id]');
@@ -606,7 +647,7 @@ function mAsk(o) {
   const inp = $('.ma-in', card), hint = $('.ma-hint', card), okb = $('.ma-ok', card);
   inp.value = o.value || ''; inp.placeholder = o.placeholder || '';
   const check = () => { const r = o.read(inp.value); hint.textContent = r.hint || ''; hint.classList.toggle('bad', !r.ok); okb.disabled = !r.ok; return r; };
-  const close = () => { box.classList.remove('on'); inp.blur(); if (o.menuFor) mMenuBack(o.menuFor); };
+  const close = () => { box.classList.remove('on'); inp.blur(); if (o.menuFor) mMenuBack(o.menuFor, o.menuKind); };
   const cancel = () => { close(); if (o.cancel) o.cancel(); };
   const sw = $('.ma-sw input', card), on = () => !!(sw && sw.checked);
   const ok = () => { const r = check(); if (r.ok) { close(); o.done(r.value, on()); } };
@@ -645,8 +686,9 @@ function mRenameAny(kind, id, fresh) {
   let cur, set, what;
   if (kind === 'p') { const p = state.projects.find(x => x.id === id); if (!p) return; cur = p.name; what = 'Project name'; set = v => mutate(() => { p.name = v; }); }
   else if (kind === 't') { const f = findThread(id); if (!f) return; cur = f.t.name; what = 'Thread name'; set = v => mutate(() => { f.t.name = v; }); }
+  else if (kind === 'c') { const c = confs().find(x => x.id === id); if (!c) return; cur = c.title; what = 'Conflict name'; set = v => mutate(() => { c.title = v; }); }
   else { const f = findTask(id); if (!f) return; cur = f.task.title; what = 'Task name'; set = v => mutate(() => { f.task.title = v; }); }
-  mAsk({ title: fresh ? (kind === 'p' ? 'New project' : 'New thread') : 'Rename', value: cur, placeholder: what, menuFor: kind === 'k' ? id : null,
+  mAsk({ title: fresh ? (kind === 'p' ? 'New project' : 'New thread') : 'Rename', value: cur, placeholder: what, menuFor: kind === 'k' || kind === 'c' ? id : null, menuKind: kind,
     cancel: fresh && kind !== 'k' ? () => mDropNew(kind, id, gen) : null,
     read: t => ({ ok: !!t.trim(), value: t.trim() }), done: v => { if (v !== cur) { set(v); if (!fresh) mUndo('Renamed'); } } });
 }
@@ -771,7 +813,7 @@ const mDayAddBtn = () => `<button class="dv-madd" aria-label="Add task to this d
    moveTasksTo / dv's altKey): its links are cut and the rest of its thread stays put. Only where that would make a
    difference (mSplitMatters); moving first is an ordinary drag. */
 const M_PEEL = 800;
-const M_HOLD = 380, M_LIFTABLE = '#grid .day:not(.nb) .chip[data-id], #grid .day:not(.nb) .chip[data-fid], #dayview .dv-blk[data-id], #dayview .dv-item[data-id], #tree .mt-task[data-id], #tree .mt-row[data-mtog]';
+const M_HOLD = 380, M_LIFTABLE = '#grid .day:not(.nb) .chip[data-id], #grid .day:not(.nb) .chip[data-fid], #grid .cfb[data-cid]:not(.nb), #dayview .dv-blk[data-id], #dayview .dv-item[data-id], #tree .mt-task[data-id], #tree .mt-row[data-mtog]';
 let mLp = null, mLpAt = 0, mLpEat = null;   // mLpEat: the click a held-and-let-go task may still get, to swallow
 document.body.insertAdjacentHTML('beforeend', `<div id="mDropOff">${ICON.nodate}<span>Drop here to unschedule</span></div>`);
 window.addEventListener('touchstart', e => {
@@ -800,7 +842,8 @@ function mLift() {
   if (s.el.matches('.mt-row')) {   // a project or thread in the drawer: its menu
     s.row = true; const id = s.el.dataset.mtog;
     if (s.el.parentElement.classList.contains('mt-p')) openProjectMenu(id, s.el); else openThreadMenu(id, s.el);
-  } else if (s.el.closest('#tree')) mTreeLift(s);
+  } else if (s.el.matches('.cfb')) mCfLift(s);
+  else if (s.el.closest('#tree')) mTreeLift(s);
   else if (s.el.closest('#grid')) mCalLift(s); else mDvLift(s);
   const f = !s.row && mLp === s && s.el.dataset.id && findTask(s.el.dataset.id);
   if (f && mSplitMatters(f)) s.peelT = setTimeout(() => mPeel(s), M_PEEL);
@@ -830,7 +873,7 @@ function mLpMove(e) {
   if (s.row) return;
   if (e.cancelable) e.preventDefault();   // (nothing scrolls under a lifted task)
   if (!s.moved && Math.hypot(s.x - s.x0, s.y - s.y0) > 6) { s.moved = true; clearTimeout(s.peelT); }   // (a drag: no peeling off now)
-  if (s.tree) mTreeDrag(s); else if (s.cal) mCalDrag(s); else mDvDrag(s);
+  if (s.cf) mCfDrag(s); else if (s.tree) mTreeDrag(s); else if (s.cal) mCalDrag(s); else mDvDrag(s);
 }
 function mLpEnd(cancelled) {
   const s = mLp; mLp = null; if (!s) return;
@@ -839,7 +882,7 @@ function mLpEnd(cancelled) {
   if (!s.on) return;
   mLpAt = Date.now();
   if (s.row) { mLpEat = { el: s.el, until: Date.now() + 450 }; return; }   // (its menu is open; the click would fold it)
-  if (s.tree) mTreeDrop(s, cancelled); else if (s.cal) mCalDrop(s, cancelled); else mDvDrop(s, cancelled);
+  if (s.cf) mCfDrop(s, cancelled); else if (s.tree) mTreeDrop(s, cancelled); else if (s.cal) mCalDrop(s, cancelled); else mDvDrop(s, cancelled);
   if (!s.moved) mLpEat = { el: s.el, until: Date.now() + 450 };   // held and let go in place: just put back (not the click that may follow, which would open its menu)
 }
 // the drawer's tree: a task lifted moves up and down (to another place in its thread, or another thread); a line shows
@@ -932,7 +975,8 @@ function mCalDrag(s) {
   const under = document.elementFromPoint(s.x, s.y), head = s.y < $('header').getBoundingClientRect().bottom;
   s.off = head && drag.from !== 'fail';
   $('#mDropOff').classList.toggle('over', s.off);
-  let day = !head && under && under.closest('#grid .day:not(.nb)');
+  // (the day under the finger, also under a conflict bar, which now takes taps itself)
+  let day = !head && under && (under.closest('#grid .day:not(.nb)') || (under.closest('#grid .cfb') && document.elementsFromPoint(s.x, s.y).find(n => n.matches && n.matches('#grid .day:not(.nb)'))));
   if (day && drag.from === 'fail' && under.closest(`.chip.failed[data-fid="${drag.fid}"]`)) day = null;   // back on its own chip: calls it off (failBail)
   if (day !== s.day) { $$('#grid .day.over').forEach(x => x.classList.remove('over')); if (day) day.classList.add('over'); else calGap.hide(); s.day = day || null; }
   if (day) calGapAt(day, !!s.split);
@@ -958,6 +1002,35 @@ function mCalDrop(s, cancelled) {
   calDropOn(s.day, !!s.split);
   if (was !== date) { if (navigator.vibrate) navigator.vibrate(8); mUndo(`Moved to ${fmtShort(date)}`); }
 }
+/* a conflict bar on the calendar: held, it lifts; moved, the conflict follows the finger day by day (its length kept;
+   shown live, as dragging it on desktop does, touch() and a redraw), and near the top or bottom the weeks step on.
+   Let go: one undoable change (mutate), or back where it was. */
+function mCfLift(s) {
+  const c = confs().find(x => x.id === s.el.dataset.cid); if (!c || !c.start) { mLp = null; return; }
+  s.cf = { id: c.id, d0: calDayAt(s.x0, s.y0) || c.start, s0: c.start, e0: c.end };
+  mCfMark(s); document.body.classList.add('m-lifting');
+}
+const mCfMark = s => $$(`#grid .cfb[data-cid="${s.cf.id}"]`).forEach(b => b.classList.add('m-cflift'));
+function mCfDrag(s) {
+  const c = confs().find(x => x.id === s.cf.id), d = calDayAt(s.x, s.y);
+  if (c && d) {
+    const k = diffDays(d, s.cf.d0), a = addDays(s.cf.s0, k), b = addDays(s.cf.e0, k);
+    if (a !== c.start) { c.start = a; c.end = b; touch(); renderCal(); mCfMark(s); }
+  }
+  const g = $('#grid').getBoundingClientRect(), Z = 34, dir = s.y < g.top + Z ? -1 : s.y > g.bottom - Z ? 1 : 0;
+  if (dir !== s.edge) {
+    clearTimeout(s.edgeT); s.edge = dir;
+    const step = () => { if (mLp !== s) return; weekShift(dir); s.edgeT = setTimeout(step, 800); };
+    if (dir) s.edgeT = setTimeout(step, 550);
+  }
+}
+function mCfDrop(s, cancelled) {
+  clearTimeout(s.edgeT); document.body.classList.remove('m-lifting');
+  const c = confs().find(x => x.id === s.cf.id); if (!c) return;
+  const a = c.start, b = c.end; c.start = s.cf.s0; c.end = s.cf.e0; touch();   // (put back, then the move as one step)
+  if (!cancelled && a !== s.cf.s0) { mutate(() => { c.start = a; c.end = b; }); if (navigator.vibrate) navigator.vibrate(8); mUndo(`Moved to ${cfSpan(c)}`); }
+  else renderCal();
+}
 // day view: the desktop's drag (dv), started here and fed these touches as pointer positions
 const mDvE = s => ({ clientX: s.x, clientY: s.y, target: document.elementFromPoint(s.x, s.y) || document.body, altKey: !!s.split });   // (peeled off: as Option)
 function mDvLift(s) {
@@ -980,14 +1053,16 @@ function mDvDrop(s, cancelled) {
 }
 
 /* ---------- the task menu ---------- */
-// its title bar: which task (and where it sits); it's also where the menu is swiped down from
-function mMenuHead(f) { return mMenuHeadOf(f.task.title, [f.t.name, f.task.date ? fmtShort(f.task.date) : 'no date'].join(' · '), colorOf(f.t)); }
+// its title bar: which task (and where it sits), as a block in the task's color, like its chip (done: as a done chip);
+// it's also where the menu is swiped down from
+const mTaskHead = (k, color, sub) => `<div class="m-mh m-mhk${k.done ? ' done' : ''}" style="--c:${esc(color)}"><div class="m-mh-t"><b>${esc(k.title)}</b><span>${esc(sub)}</span></div></div>`;
+function mMenuHead(f) { return mTaskHead(f.task, colorOf(f.t), [f.t.name, f.task.date ? fmtShort(f.task.date) : 'no date'].join(' · ')); }
 // the same for a thread or project (no color: no dot)
 const mMenuHeadOf = (title, sub, color) => `<div class="m-mh" ${color ? `style="--c:${esc(color)}"` : ''}>${color ? '<span class="m-mh-d"></span>' : ''}<div class="m-mh-t"><b>${esc(title)}</b><span>${esc(sub)}</span></div></div>`;
 /* While a menu is open, a tap anywhere outside it only closes it: nothing under the tap reacts. A tap on another task
    (chip, block, list item, the drawer's tree) still goes to it, so its menu takes this one's place. A swipe that
    starts outside closes it too, and lets the swipe through. */
-const M_TASKS = '#grid .chip[data-id], #grid .chip[data-fid], #dayview .dv-blk[data-id], #dayview .dv-blk[data-fid], #dayview .dv-item[data-id], #dayview .dv-item[data-fid], .mt-task';
+const M_TASKS = '#grid .chip[data-id], #grid .chip[data-fid], #dayview .dv-blk[data-id], #dayview .dv-blk[data-fid], #dayview .dv-item[data-id], #dayview .dv-item[data-fid], .mt-task, #grid .cfb, #dayview .dv-cfb, #dayview .dv-cfp, #tree .cfrow';
 let mMenuEat = null;
 window.addEventListener('pointerdown', e => {
   mMenuEat = null;
@@ -1009,11 +1084,51 @@ window.addEventListener('click', e => {
    as the keyboard opens all leave the menu be: mPopOpen), and once the box closes the menu is drawn again for the task
    as it now is (mMenuBack; menu.dataset.kid: the task it's open for, set by openTaskMenu). */
 const mPopOpen = () => $('#mAsk').classList.contains('on') || $('#tpop').style.display === 'block';
-function mMenuBack(id) {
+function mMenuBack(id, kind = 'k') {
   setTimeout(() => {   // (after the change the box made, and its redraw)
-    if (!MOBILE || menu.style.display !== 'block' || menu.dataset.kid !== id || mPopOpen()) return;
+    if (!MOBILE || menu.style.display !== 'block' || menu.dataset[kind === 'c' ? 'cid' : 'kid'] !== id || mPopOpen()) return;
+    if (kind === 'c') { if (confs().some(c => c.id === id)) openConflictMenu(id); else closeMenu(); return; }
     if (findTask(id)) openTaskMenu(id, null, { x: 0, y: 0 }, menuTask && menuTask.isConnected ? menuTask : null); else closeMenu();
   }, 0);
+}
+/* ---------- conflicts: tap for a menu (a tap on one on the calendar, in day view or in the drawer) ---------- */
+// its title bar like the conflict's bar; Change dates…, Rename… (boxes over the menu, which stays open: mMenuBack), Delete
+function openConflictMenu(id, at) {
+  const c = confs().find(x => x.id === id); if (!c) return;
+  menu.innerHTML = `<div class="m-mh m-mhc"><div class="m-mh-t"><b>${esc(c.title)}</b><span>${c.start ? cfSpan(c) : 'no date'}</span></div></div>`
+    + menuBtn('m-cf-dates', id, ICON.calendar, 'Change dates…') + menuBtn('m-ren-c', id, M_PENCIL, 'Rename…')
+    + '<hr>' + menuBtn('del-c', id, ICON.trash, 'Delete');
+  placeMenu(null, at || { x: 0, y: 0 }); menu.dataset.cid = id;
+}
+// Change dates…: start and end (typed as anywhere: fri, 11/26, +3; an empty end = one day), or no date at all
+function mCfDates(id) {
+  const c = confs().find(x => x.id === id); if (!c) return;
+  const box = $('#mAsk'), card = $('.ma-card', box);
+  card.innerHTML = `<div class="ma-h">Dates</div><div class="ma-sub">${esc(c.title)}</div>
+    <div class="ma-two"><label>Start<input class="ma-in ma-s" spellcheck="false" autocomplete="off" enterkeyhint="next"></label>
+    <label>End<input class="ma-in ma-e" placeholder="one day" spellcheck="false" autocomplete="off" enterkeyhint="done"></label></div>
+    <div class="ma-hint"></div>
+    <div class="ma-btns"><button class="btn mn-del ma-none">No date</button><span class="m-sp"></span><button class="btn ma-no">Cancel</button><button class="btn primary ma-ok">Save</button></div>`;
+  const si = $('.ma-s', card), ei = $('.ma-e', card), hint = $('.ma-hint', card), okb = $('.ma-ok', card);
+  si.value = c.start ? fmtShort(c.start) : ''; ei.value = c.start && c.end !== c.start ? fmtShort(c.end) : '';
+  const read = () => {
+    const a = parseDateText(si.value), b = ei.value.trim() ? parseDateText(ei.value, a || todayISO()) : '';
+    const bad = !a ? 'Start: try Nov 26, 11/26, fri, +3' : b === null ? 'End: try Nov 26, 11/26, fri, +3' : b && b < a ? 'End is before the start' : '';
+    hint.textContent = bad || (b && b !== a ? `${dayLabel(a)} – ${dayLabel(b)}` : dayLabel(a)); hint.classList.toggle('bad', !!bad); okb.disabled = !!bad;
+    return bad ? null : { a, b: b || a };
+  };
+  const close = () => { box.classList.remove('on'); si.blur(); ei.blur(); mMenuBack(id, 'c'); };
+  const save = () => { const r = read(); if (!r) return; close(); if (r.a !== c.start || r.b !== c.end) { setConflictDates(id, r.a, r.b); mUndo(`Moved to ${cfSpan(c)}`); } };
+  si.oninput = ei.oninput = read;
+  si.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); ei.focus(); } };
+  ei.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); save(); } };
+  card.onclick = e => {
+    if (e.target.closest('.ma-ok')) save(); else if (e.target.closest('.ma-no')) close();
+    else if (e.target.closest('.ma-none')) { close(); if (c.start) { setConflictDates(id, null); mUndo('Dates taken off'); } }
+  };
+  box.onclick = e => { if (e.target === box) close(); };
+  box.classList.remove('m-low'); mAskFit(); box.classList.add('on'); read();
+  si.focus(); si.select();
 }
 // swiping it down (from its title bar, or anywhere on it when it isn't scrolled) closes it; let go early, it springs back
 let mMs = null;
@@ -1083,7 +1198,7 @@ $('#tpop').addEventListener('click', e => {
 function mNotes(id, editing) {
   const f = findTask(id); if (!f) return;
   const box = $('#mAsk'), card = $('.ma-card', box), notes = f.task.notes || '';
-  const head = `<div class="m-mh" style="--c:${esc(colorOf(f.t))}"><span class="m-mh-d"></span><div class="m-mh-t"><b>${esc(f.task.title)}</b><span>Notes</span></div></div>`;
+  const head = mTaskHead(f.task, colorOf(f.t), 'Notes');
   const close = () => { box.classList.remove('on'); const ta = card.querySelector('textarea'); if (ta) ta.blur(); mMenuBack(id); };
   box.onclick = e => { if (e.target === box) close(); };
   if (!editing && notes) {
