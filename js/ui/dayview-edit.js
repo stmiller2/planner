@@ -75,9 +75,11 @@ function openTimePop(id, x, y) {
   const p = planOf(f.task);
   tpop = { id, scroll: [($('#dayview .dv-scroll') || {}).scrollTop, ($('#dayview .dv-list') || {}).scrollTop], dur: p ? p.dur : DEFAULT_DUR };
   tpEl.style.setProperty('--c', colorOf(f.t));
+  // (mobile: a number pad, and taps for the quarter hours and am / pm above the fields: mTpBtns)
+  const pad = MOBILE ? ' inputmode="numeric"' : '';
   tpEl.innerHTML = `<button class="ic tp-x" title="Close">${ICON.x}</button>
-    <div class="tp-h">${esc(f.task.title)}</div>
-    <div class="tp-row"><label>Start<input class="tp-s" spellcheck="false" autocomplete="off"></label><span class="tp-dash">–</span><label>End<input class="tp-e" spellcheck="false" autocomplete="off"></label></div>
+    <div class="tp-h">${esc(f.task.title)}</div>${MOBILE ? mTpBtns() : ''}
+    <div class="tp-row"><label>Start<input class="tp-s" spellcheck="false" autocomplete="off"${pad}></label><span class="tp-dash">–</span><label>End<input class="tp-e" spellcheck="false" autocomplete="off"${pad}></label></div>
     <div class="tp-f"><span class="tp-d"></span>${p ? '<button class="mini tp-clear">Take off timeline</button>' : ''}</div>
     <div class="tp-k" title="Hold ⇧ Shift with ↑ / ↓ to step by an hour">Enter saves · ↑↓ ±${ui.snap} min · Esc cancels</div>`;
   fillTimePop();

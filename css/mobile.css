@@ -117,6 +117,9 @@ body.mobile .m-grab{display:block;flex:none;height:20px;touch-action:none;cursor
 body.mobile .m-grab i{display:block;width:40px;height:5px;margin:8px auto 0;border-radius:3px;background:color-mix(in srgb,var(--muted) 50%,transparent)}
 body.mobile .dv-side .sb-head{flex:none;padding-top:2px;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
 body.mobile .dv-grid{margin-right:8px}
+/* one day shown: the days either side, seen while swiping, look like any day (no "other day" tint to drop on landing) */
+body.mobile .dv-col.other{background:none}
+body.mobile .dv-col.other.we{background:var(--weekend)}
 body.mobile :is(.dv-main,.dv-list){touch-action:pan-y}   /* (sideways: a swipe to the next / previous day, mobile.js) */
 /* while day view swipes or slides to another day, the list holds the days either side too, side by side, and moves
    sideways with the timeline (renderDayList / setStripX) */
@@ -185,7 +188,7 @@ body.mobile #tree{padding:0}
 .mt-ck{flex:none;width:18px;height:18px;margin-top:1px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--c) 70%,var(--muted));display:grid;place-items:center;color:#fff}
 .mt-ck svg{width:12px;height:12px;stroke-width:3}
 .mt-task.done .mt-ck{background:var(--c);border-color:var(--c)}
-.mt-n{flex:none;min-width:14px;margin-top:1px;font-size:11.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.mt-n{flex:none;min-width:calc(var(--nw,1) * .62em + 10px);margin-top:1px;font-size:11.5px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}   /* (as wide as a chain's box: titles line up) */
 .mt-tt{flex:1;min-width:0;overflow-wrap:break-word}
 .mt-task.done .mt-tt{color:var(--muted);text-decoration:line-through}
 .mt-d{flex:none;margin-top:1px;font-size:12.5px;color:var(--muted);white-space:nowrap}
@@ -197,9 +200,9 @@ body.mobile #tree{padding:0}
 .mt-empty.mt-end{height:auto}
 /* adding a task (mAddTask): one button at the drawer's foot, and one in day view's sheet heading */
 .m-foot,.dv-madd{display:none}
-body.mobile .m-foot{display:block;flex:none;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
-.m-addk{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;font-size:15.5px;font-weight:600;border-radius:12px}
-.m-addk svg{width:18px;height:18px;stroke-width:2.4}
+body.mobile .m-foot{display:block;flex:none;padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line2)}
+.m-addk{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px;border:0;border-radius:10px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font-size:14.5px;font-weight:600}
+.m-addk svg{width:16px;height:16px;stroke-width:2.4}
 body.mobile .dv-madd{display:flex;align-items:center;gap:5px;margin-left:auto;padding:5px 12px 5px 9px;border:0;border-radius:99px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .dv-madd svg{width:15px;height:15px;stroke-width:2.4}
 /* first which thread (a list as the drawer shows them: projects, then threads and sub-threads, indented, with their
@@ -211,6 +214,8 @@ body.mobile .dv-madd{display:flex;align-items:center;gap:5px;margin-left:auto;pa
 .mp-t{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:0 10px 0 calc(14px + var(--d) * 20px);border:0;border-radius:10px;background:none;font:inherit;font-size:15px;font-weight:580;color:var(--ink);text-align:left;-webkit-tap-highlight-color:transparent}
 .mp-t.on{background:color-mix(in srgb,var(--c) 16%,transparent)}
 .mp-none{padding:6px 14px 8px;font-size:13.5px;color:var(--muted)}
+.mp-list.only .mp-off{display:none}   /* (day view: only the threads on that day, until "Show all threads") */
+.mp-all{display:block;width:100%;margin-top:6px;padding:10px 14px;border:0;border-radius:10px;background:none;font:inherit;font-size:14px;font-weight:600;color:var(--accent);text-align:left}
 .ma-thr{display:flex;align-items:center;gap:10px;width:100%;margin-top:12px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font:inherit;color:var(--ink);text-align:left;-webkit-tap-highlight-color:transparent}
 .ma-thr-t{flex:1;min-width:0;display:flex;flex-direction:column}
 .ma-thr-t b{font-size:15.5px;font-weight:620;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -220,7 +225,7 @@ body.mobile .dv-madd{display:flex;align-items:center;gap:5px;margin-left:auto;pa
 /* linked tasks, as in the desktop's sidebar but without its bar down the chain: a box round the numbers of each
    same-day run, a short line from one box to the next across a next-day link */
 .mt-task{position:relative}
-.mt-n.nb{position:relative;align-self:stretch;margin:-9px 0;padding:10px 3px 0;min-width:16px;text-align:center;box-sizing:border-box}
+.mt-n.nb{position:relative;align-self:stretch;margin:-9px 0;padding:10px 0 0;width:calc(var(--nw,1) * .62em + 10px);min-width:0;text-align:center;box-sizing:border-box}   /* (one width per thread: --nw) */
 .mt-n.nb::before{content:'';position:absolute;inset:0;border-left:1.5px solid color-mix(in srgb,var(--c) 65%,transparent);border-right:1.5px solid color-mix(in srgb,var(--c) 65%,transparent);pointer-events:none}
 .mt-n.nbs::before{top:6px;border-top:1.5px solid color-mix(in srgb,var(--c) 65%,transparent);border-radius:5px 5px 0 0}
 .mt-n.nbe::before{bottom:6px;border-bottom:1.5px solid color-mix(in srgb,var(--c) 65%,transparent);border-radius:0 0 5px 5px}
@@ -274,6 +279,13 @@ body.mobile #toast{align-items:center;gap:12px;padding:8px 8px 8px 14px}
 body.mobile #tpop{left:8px !important;right:8px;top:68px !important;width:auto;padding:14px 16px;font-size:15px;z-index:62}   /* (over the task menu, which stays open under it) */
 body.mobile #tpop input{font-size:17px;padding:7px 8px}
 body.mobile #tpop .tp-k{display:none}   /* (keyboard hints; a tap outside saves) */
+/* above the fields: the quarter hours, and am / pm (mTpBtns); the field they change is outlined */
+.tp-q{display:flex;gap:6px;margin:10px 0 2px}
+.tp-q button{flex:1;min-width:0;padding:8px 0;border:1px solid var(--line);border-radius:9px;background:var(--bg);font:inherit;font-size:14.5px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;-webkit-tap-highlight-color:transparent}
+.tp-q button:active{background:color-mix(in srgb,var(--accent) 14%,var(--bg))}
+.tp-q button.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--bg));color:var(--accent)}
+.tp-q .tp-qs{flex:none;width:4px}
+body.mobile #tpop input.tp-cur{border-color:var(--accent)}
 
 /* a lifted task (long press: mLift, mobile.js) */
 .m-ghost{position:fixed;z-index:70;pointer-events:none;margin:0;overflow:hidden;transform:scale(1.04) rotate(-1deg);box-shadow:0 10px 24px rgba(0,0,0,.28);opacity:.96;transition:transform .15s}
@@ -319,7 +331,9 @@ body.mobile #grid .day.m-foc{padding-bottom:32px}
 body.mobile .m-less{grid-column:1 / -1;align-self:end;justify-self:center;z-index:4;display:flex;align-items:center;gap:4px;margin-bottom:4px;padding:4px 12px 4px 9px;border:1px solid var(--line);border-radius:99px;
   background:var(--panel);box-shadow:0 2px 8px rgba(0,0,0,.14);font:inherit;font-size:12px;font-weight:600;color:var(--text);-webkit-tap-highlight-color:transparent}
 body.mobile .m-less svg{width:14px;height:14px}
+body.mobile .m-less{animation:mLessIn .18s ease-out .26s backwards}   /* (once the rows have eased over: mFocusBar) */
+@keyframes mLessIn{from{opacity:0;transform:translateY(4px)}}
 body.mobile #grid.settle>.m-less{transition:translate .18s ease-out}   /* (pulled along by a swipe with its week: setPull) */
 /* a chip, group or "…" going: a copy fading out where it was, over the day (mFadeOut) */
 body.mobile #grid .m-fade{position:absolute;z-index:1;margin:0;box-sizing:border-box;pointer-events:none}
-@media (prefers-reduced-motion: reduce){#grid.m-anim{transition:none}}
+@media (prefers-reduced-motion: reduce){#grid.m-anim{transition:none}body.mobile .m-less{animation:none}}

@@ -77,10 +77,11 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         keyboard, #mAsk.m-low placed on the visual viewport by `mAskFit`; the thread is a best guess,
                         `mGuessThread`: last added to on this device in the last few hours, localStorage
                         planner.mLastAdd, else the thread busiest around the day, else the one whose next unfinished
-                        task is soonest; tapping it lists every thread and sub-thread, `mThreadRows`; threads in the
+                        task is soonest; tapping it lists every thread and sub-thread, `mThreadRows`, day view's only
+                        those on that day until "Show all threads" (.mp-off), Cancel returning to the name; threads in the
                         drawer end in a `.mt-end` marker, where a lifted task can be dropped), linked tasks drawn as on desktop but without the chain bar (`mTask`: number boxes), a long press on a
                         project or thread → its menu (with Add…, Rename… via `mRenameAny`; naming a new one cancelled: `mDropNew`), on a task → reorder
-                        (`mTreeLift` / `mTreeGhost` / `mTreeDrag` / `mTreeAim` / `mTreeDrop` → moveTasksTo, #mTreeLine; the copy that
+                        (let go in place after a long press: put back, no menu) (`mTreeLift` / `mTreeGhost` / `mTreeDrag` / `mTreeAim` / `mTreeDrop` → moveTasksTo, #mTreeLine; the copy that
                         follows the finger holds every row that moves); tap a chip → its menu (with Open day),
                         elsewhere in a day → openDay; a tap on any task gets a little press (`mTapFx`); a long press
                         lifts a task (`mLift`; held still M_PEEL ms longer it peels off, as Option does: `mPeel`,
@@ -91,11 +92,13 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         view through the desktop's drag (`mDvLift` sets `dv`, then dvMove / dvUp with the touch
                         positions: `mDvE`); the task menu's Reschedule… / Rename… (`mAsk`, a box at the top; Reschedule's "Only this task" switch, `toggle`,
                         moves it as Option would) and Set a
-                        time… (openTimePop), opened over the menu, which stays open and is drawn again when they close
+                        time… (openTimePop: a number pad, inputmode, and taps for :00 / :15 / :30 / :45 and AM / PM
+                        acting on the field last focused, `mTpBtns`), opened over the menu, which stays open and is drawn again when they close
                         (`mPopOpen`, `mMenuBack`; menu.dataset.kid: its task); an Undo bar after touch changes (`mUndo`, in #toast); the task menu as
                         a sheet with a title bar (`mMenuHead`), swiped down to close, and while it's open a tap
                         outside it only closes it (`mMenuEat`); notes in a card of their own (`mNotes`); swipe up / down → setPull / weekShift (`mSw`,
-                        one week per swipe); day-view touch swipes over the timeline or the list (enterStrip / setStripX /
+                        one week per swipe; R, the pull before resistance, is a week's usual share, not an opened
+                        week's height; a step needs M_WTURN of it or an M_WFLICK flick); day-view touch swipes over the timeline or the list (enterStrip / setStripX /
                         daySlide; the list holds the same days side by side and moves with it: `.m-lrow`); day view's list as a bottom sheet (`mSheetSet`, set per day on entering
                         day view by `mSheetAuto`, dragged by .m-grab / its heading; a tap on the timeline's blank
                         space puts it down);
@@ -303,14 +306,16 @@ Four places can need text when something changes. Update them only where the cha
   newRows, so a slide lands where a redraw would; it measures with the "…" taken off (`mUnclip`), so call mClip after.
   The weeks built ahead get an inline height (and, above, top) from mNbFit; weekShift clears both when one joins the
   view, as a leftover top shifts its days out of their row. With a week opened up (`mFocus`), fitRows also adds
-  "Show less" (`mFocusBar`, a grid item in that week's row) and its days carry `.m-foc` (32px kept at their foot,
+  "Show less" (`mFocusBar`, a grid item in that week's row; one already there is kept, a new one fades in once the rows
+  have eased, css .m-less) and its days carry `.m-foc` (32px kept at their foot,
   M_BAR in mFit); weekShift clears mFocus (and the bar) first. A swipe that springs back leaves it open. The "…" are
   always worked out for where rows end up, before they move: mFocusSet lays the end rows out (fitRows), then puts the
   old ones back and eases (.m-anim, during which fitRows skips mClip); weekShift gives each day of a row changing
   height its end height for mClip before frame(0). So nothing is hidden or shown when they land. mClip fades only on a
   day it has clipped before (`mSeen`); the fading copies (.m-fade) sit in the day, outside `.items`, so look for a
   day's "…" as `.items > .m-more`. Day view's list in its strip (`.m-lstrip` / `.m-lrow`) is drawn by renderDayList
-  whenever `dayStrip` is set (mobile), the days beside the current one offset down by its scroll.
+  whenever `dayStrip` is set (mobile), the days beside the current one offset down by its scroll; their timeline
+  columns have no "other day" tint on mobile (.dv-col.other).
   The sidebar's tree on mobile is `mTree`, not renderTree's: code reaching for `#tree .task` rows finds none there. Day view always shows one day: read `dayN()`, never
   `ui.dayCount`, for what's on screen. Touch gestures attach their move / end listeners to the touched element
   (`mFollow`), because a redraw mid-gesture (enterStrip) removes it from the page and its events stop bubbling.
@@ -369,9 +374,12 @@ keeps one copy per day (last 14), made by the server or, in fs mode, the page.
 
 ## Settings
 
-The Settings-window preferences (`setting: true` in UI_PREFS, js/core/prefs.js) are saved in the plan as
-`state.settings`, so they follow the plan to every browser and device; the rest of `ui` (layout, theme) stays in each
-browser's localStorage. The plan's copy wins: `render()` applies it first (`planSettings` -> `settingsFromPlan`), so
+The Settings-window preferences (`setting: true` in UI_PREFS, js/core/prefs.js), and the view preferences marked
+`sync: true` (weeks shown, collapsed threads, days shown in day view, the Timeline's future tasks), are saved in the
+plan as `state.settings`, so they follow the plan to every browser and device; the rest of `ui` (sizes, theme) stays
+in each browser's localStorage. Weeks shown is kept per kind of screen (`phoneKey`: `weeksPhone` on mobile, `planKey`).
+View preferences are changed in place (`ui.collapsed[id] = …`), so `saveUI` also writes the plan's copy and saves it
+(once the plan is loaded); the plan's copy is a copy, never `ui`'s own object. The plan's copy wins: `render()` applies it first (`planSettings` -> `settingsFromPlan`), so
 code (and tests) must change a setting through `applySetting`, which writes it to the plan (`settingsToPlan`) and
 saves; setting `ui.x` directly is undone by the next redraw. A plan without settings takes the browser's when it's
 opened (`adopt`). Undo / redo leave settings alone (`keepSettings`); an imported file without settings keeps the

@@ -37,11 +37,11 @@ function mVel(s, dx) {
   const now = performance.now();
   if (now - s.ts > 30) { s.vx = (dx - s.dxs) / (now - s.ts); s.ts = now; s.dxs = dx; }
 }
-const mFlick = s => performance.now() - s.ts < 80 && Math.abs(s.vx) > M_FLICK;   // (a finger that stopped before letting go isn't a flick)
+const mFlick = (s, v = M_FLICK) => performance.now() - s.ts < 80 && Math.abs(s.vx) > v;   // (a finger that stopped before letting go isn't a flick)
 // which way a swipe that's let go goes on: 1 next, -1 previous, 0 back (a flick back the way it came cancels)
-function mDir(s, W) {
-  if (mFlick(s)) return Math.sign(s.vx) === Math.sign(s.dx) ? -Math.sign(s.dx) : 0;
-  return Math.abs(s.dx) > W * M_TURN ? -Math.sign(s.dx) : 0;
+function mDir(s, W, turn = M_TURN, flick = M_FLICK) {
+  if (mFlick(s, flick)) return Math.sign(s.vx) === Math.sign(s.dx) ? -Math.sign(s.dx) : 0;
+  return Math.abs(s.dx) > W * turn ? -Math.sign(s.dx) : 0;
 }
 // follow one touch: its move / end listeners go on the touched element itself, which keeps getting the touch's events
 // even when a redraw takes it out of the page (they'd no longer bubble to its old ancestors)
@@ -114,7 +114,7 @@ function mBarSync() {
   const acct = $('#acctBtn'), a = $('.m-acct', f); a.hidden = acct.hidden; a.textContent = acct.textContent;
 }
 // and at its foot, the one button for adding a task (mAddTask)
-$('#tree').insertAdjacentHTML('afterend', `<div class="m-foot"><button class="btn primary m-addk">${svg('<path d="M12 5v14M5 12h14"/>')}Add task</button></div>`);
+$('#tree').insertAdjacentHTML('afterend', `<div class="m-foot"><button class="btn m-addk">${svg('<path d="M12 5v14M5 12h14"/>')}Add task</button></div>`);
 $('aside .m-addk').onclick = () => mAddTask();
 $('aside .m-bar').addEventListener('click', e => {
   const w = e.target.closest('.m-wk button');
@@ -227,9 +227,12 @@ function mFadeOut(day, el, box) {
   for (const x of [g, ...g.querySelectorAll('[data-id], [data-fid], [data-kid]')]) { delete x.dataset.id; delete x.dataset.fid; delete x.dataset.kid; }   // (nothing finds it as a task)
   Object.assign(g.style, { left: box.l + 'px', top: box.t + 'px', width: box.w + 'px', height: box.h + 'px' });
   day.appendChild(g);
-  g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: M_FADE, easing: 'ease-out' }).onfinish = () => g.remove();
+  g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: M_FADE * 0.75, easing: 'ease-out' }).onfinish = () => g.remove();
 }
-const mFadeIn = el => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: M_FADE, easing: 'ease-out' });
+// coming back: a soft drop into place, one after another down the day (i: its place among them), over about the time
+// the rows take to ease (.m-anim), so they appear as the week opens rather than all at once
+const mFadeIn = (el, i = 0) => el.animate([{ opacity: 0, transform: 'translateY(-4px)' }, { opacity: 1, transform: 'none' }],
+  { duration: 300, delay: Math.min(i * 35, 210), easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
 // el has an ancestor (inside it) in set: the ancestor's fade covers it
 const mInSet = (el, set, it) => { for (let x = el.parentElement; x && x !== it; x = x.parentElement) if (set.has(x)) return true; return false; };
 function mClip(root) {
@@ -256,7 +259,7 @@ function mClip(root) {
     if (more) { it.insertAdjacentHTML('beforeend', `<div class="m-more${more.over ? ' on' : ''}">…</div>`); mEl = it.lastElementChild; }
     if (!fade) return;
     const back = new Set([...was.hid].filter(el => !hide.has(el) && it.contains(el)));
-    back.forEach(el => { if (!mInSet(el, back, it)) mFadeIn(el); });
+    let n = 0; back.forEach(el => { if (!mInSet(el, back, it)) mFadeIn(el, n++); });
     const old = was.more, nb = mEl && mBox(mEl, day);
     if (old && nb && Math.abs(old.box.t - nb.t) < 2 && Math.abs(old.box.l - nb.l) < 2) return;   // ("…" where it was)
     if (old) mFadeOut(day, old.el, old.box);
@@ -302,11 +305,13 @@ function mFocusSet(ws) {
   g.classList.add('m-anim'); g.style.gridTemplateRows = to;
   mAnimT = setTimeout(() => { g.classList.remove('m-anim'); mClip(g); }, 320);   // (mClip: only if a resize came mid-way)
 }
-// the "Show less" under the week opened up (a grid item along the bottom of its row)
+// the "Show less" under the week opened up (a grid item along the bottom of its row). A new one fades in once the rows
+// have eased over (css .m-less), so it doesn't show at the foot of the row's old height first; one already there stays
 function mFocusBar(g) {
-  const old = g.querySelector(':scope > .m-less'); if (old) old.remove();
-  if (!mFocus) return;
-  const d = g.querySelector(`:scope > .day:not(.nb)[data-date="${mFocus}"]`); if (!d) return;
+  const old = g.querySelector(':scope > .m-less'), d = mFocus && g.querySelector(`:scope > .day:not(.nb)[data-date="${mFocus}"]`);
+  if (old && d && old.style.gridRowStart === d.style.gridRowStart) return;
+  if (old) old.remove();
+  if (!d) return;
   g.insertAdjacentHTML('beforeend', `<button class="m-less" style="grid-row:${d.style.gridRowStart}">${svg('<path d="m6 15 6-6 6 6"/>')}Show less</button>`);
 }
 // the weeks built ahead (buildNeighbours): each as tall as it will be once a step brings it into view (fitted with the
@@ -342,9 +347,10 @@ $('#grid').addEventListener('click', e => {
 
 /* ---------- calendar: swiping up / down ---------- */
 /* The desktop's scroll, by touch: the days (and the week built ahead beyond them, buildNeighbours) follow the finger
-   (setPull), with resistance past one week; let go past M_TURN of a week, or with a flick, and the calendar steps on
+   (setPull), with resistance past one week; let go past M_WTURN of a week, or with a hard flick, and the calendar steps on
    (weekShift, from where the pull got to): one week, however fast the flick. Otherwise it springs back. */
 let mSw = null;   // a touch on the calendar that may become a swipe
+const M_WTURN = 0.4, M_WFLICK = 0.7;   // weeks step less readily than other swipes: pulled past this share of a week, or flicked this fast
 $('main').addEventListener('touchstart', e => {
   if (!MOBILE || ui.dayView || admOpen || weekAnim || mSw || mEdge || e.touches.length !== 1) return;
   mSw = mTouch(e); mFollow(e, mCalMove, mCalEnd);
@@ -357,7 +363,9 @@ function mCalMove(e) {
     if (Math.hypot(dx, dy) < 8) return;
     s.axis = Math.abs(dy) >= Math.abs(dx) ? 'y' : 'x';
     // (a week opened up stays so, "Show less" pulled along with it (setPull), unless the swipe steps on: weekShift)
-    if (s.axis === 'y') { clearTimeout(nbTimer); buildNeighbours(); s.R = rowHeights()[0] || 100; }
+    // (R: how far it follows before resisting, and what a step is measured against: a week's usual share of the
+    // calendar, not an opened-up week's height)
+    if (s.axis === 'y') { clearTimeout(nbTimer); buildNeighbours(); const g = $('#grid'); s.R = Math.min(rowHeights()[0] || 100, g.clientHeight / ui.weeks); }
   }
   if (s.axis !== 'y') return;
   if (e.cancelable) e.preventDefault();
@@ -369,7 +377,7 @@ function mCalEnd(cancelled) {
   const s = mSw; mSw = null;
   if (!s || s.axis !== 'y') return;
   mSwipedAt = Date.now();
-  const dir = cancelled ? 0 : mDir(s, s.R);
+  const dir = cancelled ? 0 : mDir(s, s.R, M_WTURN, M_WFLICK);
   if (dir) weekShift(dir); else setPull(0, true);   // (one week, however hard the flick)
 }
 
@@ -528,7 +536,8 @@ function mTask(t, k, loose) {
   const cls = ['mt-task', k.done && 'done', chain && 'g', chain && !k.linkToPrev && 'gs', chain && !(nx && nx.linkToPrev) && 'ge'].filter(Boolean).join(' ');
   const num = ['mt-n', loose && 'nn', chain && 'nb', chain && k.linkToPrev !== 'sameDay' && 'nbs', chain && !(nx && nx.linkToPrev === 'sameDay') && 'nbe',
     k.linkToPrev === 'nextDay' && 'cin', nx && nx.linkToPrev === 'nextDay' && 'cout'].filter(Boolean).join(' ');
-  return `<div class="${cls}" data-id="${k.id}"><span class="mt-ck">${k.done ? ICON.check : ''}</span>${loose && !chain ? '' : `<span class="${num}">${loose ? '' : i + 1}</span>`}<span class="mt-tt">${esc(k.title)}${noteMark(k)}</span><span class="mt-d">${k.done ? '' : k.date ? fmtRelative(k.date) : 'no date'}</span></div>`;
+  // (--nw: digits in the thread's biggest number, so every number box in it is as wide and same-day boxes meet: 9 and 10)
+  return `<div class="${cls}" data-id="${k.id}"><span class="mt-ck">${k.done ? ICON.check : ''}</span>${loose && !chain ? '' : `<span class="${num}" style="--nw:${String(t.tasks.length).length}">${loose ? '' : i + 1}</span>`}<span class="mt-tt">${esc(k.title)}${noteMark(k)}</span><span class="mt-d">${k.done ? '' : k.date ? fmtRelative(k.date) : 'no date'}</span></div>`;
 }
 $('#tree').addEventListener('click', e => {
   if (!MOBILE) return;
@@ -658,13 +667,13 @@ const mRename = id => mRenameAny('k', id);
 /* Which thread a new task most likely goes in: the one last added to on this device, if that was in the last few
    hours (a run of adds); for a day (day view's button), the thread with the most unfinished tasks around it (a week
    either way, nearer ones counting more); otherwise the thread whose next unfinished task comes soonest (what's under
-   way now); otherwise the first. */
+   way now); otherwise the first. only (a Set of thread ids: day view's, the threads on that day): one of those. */
 const M_RECENT = 6 * 3600e3, M_LASTADD = 'planner.mLastAdd';
-function mGuessThread(day) {
+function mGuessThread(day, only) {
   let last = null; try { last = JSON.parse(localStorage.getItem(M_LASTADD)); } catch (e) {}
-  if (last && Date.now() - last.at < M_RECENT && findThread(last.tid)) return last.tid;
+  if (last && Date.now() - last.at < M_RECENT && findThread(last.tid) && (!only || only.has(last.tid))) return last.tid;
   const best = score => { let id = null, top = 0; score.forEach((v, k) => { if (v > top) { top = v; id = k; } }); return id; };
-  const open = allThreads().flatMap(({ t }) => t.tasks.filter(k => !k.done && k.date).map(k => [t.id, k.date]));
+  const open = allThreads().filter(({ t }) => !only || only.has(t.id)).flatMap(({ t }) => t.tasks.filter(k => !k.done && k.date).map(k => [t.id, k.date]));
   if (day) {
     const near = new Map();
     open.forEach(([tid, d]) => { const n = Math.abs(diffDays(d, day)); if (n <= 7) near.set(tid, (near.get(tid) || 0) + 1 / (1 + n)); });
@@ -672,7 +681,7 @@ function mGuessThread(day) {
   }
   const today = todayISO(), soon = new Map();
   open.forEach(([tid, d]) => { if (d >= today) soon.set(tid, Math.max(soon.get(tid) || 0, 1 / (1 + diffDays(d, today)))); });
-  return best(soon) || allThreads()[0].t.id;
+  return best(soon) || (only ? [...only][0] : allThreads()[0].t.id);
 }
 // every thread and sub-thread, in the drawer's order (sub-threads where they sit among their parent's tasks)
 function mThreadRows(p) {
@@ -682,14 +691,16 @@ function mThreadRows(p) {
 }
 function mAddTask(tid, day) {
   if (!allThreads().length) { toast('Add a project and a thread first.'); return; }
-  if (!(tid && findThread(tid))) tid = mGuessThread(day);
-  const box = $('#mAsk'), card = $('.ma-card', box);
+  // (day view's: the threads already on that day, the rest a tap away; a day with nothing on it lists them all)
+  const onDay = day && new Set(dayTasks(day).map(x => x.t.id)), only = onDay && onDay.size ? onDay : null;
+  if (!(tid && findThread(tid))) tid = mGuessThread(day, only);
+  const box = $('#mAsk'), card = $('.ma-card', box), off = t => only && !only.has(t.id) ? ' mp-off' : '';
   card.innerHTML = `<div class="ma-h">New task</div>
-    <div class="ma-pick"><div class="ma-sub">Which thread?</div><div class="mp-list">${state.projects.map(p => {
-      const rows = mThreadRows(p);
-      return `<div class="mp-p">${esc(p.name)}</div>` + (rows.map(({ t, depth }) => `<button class="mp-t" data-tid="${t.id}" style="--c:${esc(colorOf(t))};--d:${depth}"><span class="mt-dot"></span><span class="mt-nm">${esc(t.name)}</span></button>`).join('')
-        || '<div class="mp-none">No threads yet</div>');
-    }).join('')}</div><div class="ma-btns"><button class="btn ma-no">Cancel</button></div></div>
+    <div class="ma-pick"><div class="ma-sub">${only ? 'Which thread? (those on this day)' : 'Which thread?'}</div><div class="mp-list${only ? ' only' : ''}">${state.projects.map(p => {
+      const rows = mThreadRows(p), none = only && !rows.some(({ t }) => only.has(t.id)) ? ' mp-off' : '';
+      return `<div class="mp-p${none}">${esc(p.name)}</div>` + (rows.map(({ t, depth }) => `<button class="mp-t${off(t)}" data-tid="${t.id}" style="--c:${esc(colorOf(t))};--d:${depth}"><span class="mt-dot"></span><span class="mt-nm">${esc(t.name)}</span></button>`).join('')
+        || `<div class="mp-none${none}">No threads yet</div>`);
+    }).join('')}${only ? '<button class="mp-all">Show all threads</button>' : ''}</div><div class="ma-btns"><button class="btn ma-no">Cancel</button></div></div>
     <div class="ma-form"><button class="ma-thr"><span class="mt-dot"></span><span class="ma-thr-t"><b></b><span></span></span><span class="ma-chg">Change</span></button>
     <input class="ma-in ma-name" placeholder="Task name" spellcheck="true" enterkeyhint="done">
     <input class="ma-in ma-when" placeholder="Date (optional): fri, 11/26, +3" spellcheck="false" autocomplete="off" enterkeyhint="done">
@@ -724,11 +735,14 @@ function mAddTask(tid, day) {
   const close = () => { box.classList.remove('on'); name.blur(); when.blur(); if (added) mUndo(`Added “${added}”`); };
   when.oninput = () => { added = null; check(); };
   name.onkeydown = when.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } else if (e.key === 'Escape') close(); };
+  // (leaving the list without picking, by Cancel or a tap beside the box: back to the name, the thread as it was)
   card.onclick = e => {
     const t = e.target.closest('.mp-t'); if (t) { pick(t.dataset.tid); return; }
-    if (e.target.closest('.ma-thr')) picking(); else if (e.target.closest('.ma-ok')) add(); else if (e.target.closest('.ma-no')) close();
+    if (e.target.closest('.mp-all')) { list.classList.remove('only'); e.target.closest('.mp-all').remove(); $('.ma-pick .ma-sub', card).textContent = 'Which thread?'; return; }
+    if (e.target.closest('.ma-thr')) picking(); else if (e.target.closest('.ma-ok')) add();
+    else if (e.target.closest('.ma-no')) { if (card.classList.contains('picking')) pick(tid); else close(); }
   };
-  box.onclick = e => { if (e.target === box) close(); };
+  box.onclick = e => { if (e.target === box) { if (card.classList.contains('picking')) pick(tid); else close(); } };
   closeMenu(); box.classList.add('on', 'm-low'); mAskFit(); check();
   pick(tid);   // (now, in the tap that opened it, so the phone's keyboard comes up)
 }
@@ -748,14 +762,15 @@ const mDayAddBtn = () => `<button class="dv-madd" aria-label="Add task to this d
    (the day under the finger opens a gap as on desktop; held near the top or bottom edge, the weeks step on; over the
    header, it unschedules: calDropOn / moveTask); day-view blocks move in time or to another day, or into the sheet to
    come off the timeline; list items in the sheet go onto the timeline or elsewhere in the list (the desktop's own day
-   view drag: dv, dvMove / dvUp, dayview-edit.js, fed from these touches). Let go without moving: its menu instead.
+   view drag: dv, dvMove / dvUp, dayview-edit.js, fed from these touches). Let go without moving: put back, nothing
+   else (a tap is what opens its menu).
    A finger that moves before then is a swipe or a scroll, and nothing lifts. The browser's own long-press menu, and
    the click after a long press, are swallowed. What lifts is what moves: a same-day linked group lifts whole.
    Held still for M_PEEL ms more once lifted, the task peels off on its own (mPeel: a second buzz, the copy under the
    finger just that task, outlined dashed), as Option does on desktop (s.split: movingIds / calLanding / calDropOn /
    moveTasksTo / dv's altKey): its links are cut and the rest of its thread stays put. Only where that would make a
    difference (mSplitMatters); moving first is an ordinary drag. */
-const M_PEEL = 550;
+const M_PEEL = 800;
 const M_HOLD = 380, M_LIFTABLE = '#grid .day:not(.nb) .chip[data-id], #grid .day:not(.nb) .chip[data-fid], #dayview .dv-blk[data-id], #dayview .dv-item[data-id], #tree .mt-task[data-id], #tree .mt-row[data-mtog]';
 let mLp = null, mLpAt = 0, mLpEat = null;   // mLpEat: the click a held-and-let-go task may still get, to swallow
 document.body.insertAdjacentHTML('beforeend', `<div id="mDropOff">${ICON.nodate}<span>Drop here to unschedule</span></div>`);
@@ -825,11 +840,7 @@ function mLpEnd(cancelled) {
   mLpAt = Date.now();
   if (s.row) { mLpEat = { el: s.el, until: Date.now() + 450 }; return; }   // (its menu is open; the click would fold it)
   if (s.tree) mTreeDrop(s, cancelled); else if (s.cal) mCalDrop(s, cancelled); else mDvDrop(s, cancelled);
-  if (!cancelled && !s.moved) {   // held and let go in place: its menu (and not the click that may follow)
-    mLpEat = { el: s.el, until: Date.now() + 450 };
-    const at = { x: s.x, y: s.y }, el = s.el;
-    if (el.dataset.fid) openFailMenu(el.dataset.fid, at); else if (findTask(el.dataset.id)) openTaskMenu(el.dataset.id, null, at, el.isConnected ? el : null);
-  }
+  if (!s.moved) mLpEat = { el: s.el, until: Date.now() + 450 };   // held and let go in place: just put back (not the click that may follow, which would open its menu)
 }
 // the drawer's tree: a task lifted moves up and down (to another place in its thread, or another thread); a line shows
 // where it would go, snapping to the ends of a linked chain, which moves whole (moveTasksTo, as dropping it in the
@@ -1026,6 +1037,43 @@ function mMenuEnd(cancelled) {
   menu.style.transform = shut ? `translateY(${h + 30}px)` : '';
   setTimeout(() => { if (shut) closeMenu(); menu.style.transform = menu.style.transition = ''; }, 200);
 }
+
+/* ---------- Set a time…: a number pad, and taps for the quarter hours and am / pm ---------- */
+/* The time box's fields bring up a number pad here (openTimePop: inputmode), typed as anywhere ("930", "14"); the row
+   above them sets the minutes of the field last focused (start, to begin with) to :00 / :15 / :30 / :45, and (12-hour
+   clock) moves it into the morning or afternoon, keeping its hour. The field keeps the focus, so the pad stays up. */
+const mTpBtns = () => `<div class="tp-q">${[0, 15, 30, 45].map(m => `<button data-q="${m}">:${String(m).padStart(2, '0')}</button>`).join('')}`
+  + (ui.clock === '12' ? '<span class="tp-qs"></span><button data-ap="am">AM</button><button data-ap="pm">PM</button>' : '') + '</div>';
+let mTpField = null;
+const mTpInp = () => mTpField && mTpField.isConnected ? mTpField : $('#tpop .tp-s');
+// a field's time (null: nothing typed or can't be read), read as checkTimePop does
+function mTpTime(inp) {
+  const isEnd = inp.classList.contains('tp-e'), f = tpop && findTask(tpop.id), p = f && planOf(f.task);
+  const s = parseTime($('#tpop .tp-s').value, p ? p.start : 9 * 60, false);
+  const t = parseTime(inp.value, isEnd ? (Number.isFinite(s) ? s : p ? p.start + p.dur : 10 * 60) : p ? p.start : 9 * 60, isEnd);
+  return Number.isFinite(t) ? t : null;
+}
+// which of AM / PM the field's time is in, and which field the taps change
+function mTpMark() {
+  const inp = mTpInp(), t = inp && mTpTime(inp);
+  $$('#tpop .tp-q [data-ap]').forEach(b => b.classList.toggle('on', t != null && (b.dataset.ap === 'pm') === (t % 1440 >= 720)));
+  $$('#tpop .tp-s, #tpop .tp-e').forEach(x => x.classList.toggle('tp-cur', x === inp));
+}
+$('#tpop').addEventListener('focusin', e => { if (MOBILE && e.target.matches('.tp-s, .tp-e')) { mTpField = e.target; mTpMark(); } });
+$('#tpop').addEventListener('input', () => { if (MOBILE) mTpMark(); });
+$('#tpop').addEventListener('pointerdown', e => { if (MOBILE && e.target.closest('.tp-q button')) e.preventDefault(); });   // (the field keeps the focus)
+$('#tpop').addEventListener('click', e => {
+  const b = MOBILE && tpop && e.target.closest('.tp-q button'); if (!b) return;
+  const inp = mTpInp(), isEnd = inp.classList.contains('tp-e'), f = findTask(tpop.id), p = f && planOf(f.task);
+  let t = mTpTime(inp);
+  if (t == null) t = Math.floor((p ? (isEnd ? p.start + p.dur : p.start) : isEnd ? 10 * 60 : 9 * 60) / 60) * 60;   // (nothing there yet: from the slot it has, or 9 / 10)
+  if (b.dataset.q != null) t = Math.floor(Math.min(t, 1439) / 60) * 60 + +b.dataset.q;
+  else { const pm = b.dataset.ap === 'pm', h = t % 1440; t = pm && h < 720 ? h + 720 : !pm && h >= 720 ? h - 720 : h; }
+  t = isEnd ? clamp(t || 1440, 1, 1440) : clamp(t, 0, 1439);
+  inp.value = isEnd ? fmtEnd(t) : fmtTime(t);
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  if (document.activeElement !== inp) inp.focus();
+});
 
 /* ---------- notes ---------- */
 /* View/edit notes (or Add notes): a card at the top, its text readable (links work); a tap on the text edits it, in a

@@ -162,3 +162,17 @@ test('settings travel with the plan: kept by loading, applied from it, written b
   const Q = load({ projects: [], settings: 'nope' });
   assert.ok(!('settings' in Q.state));
 });
+
+test('view preferences travel with the plan too: weeks shown (a phone keeps its own), collapsed threads', () => {
+  const P = load(plan([TH('t', [T('a')])], { settings: { weeks: 5, weeksPhone: 2, collapsed: { t: true } } }), { prefs: { weeks3: 3 } });
+  assert.deepStrictEqual(j(P.settingsFromPlan()).sort(), ['collapsed', 'weeks']);
+  assert.strictEqual(P.ui.weeks, 5); assert.strictEqual(P.ui.collapsed.t, true);
+  P.run('ui.collapsed.p = true'); assert.strictEqual(P.settingsToPlan(), true);              // changed in place: still noticed
+  assert.strictEqual(P.state.settings.collapsed.p, true); assert.strictEqual(P.state.settings.weeksPhone, 2);   // (the phone's kept)
+  P.run('dataLoaded = true; ui.collapsed.t = false; saveUI()');                                // saving the preferences saves the plan
+  assert.strictEqual(P.state.settings.collapsed.t, false); assert.ok(P.calls.save > 0);
+  P.run('var MOBILE = true');                                                                  // on a phone: its own weeks
+  assert.deepStrictEqual(j(P.settingsFromPlan()), ['weeks']); assert.strictEqual(P.ui.weeks, 2);
+  P.run('ui.weeks = 1'); P.settingsToPlan();
+  assert.strictEqual(P.state.settings.weeksPhone, 1); assert.strictEqual(P.state.settings.weeks, 5);
+});
