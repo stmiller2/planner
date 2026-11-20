@@ -12,6 +12,9 @@ try { var th = JSON.parse(localStorage.getItem('planner.ui') || '{}').theme;
 </script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
+<!-- iOS (Add to Home Screen) takes neither the manifest's icons nor transparency: a full-bleed square, rounded by iOS -->
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Planner">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1e1f22" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="css/base.css">

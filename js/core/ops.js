@@ -77,20 +77,20 @@ function addTasks(tid, titles, spot) {
 function addProject() {
   const id = uid();
   mutate(() => state.projects.push({ id, name: 'New project', threads: [] }));
-  startRename('p', id);
+  startRename('p', id, null, true);
 }
 function addThread(pid) {
   const p = state.projects.find(x => x.id === pid); if (!p) return;
   const id = uid(); ui.collapsed[pid] = false; saveUI();
   const color = nextColor();
   mutate(() => p.threads.push({ id, name: 'New thread', color, tasks: [], threads: [] }));
-  startRename('t', id);
+  startRename('t', id, null, true);
 }
 function addSubThread(tid) {
   const f = findThread(tid); if (!f) return;
   const id = uid(); ui.collapsed[tid] = false; saveUI();
   mutate(() => { const L = layout(f.t); L.push({ kind: 'sub', obj: { id, name: 'New sub-thread', color: null, tasks: [], threads: [] } }); writeLayout(f.t, L); });
-  startRename('t', id);
+  startRename('t', id, null, true);
 }
 // detach a task from its thread, repairing the link of the task that followed it
 function detachTask(f) {

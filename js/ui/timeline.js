@@ -11,6 +11,7 @@ function openAdmire() {
   $('#app').classList.add('admon');
   renderHeader(); renderAdmire();
   $('#admire').scrollTop = 0;
+  if (MOBILE) mAdmToday();   // (mobile: today in view)
 }
 function closeAdmire() {
   admOpen = false; admHideTip(true);

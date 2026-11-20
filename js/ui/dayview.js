@@ -83,6 +83,7 @@ function renderDay() {
   const lbl = ds.length > 1 ? `Tasks these ${ds.length} days` : 'Tasks this day';
   const nT = MOBILE ? dayTasks(ds[0]).length : 0;   // (mobile: the sheet's heading says how many, as it's often pulled down)
   box.querySelector('.dv-side .sb-head h2').textContent = lbl + (nT ? ` · ${nT}` : ''); box.querySelector('.dv-side .sb-tab span').textContent = lbl;
+  if (MOBILE && !box.querySelector('.dv-madd')) box.querySelector('.dv-side .sb-head').insertAdjacentHTML('beforeend', mDayAddBtn());   // (mobile: + Add task, in the sheet's heading)
   $$('#dvcount button').forEach(b => b.classList.toggle('on', +b.dataset.n === ui.dayCount));
   renderDayList(box);
   renderDayTimeline(box);
@@ -105,6 +106,9 @@ function buildDaySkeleton(box) {
   box.querySelector('.dv-side').addEventListener('wheel', e => dayWheel(e, false), { passive: true });
 }
 function renderDayList(box, only, cur = ui.dayView) {
+  // (mobile: while the timeline holds the days either side, dayStrip, so does the list, side by side: m-lrow)
+  if (MOBILE && !only && dayStrip) only = dayStrip.days;
+  const row = MOBILE && !!only;
   const days = only || dvDays(), multi = dayN() > 1, solo = !!only && !multi, today = todayISO(), listEl = box.querySelector('.dv-list');
   const keepEl = box.querySelector('.dvadd'), keep = keepEl ? keepEl.value : '', keepTop = listEl.scrollTop;
   const addBox = tid => `<input class="add dvadd" data-tid="${tid}" placeholder="New task (Enter to add, Esc to stop)">`;
@@ -143,8 +147,11 @@ function renderDayList(box, only, cur = ui.dayView) {
       <div class="dv-dh"><b>${DOW[dd.getDay()]} ${dd.getDate()}</b><span>${MON[dd.getMonth()]}${day === today ? ' · today' : ''}</span><span class="cnt">${n ? plural(n, 'task') : ''}</span></div>
       ${cfp}${sec || '<div class="dv-empty small">Nothing scheduled.</div>'}</section>`;
   });
-  listEl.innerHTML = html + (MOBILE ? mDayAddBtn() : '');   // (mobile: + Add task, at the end)
+  listEl.innerHTML = row ? `<div class="m-lrow">${html}</div>` : html;
+  if (MOBILE) listEl.classList.toggle('m-lstrip', row);
   listEl.scrollTop = keepTop;
+  // (the list scrolled down: the days beside the current one show from their top)
+  if (row) $$('.m-lrow > .dv-day', listEl).forEach(s => { if (s.dataset.date !== cur) s.style.top = keepTop + 'px'; });
   const inp = box.querySelector('.dvadd');
   if (inp) { inp.value = keep; if (!rendering || dvAdd) inp.focus(); }
 }
@@ -232,15 +239,18 @@ let dvResizeT; window.addEventListener('resize', () => { clearTimeout(dvResizeT)
    day before and the day after as well and scrolls sideways under the fixed hours: it follows your fingers a little
    (with resistance), and past DAY_PULL it carries on and glides all the way to the next / previous day; let go early
    and it springs back. One swipe = one step. Only the timeline moves sideways; the list beside it scrolls up or down
-   to the new day. Up / down still scrolls the hours and the list. */
+   to the new day (mobile: the list holds the same days side by side and moves sideways with the timeline). Up / down
+   still scrolls the hours and the list. */
 const DAY_PULL = 70;
-let dayStrip = null;   // { days, W } while the timeline holds the neighbouring days too
+let dayStrip = null;   // { days, W, LW (mobile: the list's width) } while the timeline holds the neighbouring days too
 let dayAnim = null;    // { cancel, finish } while it glides
 // slide the days by x: the timeline, header and conflict strip move left; their hour / gutter column moves back by the same
 // amount, so it stays put
 const setStripX = x => {
   if (dayStrip) dayStrip.x = x;
   $$('#dayview .dv-grid, #dayview .dv-heads, #dayview .dv-conf').forEach(el => { el.style.transform = x ? `translateX(${-x}px)` : ''; });
+  // (mobile: the list's days, side by side, move with it, each the list's width: LW)
+  const lr = MOBILE && $('#dayview .m-lrow'); if (lr) lr.style.transform = x && dayStrip ? `translateX(${(-x * dayStrip.LW / dayStrip.W).toFixed(2)}px)` : '';
   $$('#dayview .dv-hours, #dayview .dv-heads>div:first-child, #dayview .dv-cfg').forEach(el => { el.style.transform = x ? `translateX(${x}px)` : ''; });
 };
 // the timeline also holds `before` days before the view and `after` days after it (one each for a swipe; more for T)
@@ -249,7 +259,9 @@ function enterStrip(before = 1, after = 1) {
   closeTimePop(false); hideTip();
   const col = $('#dayview .dv-col'), W = col ? col.getBoundingClientRect().width : 300;
   dayStrip = { W, days: Array.from({ length: before + dayN() + after }, (_, i) => addDays(ui.dayView, i - before)) };
-  renderDayTimeline($('#dayview')); setStripX(W * before);
+  renderDayTimeline($('#dayview'));
+  if (MOBILE) { const box = $('#dayview'); renderDayList(box, dayStrip.days); dayStrip.LW = $('.dv-list', box).clientWidth || W; }   // (mobile: the list too)
+  setStripX(W * before);
 }
 function exitStrip(newDay) {
   if (dayAnim) { dayAnim.cancel(); dayAnim = null; }
@@ -274,6 +286,11 @@ function daySlide(dir, m = 1) {
   if (dayAnim) dayAnim.finish();
   if (m > 1 && dayStrip) exitStrip(null);   // (a swipe's strip only reaches one day either side)
   enterStrip(dir < 0 ? m : 1, dir > 0 ? m : 1);
+  if (MOBILE) {   // (mobile: the list moves sideways with the timeline, setStripX, instead of scrolling to the new day)
+    const nf = addDays(ui.dayView, dir * m); setRange(nf);
+    glide(dayStrip.W * (dir < 0 ? m : 1) + dir * m * dayStrip.W, (WEEK_SLIDE_MS + 50 * (m - 1)) * 1.15, () => exitStrip(nf));
+    return;
+  }
   const box = $('#dayview'), oldDays = dvDays(), newFirst = addDays(ui.dayView, dir * m), listEl = $('.dv-list', box), s0 = listEl.scrollTop;
   // the list holds the old days and the arriving ones while it scrolls to the new first day
   const lo = dir > 0 ? oldDays[0] : newFirst, union = Array.from({ length: dayN() + m }, (_, i) => addDays(lo, i));

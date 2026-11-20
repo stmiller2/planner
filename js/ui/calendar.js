@@ -170,7 +170,7 @@ const rowHeights = () => { const ds = viewDays(); return Array.from({ length: Ma
    that are in neither view (a slide of more weeks than are shown) pass by at an average height. */
 function weekShift(dir, m = 1) {
   if (weekAnim) weekAnim.finish();
-  if (MOBILE) mFocus = null;   // (a week opened up to show all its tasks goes back to its usual size: mFocusSet)
+  if (MOBILE) { mFocus = null; mFocusBar($('#grid')); }   // (a week opened up to show all its tasks goes back to its usual size: mFocusSet)
   clearTimeout(nbTimer);
   const g = $('#grid'), pulled = weekPull;   // how far a swipe's pull already moved it: the slide goes on from there
   setPull(0);
@@ -227,7 +227,9 @@ function weekShift(dir, m = 1) {
     if (el.classList.contains('day')) rows[r].days.push(el); else if (el.classList.contains('cfb')) rows[r].bars.push(el);
   }
   g.style.gridTemplateRows = R.map(h => h + 'px').join(' ');
-  if (MOBILE) mClip(g);   // (arriving weeks built just now get their "…")
+  // (mobile: the "…" as they'll be once landed, so nothing changes at the end; rows changing height are given their
+  // new height to work that out, then frame(0) puts them back. Arriving weeks built just now get theirs too)
+  if (MOBILE) { rows.forEach((r, i) => { if (moving[i]) r.days.forEach(d => { d.style.alignSelf = 'start'; d.style.height = b[i] + 'px'; }); }); mClip(g); }
   g.classList.add('sliding'); g.scrollTop = 0;
   if (hl) setHL(hl, true);
   const frame = (k, all) => {
@@ -297,7 +299,8 @@ function setPull(px, settle) {
   const g = $('#grid'); weekPull = px;
   g.classList.toggle('settle', !!settle);
   const tr = px ? `0 ${-px}px` : '';
-  for (const el of g.children) if (el.classList.contains('day') || el.classList.contains('cfb')) el.style.translate = tr;
+  // (mobile: "Show less" goes with its week, .m-less)
+  for (const el of g.children) if (el.classList.contains('day') || el.classList.contains('cfb') || el.classList.contains('m-less')) el.style.translate = tr;
 }
 // scrolling the calendar: a week per swipe. The swipe pulls the days along (setPull); once it has scrolled WEEK_PULL
 // px, the calendar takes the same step as ‹ › and the arrow keys, on from where the pull got to. A scroll that starts

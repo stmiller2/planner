@@ -69,7 +69,7 @@ function changedOnDisk(b) {
   $('#mKeep').onclick = () => { hideModal(); clearTimeout(saveTimer); saveChain = saveChain.then(() => writeNow(true)); };
 }
 // pick up edits made elsewhere when the window regains focus (unless this window has unsaved changes)
-window.addEventListener('focus', async () => {
+async function pullLatest() {
   const b = backend();
   if (!b || !b.ready() || blocked || dirty) return;
   try {
@@ -77,7 +77,25 @@ window.addEventListener('focus', async () => {
     state = migrate(JSON.parse(got.text)); got.seen();
     undoStack.length = 0; redoStack.length = 0; render(); toast(server.hosted && b === server ? 'Loaded the latest version of your plan.' : 'Loaded newer planner.json from disk.');
   } catch (e) {}
+}
+window.addEventListener('focus', pullLatest);
+/* Mobile (one plan used from a phone and a computer): a phone often doesn't send focus when the app comes back, so
+   coming back into view (or back from the browser's page cache) checks too; and going out of view saves at once, as
+   the phone may stop the page before the usual short wait is up. */
+document.addEventListener('visibilitychange', () => {
+  if (!MOBILE) return;
+  if (document.visibilityState === 'visible') pullLatest(); else if (dirty) flushSave();
 });
+window.addEventListener('pageshow', e => { if (MOBILE && e.persisted) pullLatest(); });
+/* Refreshing by hand (mobile: the header pulled down, mobile.js): save what's waiting, make sure the plan can be
+   reached, then reload the page (which also brings in a newer version of the app). Resolves to a reason it didn't
+   (a save that conflicted or failed says so itself), or nothing as the page reloads. */
+async function refreshPage() {
+  const b = backend();
+  if (b && b.ready() && !blocked && dirty) { await flushSave(); if (dirty) return 'not saved'; }
+  if (MODE === 'server') { try { const r = await server.fetch(); if (r.type === 'opaqueredirect' || r.status >= 400) throw 0; } catch (e) { return 'offline'; } }
+  dirty = false; location.reload();
+}
 window.addEventListener('beforeunload', e => {
   if (dirty && MODE === 'server' && server.hosted) server.keepPending();   // online: the save may not finish; keep a copy here
   if (dirty) { flushSave(); e.preventDefault(); e.returnValue = ''; }

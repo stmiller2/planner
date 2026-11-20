@@ -74,7 +74,9 @@ $('aside').insertAdjacentHTML('afterbegin', sbTab('Projects / Conflicts'));
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  if (!e.target.closest('#menu') && !e.target.closest('[data-act="linkmenu"], [data-act="tmenu"], [data-act="pmenu"], [data-act="kmenu"], [data-act="acct"]')) closeMenu();
+  // (mobile: a box opened from the task menu sits over it, which stays open: mPopOpen. Its close button may already be
+  // gone from the page: closeTimePop empties #tpop)
+  if (!e.target.closest('#menu') && !e.target.closest('[data-act="linkmenu"], [data-act="tmenu"], [data-act="pmenu"], [data-act="kmenu"], [data-act="acct"]') && !(MOBILE && (e.target.closest('#mAsk, #tpop') || !e.target.isConnected))) closeMenu();
   if (e.target.closest('.inl')) return;            // clicks inside a rename box just move the cursor
   const a = e.target.closest('[data-act]'); if (!a) return;
   const act = a.dataset.act;
@@ -106,14 +108,14 @@ document.addEventListener('click', e => {
     case 'setlink': closeMenu(); setLink(id, a.dataset.v); break;
     case 'unsched': moveTask(id, null); break;
     case 'kmenu': openTaskMenu(id, a); break;
-    case 'k-notes': closeMenu(); if (MOBILE) mNotes(id); else editNotes(id, menuTask); break;   // (mobile: a card of its own, mobile.js)
+    case 'k-notes': if (MOBILE) mNotes(id); else { closeMenu(); editNotes(id, menuTask); } break;   // (mobile: a card of its own over the menu, which stays open: mobile.js)
     case 'k-day': { closeMenu(); const f = findTask(id); if (f && f.task.date) { if (admOpen) closeAdmire(); openDay(f.task.date); } break; }   // (mobile's task menu)
-    case 'k-resched': closeMenu(); mReschedule(id); break;   // (mobile's task menu, mobile.js)
+    case 'k-resched': mReschedule(id); break;   // (mobile's task menu, which stays open under it: mobile.js)
     case 'm-add-k': closeMenu(); mAddTask(id); break;          // (mobile's thread / project menus)
     case 'm-ren-t': closeMenu(); mRenameAny('t', id); break;
     case 'm-ren-p': closeMenu(); mRenameAny('p', id); break;
-    case 'k-rename': closeMenu(); mRename(id); break;
-    case 'k-time': closeMenu(); openTimePop(id, 0, 0); break;   // (placed by css/mobile.css)
+    case 'k-rename': mRename(id); break;
+    case 'k-time': openTimePop(id, 0, 0); break;   // (placed by css/mobile.css, over the menu)
     case 'k-done': { closeMenu(); const f = findTask(id); if (f) mutate(() => f.task.done = !f.task.done); break; }   // (mobile's task menu)
     case 'acct': openAccount(a); break;
     case 'acct-export': closeMenu(); $('#exportBtn').click(); break;

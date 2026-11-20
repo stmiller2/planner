@@ -122,7 +122,9 @@ function closeTimePop(save) {
   clearTimeout(tpopTimer);
   if (!tpop) return;
   if (save) commitTimePop();
+  const id = tpop.id;
   tpop = null; tpEl.style.display = 'none'; tpEl.innerHTML = '';
+  if (MOBILE) mMenuBack(id);   // (opened from the task menu, still open under it: drawn again)
 }
 // after a re-render: drop the popover if its task left the view, otherwise refresh it (unless it's being typed in)
 function syncTimePop() {

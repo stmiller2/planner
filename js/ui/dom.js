@@ -100,7 +100,8 @@ function editDateIn(btn, opt) {
 const menu = $('#menu');
 function closeMenu() { menu.style.display = 'none'; delete menu.dataset.for; }
 // it stays put while what it belongs to moves: scrolling (or a wheel step to other weeks / days) closes it
-document.addEventListener('scroll', e => { if (menu.style.display === 'block' && !menu.contains(e.target)) closeMenu(); }, true);
+// (mobile: not for the scroll a phone's keyboard makes as a box opened from the task menu takes focus: mPopOpen)
+document.addEventListener('scroll', e => { if (menu.style.display === 'block' && !menu.contains(e.target) && !(MOBILE && mPopOpen())) closeMenu(); }, true);
 document.addEventListener('wheel', e => { if (menu.style.display === 'block' && !menu.contains(e.target)) closeMenu(); }, { capture: true, passive: true });
 
 /* ---------- hover tips: warm after the first ---------- */
@@ -126,9 +127,10 @@ document.addEventListener('pointerdown', e => {
   const inp = document.querySelector('.inl');
   if (inp && e.target !== inp && !e.target.closest('.dclr')) inp.blur();
 }, true);
-function startRename(kind, id, el) {
+// fresh: it was just added (addProject / addThread / addSubThread); on mobile, cancelling its name takes it away again
+function startRename(kind, id, el, fresh) {
   el = el || $(`[data-act="rename-${kind}"][data-id="${id}"]`);
-  if (!el) { if (MOBILE && ['k', 't', 'p'].includes(kind)) mRenameAny(kind, id); return; }   // (mobile's tree has no names to type over: a box instead)
+  if (!el) { if (MOBILE && ['k', 't', 'p'].includes(kind)) mRenameAny(kind, id, fresh); return; }   // (mobile's tree has no names to type over: a box instead)
   let cur, commit;
   if (kind === 'p') { const p = state.projects.find(x => x.id === id); cur = p.name; commit = v => mutate(() => p.name = v); }
   else if (kind === 't') { const f = findThread(id); cur = f.t.name; commit = v => mutate(() => f.t.name = v); }

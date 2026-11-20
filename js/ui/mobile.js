@@ -52,6 +52,37 @@ function mFollow(e, move, end) {
   tg.addEventListener('touchend', fin); tg.addEventListener('touchcancel', fin);
 }
 
+/* ---------- pulling the header down: refresh ---------- */
+/* A swipe down that starts on the header pulls a badge out from under it (#mPtr); past M_PTR px it's armed, and let go
+   then, the page saves what's waiting and reloads with the latest plan (refreshPage, storage.js). Let go early: back. */
+const M_PTR = 72;
+document.body.insertAdjacentHTML('beforeend', `<div id="mPtr">${svg('<path d="M12 5v14M6 13l6 6 6-6"/>')}</div>`);
+let mPt = null;
+function mPtrAt(px, armed, settle) {
+  const el = $('#mPtr'); el.classList.toggle('settle', !!settle); el.classList.toggle('armed', !!armed);
+  el.style.transform = `translateY(${(px - 48).toFixed(1)}px)`; el.style.opacity = String(clamp(px / M_PTR, 0, 1));
+}
+$('header').addEventListener('touchstart', e => {
+  if (!MOBILE || e.touches.length !== 1 || mPt || mEdge || $('#mPtr').classList.contains('spin') || $('#modal').style.display === 'grid') return;
+  mPt = mTouch(e); mFollow(e, mPtMove, mPtEnd);
+}, { passive: true });
+function mPtMove(e) {
+  const s = mPt; if (!s) return;
+  const t = e.touches[0], dx = t.clientX - s.x0, dy = t.clientY - s.y0;
+  if (!s.axis) { if (Math.hypot(dx, dy) < 8) return; s.axis = dy > Math.abs(dx) ? 'y' : 'n'; if (s.axis === 'n') { mPt = null; return; } closeMenu(); }
+  if (e.cancelable) e.preventDefault();
+  s.dx = Math.max(0, dy);
+  mPtrAt(s.dx < M_PTR ? s.dx : M_PTR + (s.dx - M_PTR) * 0.3, s.dx >= M_PTR);   // (with resistance past the point)
+}
+async function mPtEnd(cancelled) {
+  const s = mPt; mPt = null; if (!s || s.axis !== 'y') return;
+  if (cancelled || s.dx < M_PTR) return mPtrAt(0, false, true);
+  const el = $('#mPtr'); mPtrAt(M_PTR * 0.8, false, true); el.classList.add('spin');
+  const why = await refreshPage();   // (nothing comes back if the page reloads)
+  el.classList.remove('spin'); mPtrAt(0, false, true);
+  if (why === 'offline') toast('Couldn’t reach your plan to refresh. Check your connection and try again.', 4000);
+}
+
 /* ---------- header and drawer ---------- */
 $('header').insertAdjacentHTML('afterbegin', `<button class="ic" id="mBurger" aria-label="Menu">${svg('<path d="M4 6h16M4 12h16M4 18h16"/>')}</button>`
   + `<button class="ic" id="mBack" aria-label="Back to the calendar">${svg('<path d="m15 18-6-6 6-6"/>')}</button>`);
@@ -82,6 +113,9 @@ function mBarSync() {
   $('[data-m="status"]', f).textContent = $('#status').textContent;
   const acct = $('#acctBtn'), a = $('.m-acct', f); a.hidden = acct.hidden; a.textContent = acct.textContent;
 }
+// and at its foot, the one button for adding a task (mAddTask)
+$('#tree').insertAdjacentHTML('afterend', `<div class="m-foot"><button class="btn primary m-addk">${svg('<path d="M12 5v14M5 12h14"/>')}Add task</button></div>`);
+$('aside .m-addk').onclick = () => mAddTask();
 $('aside .m-bar').addEventListener('click', e => {
   const w = e.target.closest('.m-wk button');
   if (w) { setPull(0); mFocus = null; setWeekCount(+w.dataset.n); mBarSync(); return; }
@@ -174,21 +208,59 @@ function mCloseEnd(cancelled) {
 /* In each day under root (the weeks built ahead too), the chips that don't fit whole are hidden, one by one (a same-day
    group can lose its last ones), and a "…" goes below the last one shown. At least one always shows: if there isn't
    room for it and the "…" too, the "…" sits over its corner instead (.on). */
-const M_MORE = 13;   // px kept for the "…"
-const mUnclip = it => { for (const c of it.querySelectorAll('.m-hid')) c.classList.remove('m-hid'); const m = it.querySelector(':scope > .m-more'); if (m) m.remove(); };
+/* When a day already on screen changes what it shows (its row eased to another height, a resize), the change fades:
+   chips coming back fade in, chips going and a "…" that moves or goes fade out where they were (a copy, .m-fade, laid
+   over the day, as the chip itself is already display: none), and a new "…" fades in. mUnclip notes what was hidden
+   (mWas) before showing it all; mClip compares with that. A day drawn afresh (renderCal) just shows its state. */
+const M_MORE = 13, M_FADE = 200;   // px kept for the "…"; ms a fade takes
+const mWas = new WeakMap(), mSeen = new WeakSet();   // mWas: items → { hid, more } as shown before mUnclip; mSeen: items clipped before
+// el's box in day's own coordinates (what an absolutely placed copy needs)
+const mBox = (el, day) => { const r = el.getBoundingClientRect(), d = day.getBoundingClientRect(); return { l: r.left - d.left - day.clientLeft, t: r.top - d.top - day.clientTop, w: r.width, h: r.height }; };
+function mNote(it) {
+  if (mWas.has(it)) return;
+  const more = it.querySelector(':scope > .m-more');
+  mWas.set(it, { hid: new Set(it.querySelectorAll('.m-hid')), more: more && mSeen.has(it) ? { el: more, box: mBox(more, it.parentElement) } : null });
+}
+const mUnclip = it => { mNote(it); for (const c of it.querySelectorAll('.m-hid')) c.classList.remove('m-hid'); const m = it.querySelector(':scope > .m-more'); if (m) m.remove(); };
+function mFadeOut(day, el, box) {
+  const g = el.cloneNode(true); g.classList.remove('m-hid'); g.classList.add('m-fade');
+  for (const x of [g, ...g.querySelectorAll('[data-id], [data-fid], [data-kid]')]) { delete x.dataset.id; delete x.dataset.fid; delete x.dataset.kid; }   // (nothing finds it as a task)
+  Object.assign(g.style, { left: box.l + 'px', top: box.t + 'px', width: box.w + 'px', height: box.h + 'px' });
+  day.appendChild(g);
+  g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: M_FADE, easing: 'ease-out' }).onfinish = () => g.remove();
+}
+const mFadeIn = el => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: M_FADE, easing: 'ease-out' });
+// el has an ancestor (inside it) in set: the ancestor's fade covers it
+const mInSet = (el, set, it) => { for (let x = el.parentElement; x && x !== it; x = x.parentElement) if (set.has(x)) return true; return false; };
 function mClip(root) {
   $$('.day .items', root).forEach(it => {
     mUnclip(it);
-    if (it.scrollHeight <= it.clientHeight + 1) return;
-    const bottom = it.getBoundingClientRect().bottom, chips = $$('.chip', it);
-    if (!chips.length) return;
-    let n = chips.findIndex(c => c.getBoundingClientRect().bottom > bottom - M_MORE);
-    if (n < 0) return;
-    n = Math.max(1, n);
-    chips.slice(n).forEach(c => c.classList.add('m-hid'));
-    for (const w of it.children) if (!w.classList.contains('chip') && !w.querySelector('.chip:not(.m-hid)')) w.classList.add('m-hid');   // (groups left empty)
-    const over = chips[n - 1].getBoundingClientRect().bottom > bottom - M_MORE;
-    it.insertAdjacentHTML('beforeend', `<div class="m-more${over ? ' on' : ''}">…</div>`);
+    const was = mWas.get(it), day = it.parentElement, fade = MOTION() && mSeen.has(it) && !!it.animate;
+    mWas.delete(it); mSeen.add(it);
+    let hide = new Set(), more = null;
+    const chips = it.scrollHeight > it.clientHeight + 1 ? $$('.chip', it) : [];
+    if (chips.length) {
+      const bottom = it.getBoundingClientRect().bottom;
+      let n = chips.findIndex(c => c.getBoundingClientRect().bottom > bottom - M_MORE);
+      if (n >= 0) {
+        n = Math.max(1, n);
+        hide = new Set(chips.slice(n));
+        for (const w of it.children) if (!w.classList.contains('chip') && ![...w.querySelectorAll('.chip')].some(c => !hide.has(c))) hide.add(w);   // (groups left empty)
+        more = { over: chips[n - 1].getBoundingClientRect().bottom > bottom - M_MORE };
+      }
+    }
+    // what goes fades out where it is now (measured before it's hidden; a copy below the day's edge is just clipped)
+    if (fade) for (const el of hide) if (!was.hid.has(el) && !mInSet(el, hide, it)) mFadeOut(day, el, mBox(el, day));
+    hide.forEach(el => el.classList.add('m-hid'));
+    let mEl = null;
+    if (more) { it.insertAdjacentHTML('beforeend', `<div class="m-more${more.over ? ' on' : ''}">…</div>`); mEl = it.lastElementChild; }
+    if (!fade) return;
+    const back = new Set([...was.hid].filter(el => !hide.has(el) && it.contains(el)));
+    back.forEach(el => { if (!mInSet(el, back, it)) mFadeIn(el); });
+    const old = was.more, nb = mEl && mBox(mEl, day);
+    if (old && nb && Math.abs(old.box.t - nb.t) < 2 && Math.abs(old.box.l - nb.l) < 2) return;   // ("…" where it was)
+    if (old) mFadeOut(day, old.el, old.box);
+    if (mEl) mFadeIn(mEl);
   });
 }
 /* Week heights: what each week needs (weekNeeds, measured with every chip shown), shared out as on desktop (fitSizes):
@@ -196,7 +268,8 @@ function mClip(root) {
    "…" (mClip, after). days: 7 a week, in order. mNeed: the needs of the weeks just fitted (the view's), for mNbFit. */
 let mNeed = [];
 function mFit(days, H) {
-  days.forEach(d => mUnclip(d.querySelector('.items')));
+  const its = days.map(d => d.querySelector('.items'));
+  its.forEach(mNote); its.forEach(mUnclip);   // (all read, then all changed: one layout, not one per day)
   mNeed = weekNeeds(days);
   const n = mNeed.length, f = mFocus ? days.findIndex(d => d.dataset.date === mFocus) : -1;
   if (mFocus && f < 0) mFocus = null;
@@ -212,15 +285,22 @@ function mFit(days, H) {
 }
 /* Opening up a week: a tap on a "…" makes its week as tall as all its tasks need, the other weeks crushed down to their
    day numbers and a chip or so (M_CRUSH), with a "Show less" at its foot to put things back. Changing weeks (or how
-   many are shown) puts them back too. The rows ease to their new sizes (.m-anim); the "…" are worked out once they're there. */
+   many are shown) puts them back too. The rows ease to their new sizes (.m-anim). The "…" are worked out for where
+   the rows end up before they move (laid out there for a moment, then put back to ease over), so a week too full to
+   show everything opens only as far as it will go, its "…" already in place, and nothing is hidden again at the end. */
 const M_CRUSH = 52, M_BAR = 30;   // M_BAR: .day.m-foc's extra padding (mobile.css)
 let mFocus = null, mAnimT = 0;   // mFocus: the first day of the week opened up
 function mFocusSet(ws) {
   mFocus = ws; const g = $('#grid');
   clearTimeout(mAnimT);
-  if (!MOTION()) { fitRows(); return; }
-  g.classList.add('m-anim'); fitRows();
-  mAnimT = setTimeout(() => { g.classList.remove('m-anim'); mClip(g); }, 320);
+  const from = g.style.gridTemplateRows;
+  g.classList.remove('m-anim');
+  fitRows();   // (the rows where they end up, and their "…")
+  if (!MOTION()) return;
+  const to = g.style.gridTemplateRows;
+  g.style.gridTemplateRows = from; void g.offsetHeight;   // back where they were, then ease over
+  g.classList.add('m-anim'); g.style.gridTemplateRows = to;
+  mAnimT = setTimeout(() => { g.classList.remove('m-anim'); mClip(g); }, 320);   // (mClip: only if a resize came mid-way)
 }
 // the "Show less" under the week opened up (a grid item along the bottom of its row)
 function mFocusBar(g) {
@@ -263,7 +343,7 @@ $('#grid').addEventListener('click', e => {
 /* ---------- calendar: swiping up / down ---------- */
 /* The desktop's scroll, by touch: the days (and the week built ahead beyond them, buildNeighbours) follow the finger
    (setPull), with resistance past one week; let go past M_TURN of a week, or with a flick, and the calendar steps on
-   (weekShift, from where the pull got to): one week, or two or three for a fast flick. Otherwise it springs back. */
+   (weekShift, from where the pull got to): one week, however fast the flick. Otherwise it springs back. */
 let mSw = null;   // a touch on the calendar that may become a swipe
 $('main').addEventListener('touchstart', e => {
   if (!MOBILE || ui.dayView || admOpen || weekAnim || mSw || mEdge || e.touches.length !== 1) return;
@@ -276,7 +356,8 @@ function mCalMove(e) {
   if (!s.axis) {
     if (Math.hypot(dx, dy) < 8) return;
     s.axis = Math.abs(dy) >= Math.abs(dx) ? 'y' : 'x';
-    if (s.axis === 'y') { if (mFocus) { mFocus = null; mFocusBar($('#grid')); } clearTimeout(nbTimer); buildNeighbours(); s.R = rowHeights()[0] || 100; }
+    // (a week opened up stays so, "Show less" pulled along with it (setPull), unless the swipe steps on: weekShift)
+    if (s.axis === 'y') { clearTimeout(nbTimer); buildNeighbours(); s.R = rowHeights()[0] || 100; }
   }
   if (s.axis !== 'y') return;
   if (e.cancelable) e.preventDefault();
@@ -288,17 +369,18 @@ function mCalEnd(cancelled) {
   const s = mSw; mSw = null;
   if (!s || s.axis !== 'y') return;
   mSwipedAt = Date.now();
-  const dir = cancelled ? 0 : mDir(s, s.R), v = mFlick(s) ? Math.abs(s.vx) : 0;
-  if (dir) weekShift(dir, v > 1.8 ? 3 : v > 1.1 ? 2 : 1); else setPull(0, true);
+  const dir = cancelled ? 0 : mDir(s, s.R);
+  if (dir) weekShift(dir); else setPull(0, true);   // (one week, however hard the flick)
 }
 
 /* ---------- day view ---------- */
-// sideways swipes over the timeline: the day before and after follow the finger (enterStrip / setStripX, dayview.js);
-// let go far enough (or with a flick) and it slides on (daySlide), otherwise back
+// sideways swipes over the timeline or the sheet's list: the day before and after follow the finger (enterStrip /
+// setStripX, dayview.js: the list's days move sideways too); let go far enough (or with a flick) and it slides on
+// (daySlide), otherwise back. Up / down: the hours or the list scroll as usual
 let mDs = null;
 const dvBox = $('#dayview');
 dvBox.addEventListener('touchstart', e => {
-  if (!MOBILE || !ui.dayView || admOpen || dayAnim || dv || mDs || mEdge || e.touches.length !== 1 || !e.target.closest('.dv-main')) return;
+  if (!MOBILE || !ui.dayView || admOpen || dayAnim || dv || mDs || mEdge || e.touches.length !== 1 || !e.target.closest('.dv-main, .dv-list')) return;
   mDs = mTouch(e); mFollow(e, mDayMove, mDayEnd);
 }, { passive: true });
 function mDayMove(e) {
@@ -355,7 +437,7 @@ function mSheetAuto(d) {
 }
 window.addEventListener('resize', () => { if (MOBILE) mSheetSet(mSheetH >= mSheetMax() - 1 ? Infinity : mSheetH); });
 dvBox.addEventListener('pointerdown', e => {
-  if (!MOBILE || mSh || !e.target.closest('.m-grab, .dv-side .sb-head')) return;
+  if (!MOBILE || mSh || !e.target.closest('.m-grab, .dv-side .sb-head') || e.target.closest('button')) return;   // (its Add task button: just a tap)
   const side = e.target.closest('.dv-side');
   mSh = { y0: e.clientY, h0: mSheetH, moved: false, ts: performance.now(), dxs: 0, vx: 0, side };
   side.classList.add('m-dragging'); side.setPointerCapture(e.pointerId);
@@ -386,6 +468,11 @@ $('#admire').addEventListener('click', e => {
   const t = e.target.closest('.adm-dot, .adm-bar, .adm-tag'), host = t && (t.dataset.lk ? t : t.closest('[data-lk]'));
   mAdmSpot(host ? host.dataset.lk : null, false, false);
 });
+// opening the Timeline: today's week in the middle of the screen (openAdmire), not the start of all time
+function mAdmToday() {
+  const el = $('#admire'), td = $('#admire .adm-day.today'), row = td && td.closest('.adm-row'); if (!row) return;
+  el.scrollTop += row.getBoundingClientRect().top - el.getBoundingClientRect().top - (el.clientHeight - row.offsetHeight) / 2;
+}
 // pick out thread / project k (null: nothing), as hovering it does on desktop; scroll: bring its first lane into view
 function mAdmSpot(k, proj, scroll = true) {
   const tl = $('#admire .adm-tl'); if (!tl) return;
@@ -429,12 +516,13 @@ function mThread(p, t) {
     }
     body += mTask(t, L[i].obj, loose); i++;
   }
-  body += `<button class="mt-add" data-tid="${t.id}">${M_PLUS}<span>Add task</span></button>`;   // (new tasks go at the end; a long press moves them)
+  // (where the thread ends: a lifted task can be dropped there, mTreeAim; an empty thread says so)
+  body += ks.length || t.threads.length ? `<div class="mt-end" data-tid="${t.id}"></div>` : `<div class="mt-empty mt-end" data-tid="${t.id}">No tasks yet</div>`;
   return mNode(t.id, 'mt-t', `<span class="mt-dot"></span><span class="mt-nm">${esc(t.name)}</span><span class="mt-cnt">${ks.length ? `${done}/${ks.length}` : ''}</span>`,
     body, `style="--c:${esc(colorOf(t))}"`);
 }
-// a task's row. Linked tasks as on desktop (renderTaskRow): a bar down the chain's left, and a box round its numbers that
-// runs through same-day links and starts afresh at a next-day one, a short line joining the boxes
+// a task's row. Linked tasks as on desktop (renderTaskRow), less its bar down the chain's left: a box round its numbers
+// that runs through same-day links and starts afresh at a next-day one, a short line joining the boxes
 function mTask(t, k, loose) {
   const i = t.tasks.indexOf(k), nx = t.tasks[i + 1], chain = !!(k.linkToPrev || (nx && nx.linkToPrev));
   const cls = ['mt-task', k.done && 'done', chain && 'g', chain && !k.linkToPrev && 'gs', chain && !(nx && nx.linkToPrev) && 'ge'].filter(Boolean).join(' ');
@@ -444,7 +532,6 @@ function mTask(t, k, loose) {
 }
 $('#tree').addEventListener('click', e => {
   if (!MOBILE) return;
-  const add = e.target.closest('.mt-add'); if (add) { mAddTask(add.dataset.tid); return; }
   const r = e.target.closest('[data-mtog]');
   if (r) { const id = r.dataset.mtog, n = r.parentElement, shut = !n.classList.contains('closed'); n.classList.toggle('closed', shut); ui.collapsed[id] = shut; saveUI(); return; }
   const k = e.target.closest('.mt-task[data-id]');
@@ -485,8 +572,19 @@ document.addEventListener('click', e => {
   setTimeout(() => mUndo(msg), 0);
 }, true);
 
+/* ---------- the warning bar: kept short ---------- */
+// each warning is cut to two lines and the bar to about two warnings (css #warn); a tap on them shows them all (still
+// capped, scrolling). New warnings start short again; m-over marks a bar with more than shows (faded at its foot).
+{
+  const w = $('#warn'), msg = $('#warn .msg');
+  new MutationObserver(() => { w.classList.remove('m-open'); requestAnimationFrame(() => w.classList.toggle('m-over', msg.scrollHeight > msg.clientHeight + 2)); }).observe(msg, { childList: true });
+  msg.addEventListener('click', () => { if (MOBILE && (w.classList.contains('m-over') || w.classList.contains('m-open'))) { w.classList.toggle('m-open'); armWarn(); } });
+}
+
 /* ---------- typing a date or a name: a box at the top (clear of the keyboard) ---------- */
-// o: { title, sub, value, placeholder, read(text) → { ok, hint, value }, chips: [{ label, value }], ok, done(value) }
+// o: { title, sub, value, placeholder, read(text) → { ok, hint, value }, chips: [{ label, value }], ok, done(value),
+//      cancel() (closed without saving), menuFor (a task id: opened from its menu, which stays open under it: mMenuBack),
+//      toggle: { label, note } (a switch, off to start; done gets whether it's on as a second argument) }
 const M_PENCIL = svg('<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>');
 document.body.insertAdjacentHTML('beforeend', '<div id="mAsk"><div class="ma-card"></div></div>');
 function mAsk(o) {
@@ -494,20 +592,24 @@ function mAsk(o) {
   card.innerHTML = `<div class="ma-h">${esc(o.title)}</div>${o.sub ? `<div class="ma-sub">${esc(o.sub)}</div>` : ''}
     <input class="ma-in" spellcheck="false" autocomplete="off" enterkeyhint="done"><div class="ma-hint"></div>
     ${o.chips ? `<div class="ma-chips">${o.chips.map((c, i) => `<button data-i="${i}">${esc(c.label)}</button>`).join('')}</div>` : ''}
+    ${o.toggle ? `<label class="switch ma-sw"><input type="checkbox"><span class="track"></span><span class="ma-sw-t"><b>${esc(o.toggle.label)}</b><span>${esc(o.toggle.note)}</span></span></label>` : ''}
     <div class="ma-btns"><button class="btn ma-no">Cancel</button><button class="btn primary ma-ok">${esc(o.ok || 'Save')}</button></div>`;
   const inp = $('.ma-in', card), hint = $('.ma-hint', card), okb = $('.ma-ok', card);
   inp.value = o.value || ''; inp.placeholder = o.placeholder || '';
   const check = () => { const r = o.read(inp.value); hint.textContent = r.hint || ''; hint.classList.toggle('bad', !r.ok); okb.disabled = !r.ok; return r; };
-  const close = () => { box.classList.remove('on'); inp.blur(); };
-  const ok = () => { const r = check(); if (r.ok) { close(); o.done(r.value); } };
+  const close = () => { box.classList.remove('on'); inp.blur(); if (o.menuFor) mMenuBack(o.menuFor); };
+  const cancel = () => { close(); if (o.cancel) o.cancel(); };
+  const sw = $('.ma-sw input', card), on = () => !!(sw && sw.checked);
+  const ok = () => { const r = check(); if (r.ok) { close(); o.done(r.value, on()); } };
   inp.oninput = check;
-  inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } else if (e.key === 'Escape') close(); };
+  inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } else if (e.key === 'Escape') cancel(); };
   card.onclick = e => {
-    const c = e.target.closest('.ma-chips button'); if (c) { close(); o.done(o.chips[+c.dataset.i].value); return; }
-    if (e.target.closest('.ma-no')) close(); else if (e.target.closest('.ma-ok')) ok();
+    const c = e.target.closest('.ma-chips button'); if (c) { close(); o.done(o.chips[+c.dataset.i].value, on()); return; }
+    if (e.target.closest('.ma-no')) cancel(); else if (e.target.closest('.ma-ok')) ok();
   };
-  box.onclick = e => { if (e.target === box) close(); };
-  closeMenu(); box.classList.add('on'); check();
+  box.onclick = e => { if (e.target === box) cancel(); };
+  if (!o.menuFor) closeMenu();
+  box.classList.remove('m-low'); mAskFit(); box.classList.add('on'); check();
   setTimeout(() => { inp.focus(); inp.select(); }, 30);
 }
 // Reschedule…: typed as on desktop ("fri", "11/26", "+3", "tm", "none"), or one tap on a common choice
@@ -517,60 +619,129 @@ function mReschedule(id) {
   const chips = [{ label: 'Today', value: t }, { label: 'Tomorrow', value: addDays(t, 1) }];
   if (cur) chips.push({ label: '+1 day', value: addDays(cur, 1) }, { label: '+1 week', value: addDays(cur, 7) }, { label: 'No date', value: null });
   else chips.push({ label: 'Next week', value: addDays(t, 7) });
-  mAsk({ title: 'Reschedule', sub: f.task.title + (cur ? ` · now ${fmtShort(cur)}` : ' · not scheduled'), value: cur ? fmtShort(cur) : '', placeholder: 'e.g. fri, Nov 26, +3', chips,
+  mAsk({ title: 'Reschedule', menuFor: id, sub: f.task.title + (cur ? ` · now ${fmtShort(cur)}` : ' · not scheduled'), value: cur ? fmtShort(cur) : '', placeholder: 'e.g. fri, Nov 26, +3', chips,
     read: s => { const v = parseDateText(s); return v === null ? { ok: false, hint: 'try Nov 26, 11/26, fri, td, tm, +3, none' } : v === '' ? { ok: true, hint: 'no date (unscheduled)', value: null } : { ok: true, hint: dayLabel(v), value: v }; },
-    done: v => {
+    // (as Option on desktop: just this task, its links cut, the rest of its thread left where it is; where that differs)
+    toggle: mSplitMatters(f) ? { label: 'Only this task', note: 'Unlinks it and leaves the rest of its thread where it is' } : null,
+    done: (v, only) => {
       if (v === cur || !findTask(id)) return;
-      moveTask(id, v);
+      moveTask(id, v, only);
       mUndo(v ? `Moved to ${fmtShort(v)}` : 'Unscheduled');
     } });
 }
-// Rename…: a task ('k'), thread ('t') or project ('p'); also what naming a new thread or project opens (startRename)
-function mRenameAny(kind, id) {
+// Rename…: a task ('k'), thread ('t') or project ('p'); also what naming a new thread or project opens (startRename:
+// fresh), where Cancel takes the new one away again (mDropNew)
+function mRenameAny(kind, id, fresh) {
+  const gen = stateGen;
   let cur, set, what;
   if (kind === 'p') { const p = state.projects.find(x => x.id === id); if (!p) return; cur = p.name; what = 'Project name'; set = v => mutate(() => { p.name = v; }); }
   else if (kind === 't') { const f = findThread(id); if (!f) return; cur = f.t.name; what = 'Thread name'; set = v => mutate(() => { f.t.name = v; }); }
   else { const f = findTask(id); if (!f) return; cur = f.task.title; what = 'Task name'; set = v => mutate(() => { f.task.title = v; }); }
-  mAsk({ title: 'Rename', value: cur, placeholder: what, read: t => ({ ok: !!t.trim(), value: t.trim() }), done: v => { if (v !== cur) { set(v); mUndo('Renamed'); } } });
+  mAsk({ title: fresh ? (kind === 'p' ? 'New project' : 'New thread') : 'Rename', value: cur, placeholder: what, menuFor: kind === 'k' ? id : null,
+    cancel: fresh && kind !== 'k' ? () => mDropNew(kind, id, gen) : null,
+    read: t => ({ ok: !!t.trim(), value: t.trim() }), done: v => { if (v !== cur) { set(v); if (!fresh) mUndo('Renamed'); } } });
+}
+// a new project or thread whose naming was cancelled: gone again. Nothing else changed since it was added: undone, as
+// if it never was (and not left to redo); otherwise deleted (it's empty, so nothing asks first)
+function mDropNew(kind, id, gen) {
+  if (kind === 'p' ? !state.projects.some(x => x.id === id) : !findThread(id)) return;
+  if (stateGen === gen && undoStack.length) { undo(); redoStack.pop(); return; }
+  if (kind === 'p') delProject(id); else delThread(id);
 }
 const mRename = id => mRenameAny('k', id);
-/* Adding tasks (the drawer's "Add task" under a thread, the thread's menu, or "Add task to this day" in day view's
-   sheet): a name, which thread (that one, or the last one added to), and a date if wanted (typed as anywhere else).
-   Undated, it goes at the end of the thread (addTasks); dated, where that date falls among the thread's tasks
-   (addDayTasks). Add keeps the box open for the next one; Done closes it. */
-let mLastTid = null;
+/* Adding tasks: the drawer's one "Add task" button (at its foot), day view's (in its sheet's heading: that day filled
+   in), or a thread's menu. The box opens on the name, the keyboard up, the box just above it (m-low, mAskFit), with
+   the thread it most likely goes in (mGuessThread; from a thread's menu, that thread) shown above. A tap there lists
+   every project's threads and sub-threads as the drawer shows them (color dots, indented; mThreadRows) to pick
+   another. A date is optional (typed as anywhere else). Undated, it goes at the end of the thread (addTasks); dated,
+   where that date falls among the thread's tasks (addDayTasks). Add keeps the box open for the next one; Done closes it. */
+/* Which thread a new task most likely goes in: the one last added to on this device, if that was in the last few
+   hours (a run of adds); for a day (day view's button), the thread with the most unfinished tasks around it (a week
+   either way, nearer ones counting more); otherwise the thread whose next unfinished task comes soonest (what's under
+   way now); otherwise the first. */
+const M_RECENT = 6 * 3600e3, M_LASTADD = 'planner.mLastAdd';
+function mGuessThread(day) {
+  let last = null; try { last = JSON.parse(localStorage.getItem(M_LASTADD)); } catch (e) {}
+  if (last && Date.now() - last.at < M_RECENT && findThread(last.tid)) return last.tid;
+  const best = score => { let id = null, top = 0; score.forEach((v, k) => { if (v > top) { top = v; id = k; } }); return id; };
+  const open = allThreads().flatMap(({ t }) => t.tasks.filter(k => !k.done && k.date).map(k => [t.id, k.date]));
+  if (day) {
+    const near = new Map();
+    open.forEach(([tid, d]) => { const n = Math.abs(diffDays(d, day)); if (n <= 7) near.set(tid, (near.get(tid) || 0) + 1 / (1 + n)); });
+    const id = best(near); if (id) return id;
+  }
+  const today = todayISO(), soon = new Map();
+  open.forEach(([tid, d]) => { if (d >= today) soon.set(tid, Math.max(soon.get(tid) || 0, 1 / (1 + diffDays(d, today)))); });
+  return best(soon) || allThreads()[0].t.id;
+}
+// every thread and sub-thread, in the drawer's order (sub-threads where they sit among their parent's tasks)
+function mThreadRows(p) {
+  const out = [], rec = (t, depth) => { out.push({ t, depth }); layout(t).forEach(x => { if (x.kind !== 'task') rec(x.obj, depth + 1); }); };
+  p.threads.forEach(t => rec(t, 0));
+  return out;
+}
 function mAddTask(tid, day) {
-  const list = allThreads(); if (!list.length) { toast('Add a project and a thread first.'); return; }
-  const first = day && dayTasks(day)[0];
-  tid = tid || (mLastTid && findThread(mLastTid) ? mLastTid : first ? first.t.id : list[0].t.id);
+  if (!allThreads().length) { toast('Add a project and a thread first.'); return; }
+  if (!(tid && findThread(tid))) tid = mGuessThread(day);
   const box = $('#mAsk'), card = $('.ma-card', box);
   card.innerHTML = `<div class="ma-h">New task</div>
-    <select class="ma-sel">${list.map(({ p, t, path }) => `<option value="${t.id}" ${t.id === tid ? 'selected' : ''}>${esc(t.name + '  ·  ' + [p.name, ...path.slice(0, -1)].join(' › '))}</option>`).join('')}</select>
-    <input class="ma-in" placeholder="Task name" spellcheck="true" enterkeyhint="done">
+    <div class="ma-pick"><div class="ma-sub">Which thread?</div><div class="mp-list">${state.projects.map(p => {
+      const rows = mThreadRows(p);
+      return `<div class="mp-p">${esc(p.name)}</div>` + (rows.map(({ t, depth }) => `<button class="mp-t" data-tid="${t.id}" style="--c:${esc(colorOf(t))};--d:${depth}"><span class="mt-dot"></span><span class="mt-nm">${esc(t.name)}</span></button>`).join('')
+        || '<div class="mp-none">No threads yet</div>');
+    }).join('')}</div><div class="ma-btns"><button class="btn ma-no">Cancel</button></div></div>
+    <div class="ma-form"><button class="ma-thr"><span class="mt-dot"></span><span class="ma-thr-t"><b></b><span></span></span><span class="ma-chg">Change</span></button>
+    <input class="ma-in ma-name" placeholder="Task name" spellcheck="true" enterkeyhint="done">
     <input class="ma-in ma-when" placeholder="Date (optional): fri, 11/26, +3" spellcheck="false" autocomplete="off" enterkeyhint="done">
     <div class="ma-hint"></div>
-    <div class="ma-btns"><button class="btn ma-no">Done</button><button class="btn primary ma-ok">Add</button></div>`;
-  const sel = $('.ma-sel', card), name = $('.ma-in', card), when = $('.ma-when', card), hint = $('.ma-hint', card);
+    <div class="ma-btns"><button class="btn ma-no">Done</button><button class="btn primary ma-ok">Add</button></div></div>`;
+  const name = $('.ma-name', card), when = $('.ma-when', card), hint = $('.ma-hint', card), list = $('.mp-list', card);
   if (day) when.value = fmtShort(day);
   let added = null;
   const date = () => parseDateText(when.value);   // '' = none, null = can't read it
   const check = () => { const d = date(); hint.classList.toggle('bad', d === null); hint.textContent = d === null ? 'try Nov 26, 11/26, fri, td, tm, +3' : added ? `Added “${added}”` : d ? dayLabel(d) : 'No date: at the end of the thread'; return d; };
+  // the thread: picked (the form, its name typed into straight away) or being picked (the list, the current one marked)
+  const pick = id => {
+    const f = findThread(id); if (!f) return;
+    tid = id; card.classList.remove('picking');
+    const b = $('.ma-thr', card); b.style.setProperty('--c', colorOf(f.t));
+    $('b', b).textContent = f.t.name; $('.ma-thr-t span', b).textContent = [f.p.name, ...f.path.slice(0, -1)].join(' › ');
+    name.focus();   // (in the tap's own handler, so the phone's keyboard comes up)
+  };
+  const picking = () => {
+    name.blur(); when.blur(); card.classList.add('picking');
+    $$('.mp-t', list).forEach(b => b.classList.toggle('on', b.dataset.tid === tid));
+    const on = $('.mp-t.on', list); if (on) on.scrollIntoView({ block: 'center' });
+  };
   const add = () => {
     const d = check(), v = name.value.trim(); if (d === null || !v) { if (!v) name.focus(); return; }
-    const t = sel.value, f = findThread(t); if (!f) return;
-    mLastTid = t; ui.collapsed[t] = false; ui.collapsed[f.p.id] = false; saveUI();
-    if (d) addDayTasks(t, [v], null, d); else { addTasks(t, [v], null); addOpen = focusAdd = null; }
+    const f = findThread(tid); if (!f) return;
+    try { localStorage.setItem(M_LASTADD, JSON.stringify({ tid, at: Date.now() })); } catch (e) {}
+    ui.collapsed[tid] = false; ui.collapsed[f.p.id] = false; saveUI();
+    if (d) addDayTasks(tid, [v], null, d); else { addTasks(tid, [v], null); addOpen = focusAdd = null; }
     added = v; name.value = ''; check(); name.focus();
   };
   const close = () => { box.classList.remove('on'); name.blur(); when.blur(); if (added) mUndo(`Added “${added}”`); };
   when.oninput = () => { added = null; check(); };
   name.onkeydown = when.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } else if (e.key === 'Escape') close(); };
-  card.onclick = e => { if (e.target.closest('.ma-ok')) add(); else if (e.target.closest('.ma-no')) close(); };
+  card.onclick = e => {
+    const t = e.target.closest('.mp-t'); if (t) { pick(t.dataset.tid); return; }
+    if (e.target.closest('.ma-thr')) picking(); else if (e.target.closest('.ma-ok')) add(); else if (e.target.closest('.ma-no')) close();
+  };
   box.onclick = e => { if (e.target === box) close(); };
-  closeMenu(); box.classList.add('on'); check();
-  setTimeout(() => name.focus(), 30);
+  closeMenu(); box.classList.add('on', 'm-low'); mAskFit(); check();
+  pick(tid);   // (now, in the tap that opened it, so the phone's keyboard comes up)
 }
-const mDayAddBtn = () => `<button class="mt-add dv-madd">${M_PLUS}<span>Add task to this day</span></button>`;
+// the new task box sits at the bottom of what's visible: just above the keyboard while it's up (the visual viewport
+// shrinks to what the keyboard leaves; iOS may also scroll it)
+function mAskFit() {
+  const box = $('#mAsk'), vv = window.visualViewport, low = box.classList.contains('m-low') && box.classList.contains('on');
+  box.style.top = low && vv ? vv.offsetTop + 'px' : ''; box.style.height = low && vv ? vv.height + 'px' : '';
+  box.classList.toggle('m-kb', !!(low && vv && vv.height < innerHeight - 120));   // (keyboard up: no room kept for the home bar)
+}
+if (window.visualViewport) { visualViewport.addEventListener('resize', mAskFit); visualViewport.addEventListener('scroll', mAskFit); }
+// day view's: in the sheet's heading (renderDay puts it there)
+const mDayAddBtn = () => `<button class="dv-madd" aria-label="Add task to this day">${M_PLUS}<span>Add task</span></button>`;
 
 /* ---------- long press: lift a task and drag it ---------- */
 /* Hold a task still for M_HOLD ms and it lifts (a little buzz where the phone can): calendar chips go to another day
@@ -579,7 +750,12 @@ const mDayAddBtn = () => `<button class="mt-add dv-madd">${M_PLUS}<span>Add task
    come off the timeline; list items in the sheet go onto the timeline or elsewhere in the list (the desktop's own day
    view drag: dv, dvMove / dvUp, dayview-edit.js, fed from these touches). Let go without moving: its menu instead.
    A finger that moves before then is a swipe or a scroll, and nothing lifts. The browser's own long-press menu, and
-   the click after a long press, are swallowed. */
+   the click after a long press, are swallowed. What lifts is what moves: a same-day linked group lifts whole.
+   Held still for M_PEEL ms more once lifted, the task peels off on its own (mPeel: a second buzz, the copy under the
+   finger just that task, outlined dashed), as Option does on desktop (s.split: movingIds / calLanding / calDropOn /
+   moveTasksTo / dv's altKey): its links are cut and the rest of its thread stays put. Only where that would make a
+   difference (mSplitMatters); moving first is an ordinary drag. */
+const M_PEEL = 550;
 const M_HOLD = 380, M_LIFTABLE = '#grid .day:not(.nb) .chip[data-id], #grid .day:not(.nb) .chip[data-fid], #dayview .dv-blk[data-id], #dayview .dv-item[data-id], #tree .mt-task[data-id], #tree .mt-row[data-mtog]';
 let mLp = null, mLpAt = 0, mLpEat = null;   // mLpEat: the click a held-and-let-go task may still get, to swallow
 document.body.insertAdjacentHTML('beforeend', `<div id="mDropOff">${ICON.nodate}<span>Drop here to unschedule</span></div>`);
@@ -589,7 +765,7 @@ window.addEventListener('touchstart', e => {
   const el = e.target.closest(M_LIFTABLE); if (!el || e.target.closest('input, button, .inl')) return;
   if (el.dataset.fid && !el.matches('[draggable="true"]')) return;   // a failed attempt whose task is on a day again (failChip)
   const t = e.touches[0];
-  mLp = { x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, el, on: false, timer: setTimeout(mLift, M_HOLD) };
+  mLp = { x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, el, split: false, on: false, timer: setTimeout(mLift, M_HOLD) };
   mFollow(e, mLpMove, cancelled => mLpEnd(cancelled));
 }, { capture: true, passive: true });
 window.addEventListener('contextmenu', e => { if (MOBILE && (mLp || Date.now() - mLpAt < 800)) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
@@ -611,6 +787,26 @@ function mLift() {
     if (s.el.parentElement.classList.contains('mt-p')) openProjectMenu(id, s.el); else openThreadMenu(id, s.el);
   } else if (s.el.closest('#tree')) mTreeLift(s);
   else if (s.el.closest('#grid')) mCalLift(s); else mDvLift(s);
+  const f = !s.row && mLp === s && s.el.dataset.id && findTask(s.el.dataset.id);
+  if (f && mSplitMatters(f)) s.peelT = setTimeout(() => mPeel(s), M_PEEL);
+}
+/* Would moving just this task (Option) differ from an ordinary move? Yes when it's linked (the rest of its chain would
+   come with it), or when an ordinary move would shift what comes later in its thread (Settings' shiftLater, an ordered
+   thread, a dated task, something dated and unfinished after it). */
+function mSplitMatters(f) {
+  const [a, b] = runOf(f.t, f.i); if (b > a) return true;
+  if (!f.task.date || !ui.shiftLater || isLoose(f.p, f.t)) return false;
+  const L = layout(f.t), at = L.findIndex(x => x.obj === f.task);
+  return L.slice(at + 1).some(x => x.kind !== 'task' || (x.obj.date && !x.obj.done));
+}
+// held still a moment longer: just this task (the copy under the finger and what's dimmed show it)
+function mPeel(s) {
+  if (mLp !== s || s.moved || s.split) return;
+  s.split = true;
+  if (navigator.vibrate) navigator.vibrate([8, 50, 8]);
+  if (s.tree) { s.src.forEach(x => x.classList.remove('dragsrc')); s.ghost.remove(); mTreeGhost(s); mTreeAim(s); }
+  else if (s.cal) { dragSrc.forEach(x => x.classList.remove('dragsrc')); s.ghost.remove(); mCalGhost(s); calGap.hide(); }
+  else s.el.classList.add('m-split');
 }
 function mLpMove(e) {
   const s = mLp; if (!s) return;
@@ -618,12 +814,13 @@ function mLpMove(e) {
   if (!s.on) { if (Math.hypot(s.x - s.x0, s.y - s.y0) > 6) { clearTimeout(s.timer); mLp = null; } return; }
   if (s.row) return;
   if (e.cancelable) e.preventDefault();   // (nothing scrolls under a lifted task)
-  s.moved = s.moved || Math.hypot(s.x - s.x0, s.y - s.y0) > 6;
+  if (!s.moved && Math.hypot(s.x - s.x0, s.y - s.y0) > 6) { s.moved = true; clearTimeout(s.peelT); }   // (a drag: no peeling off now)
   if (s.tree) mTreeDrag(s); else if (s.cal) mCalDrag(s); else mDvDrag(s);
 }
 function mLpEnd(cancelled) {
   const s = mLp; mLp = null; if (!s) return;
   clearTimeout(s.timer);
+  clearTimeout(s.peelT);
   if (!s.on) return;
   mLpAt = Date.now();
   if (s.row) { mLpEat = { el: s.el, until: Date.now() + 450 }; return; }   // (its menu is open; the click would fold it)
@@ -639,14 +836,21 @@ function mLpEnd(cancelled) {
 // desktop's sidebar); near the top or bottom, the list scrolls
 document.body.insertAdjacentHTML('beforeend', '<div id="mTreeLine"></div>');
 function mTreeLift(s) {
-  const el = s.el, r = el.getBoundingClientRect();
-  s.tree = true; s.dy = s.y0 - r.top; s.ids = movingIds(el.dataset.id, false);
-  s.ghost = el.cloneNode(true); s.ghost.classList.add('m-ghost', 'mt-ghost');
-  Object.assign(s.ghost.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
-  s.ghost.style.setProperty('--c', getComputedStyle(el).getPropertyValue('--c'));
-  document.body.appendChild(s.ghost);
-  s.src = s.ids.map(k => $(`#tree .mt-task[data-id="${k}"]`)).filter(Boolean); s.src.forEach(x => x.classList.add('dragsrc'));
+  s.tree = true; mTreeGhost(s);
   document.body.classList.add('m-lifting');
+}
+// what moves (its chain; peeled off, just it), dimmed where it is, and a copy of it following the finger, rows one under the other
+function mTreeGhost(s) {
+  const el = s.el;
+  s.ids = movingIds(el.dataset.id, s.split);
+  s.src = s.ids.map(k => $(`#tree .mt-task[data-id="${k}"]`)).filter(Boolean);
+  const rows = s.src.length ? s.src : [el], r0 = rows[0].getBoundingClientRect(), r1 = rows[rows.length - 1].getBoundingClientRect();
+  s.dy = s.y - r0.top;
+  s.ghost = document.createElement('div'); s.ghost.className = 'm-ghost mt-ghost' + (s.split ? ' m-split' : '');
+  rows.forEach(x => { const c = x.cloneNode(true); c.style.setProperty('--c', getComputedStyle(x).getPropertyValue('--c')); s.ghost.appendChild(c); });
+  Object.assign(s.ghost.style, { left: r0.left + 'px', top: r0.top + 'px', width: r0.width + 'px', height: (r1.bottom - r0.top) + 'px' });
+  document.body.appendChild(s.ghost);
+  s.src.forEach(x => x.classList.add('dragsrc'));
 }
 function mTreeDrag(s) {
   s.ghost.style.top = (s.y - s.dy) + 'px';
@@ -666,7 +870,7 @@ function mTreeAim(s) {
     const r = row.getBoundingClientRect(); if (!r.height) continue;
     for (const [side, y] of [['before', r.top], ['after', r.bottom]]) { const d = Math.abs(s.y - y); if (!best || d < best.d) best = { d, side, row }; }
   }
-  for (const add of $$('#tree .mt-add[data-tid]')) {   // the end of a thread (an empty one too)
+  for (const add of $$('#tree .mt-end[data-tid]')) {   // the end of a thread (an empty one too)
     if (!shown(add)) continue; const r = add.getBoundingClientRect(); if (!r.height) continue;
     const d = Math.abs(s.y - (r.top + r.height / 2)); if (!best || d < best.d) best = { d, add };
   }
@@ -680,7 +884,7 @@ function mTreeAim(s) {
         spot = { tid: g.t.id, refId: anchor.id, side: best.side }; at = { y: best.side === 'before' ? r.top : r.bottom, left: r.left, width: r.width };
       }
     }
-    if (spot && ((spot.refId && s.ids.includes(spot.refId)) || isNoopTasks(s.el.dataset.id, false, spot))) spot = null;
+    if (spot && ((spot.refId && s.ids.includes(spot.refId)) || isNoopTasks(s.el.dataset.id, s.split, spot))) spot = null;
   }
   s.spot = spot;
   const line = $('#mTreeLine');
@@ -690,21 +894,27 @@ function mTreeDrop(s, cancelled) {
   cancelAnimationFrame(s.scrollRaf); s.scrollV = 0;
   s.ghost.remove(); s.src.forEach(x => x.classList.remove('dragsrc')); document.body.classList.remove('m-lifting'); $('#mTreeLine').style.display = 'none';
   if (cancelled || !s.moved || !s.spot) return;
-  const g0 = stateGen; moveTasksTo(s.el.dataset.id, false, s.spot);
+  const g0 = stateGen; moveTasksTo(s.el.dataset.id, s.split, s.spot);
   if (stateGen !== g0) { if (navigator.vibrate) navigator.vibrate(8); mUndo('Task moved'); }
 }
 // calendar: a copy of the chip follows the finger; the chips of what moves with it dim where they are
 function mCalLift(s) {
-  const el = s.el, id = el.dataset.id || el.dataset.kid, r = el.getBoundingClientRect();
+  const el = s.el, id = el.dataset.id || el.dataset.kid;
   drag = el.dataset.fid ? { kind: 'task', id, from: 'fail', fid: el.dataset.fid } : { kind: 'task', id, from: 'cal' };
   drag.ch = el.offsetHeight;
-  s.cal = true; s.dx = s.x0 - r.left; s.dy = s.y0 - r.top;
-  s.ghost = el.cloneNode(true); s.ghost.classList.add('m-ghost');
+  s.cal = true; mCalGhost(s);
+  document.body.classList.add('m-lifting', drag.from === 'fail' ? 'm-nodropoff' : 'm-dropoff');
+}
+// a copy of what's lifted following the finger (a chip in a same-day linked group: the group, which lands together,
+// calLanding; peeled off, just the chip), and the chips of what moves with it dimmed
+function mCalGhost(s) {
+  const el = s.el, up = (!s.split && el.dataset.id && el.closest('.grp')) || el, r = up.getBoundingClientRect();
+  s.dx = s.x - r.left; s.dy = s.y - r.top;
+  s.ghost = up.cloneNode(true); s.ghost.classList.add('m-ghost'); if (s.split) s.ghost.classList.add('m-split');
   Object.assign(s.ghost.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });   // (the size it had)
   document.body.appendChild(s.ghost);
-  dragSrc = drag.from === 'fail' ? [el] : movingIds(id, false).flatMap(k => $$(`#grid .chip[data-id="${k}"]`));
+  dragSrc = drag.from === 'fail' ? [el] : movingIds(drag.id, s.split).flatMap(k => $$(`#grid .chip[data-id="${k}"]`));
   dragSrc.forEach(x => x.classList.add('dragsrc'));
-  document.body.classList.add('m-lifting', drag.from === 'fail' ? 'm-nodropoff' : 'm-dropoff');
 }
 function mCalDrag(s) {
   s.ghost.style.left = (s.x - s.dx) + 'px'; s.ghost.style.top = (s.y - s.dy) + 'px';
@@ -714,7 +924,7 @@ function mCalDrag(s) {
   let day = !head && under && under.closest('#grid .day:not(.nb)');
   if (day && drag.from === 'fail' && under.closest(`.chip.failed[data-fid="${drag.fid}"]`)) day = null;   // back on its own chip: calls it off (failBail)
   if (day !== s.day) { $$('#grid .day.over').forEach(x => x.classList.remove('over')); if (day) day.classList.add('over'); else calGap.hide(); s.day = day || null; }
-  if (day) calGapAt(day, false);
+  if (day) calGapAt(day, !!s.split);
   // held near the top or bottom of the calendar: a week on, and another every so often while it stays there
   const g = $('#grid').getBoundingClientRect(), Z = 34;
   const dir = !head && s.y < g.top + Z ? -1 : s.y > g.bottom - Z ? 1 : 0;
@@ -731,14 +941,14 @@ function mCalDrop(s, cancelled) {
   $$('#grid .day.over').forEach(x => x.classList.remove('over'));
   const id = drag && drag.id;
   if (cancelled || !s.moved || !drag) { drag = null; calGap.hide(); return; }
-  if (s.off) { drag = null; calGap.hide(); moveTask(id, null); mUndo('Unscheduled'); return; }
+  if (s.off) { drag = null; calGap.hide(); moveTask(id, null, !!s.split); mUndo('Unscheduled'); return; }
   if (!s.day) { drag = null; calGap.hide(); return; }
   const was = (findTask(id) || { task: {} }).task.date, date = s.day.dataset.date;
-  calDropOn(s.day, false);
+  calDropOn(s.day, !!s.split);
   if (was !== date) { if (navigator.vibrate) navigator.vibrate(8); mUndo(`Moved to ${fmtShort(date)}`); }
 }
 // day view: the desktop's drag (dv), started here and fed these touches as pointer positions
-const mDvE = s => ({ clientX: s.x, clientY: s.y, target: document.elementFromPoint(s.x, s.y) || document.body, altKey: false });
+const mDvE = s => ({ clientX: s.x, clientY: s.y, target: document.elementFromPoint(s.x, s.y) || document.body, altKey: !!s.split });   // (peeled off: as Option)
 function mDvLift(s) {
   const el = s.el, blk = el.classList.contains('dv-blk'), f = findTask(el.dataset.id); if (!f) { mLp = null; return; }
   closeTimePop(true);
@@ -752,7 +962,7 @@ function mDvLift(s) {
 }
 function mDvDrag(s) { if (dv) { if (s.moved) s.el.classList.remove('m-lifted'); dvMove(mDvE(s)); } }
 function mDvDrop(s, cancelled) {
-  s.el.classList.remove('m-lifted');
+  s.el.classList.remove('m-lifted', 'm-split');
   if (dv) dvUp(mDvE(s), cancelled || !s.moved);
   if (s.sheetWas) mSheetSet(s.sheetWas);
   if (!cancelled && s.moved && stateGen !== s.gen) mUndo('Task moved');
@@ -770,7 +980,7 @@ const M_TASKS = '#grid .chip[data-id], #grid .chip[data-fid], #dayview .dv-blk[d
 let mMenuEat = null;
 window.addEventListener('pointerdown', e => {
   mMenuEat = null;
-  if (!MOBILE || menu.style.display !== 'block' || !e.target.closest || menu.contains(e.target) || e.target.closest(M_TASKS)) return;
+  if (!MOBILE || menu.style.display !== 'block' || !e.target.closest || menu.contains(e.target) || e.target.closest(M_TASKS) || mPopOpen()) return;
   mMenuEat = { at: Date.now(), x: e.clientX, y: e.clientY };
   e.stopImmediatePropagation();
 }, true);
@@ -783,6 +993,17 @@ window.addEventListener('click', e => {
   if (!k || Date.now() - k.at > 1500) return;
   e.preventDefault(); e.stopImmediatePropagation(); closeMenu();
 }, true);
+/* The task menu's Reschedule…, Rename…, View/edit notes and Set a time… open their box over it (#mAsk, #tpop) and the
+   menu stays open under it: taps there are the box's own (mMenuEat, the document's click handler and the page scrolling
+   as the keyboard opens all leave the menu be: mPopOpen), and once the box closes the menu is drawn again for the task
+   as it now is (mMenuBack; menu.dataset.kid: the task it's open for, set by openTaskMenu). */
+const mPopOpen = () => $('#mAsk').classList.contains('on') || $('#tpop').style.display === 'block';
+function mMenuBack(id) {
+  setTimeout(() => {   // (after the change the box made, and its redraw)
+    if (!MOBILE || menu.style.display !== 'block' || menu.dataset.kid !== id || mPopOpen()) return;
+    if (findTask(id)) openTaskMenu(id, null, { x: 0, y: 0 }, menuTask && menuTask.isConnected ? menuTask : null); else closeMenu();
+  }, 0);
+}
 // swiping it down (from its title bar, or anywhere on it when it isn't scrolled) closes it; let go early, it springs back
 let mMs = null;
 menu.addEventListener('touchstart', e => {
@@ -808,13 +1029,14 @@ function mMenuEnd(cancelled) {
 
 /* ---------- notes ---------- */
 /* View/edit notes (or Add notes): a card at the top, its text readable (links work); a tap on the text edits it, in a
-   box big enough not to make the phone zoom. Saving it empty removes the notes. (The desktop's note, opened beside the
+   box big enough not to make the phone zoom. Saving it empty removes the notes. Opened from the task menu, which stays
+   open under it. (The desktop's note, opened beside the
    task, closes as soon as the page scrolls, which the phone's keyboard does as it opens.) */
 function mNotes(id, editing) {
   const f = findTask(id); if (!f) return;
   const box = $('#mAsk'), card = $('.ma-card', box), notes = f.task.notes || '';
   const head = `<div class="m-mh" style="--c:${esc(colorOf(f.t))}"><span class="m-mh-d"></span><div class="m-mh-t"><b>${esc(f.task.title)}</b><span>Notes</span></div></div>`;
-  const close = () => { box.classList.remove('on'); const ta = card.querySelector('textarea'); if (ta) ta.blur(); };
+  const close = () => { box.classList.remove('on'); const ta = card.querySelector('textarea'); if (ta) ta.blur(); mMenuBack(id); };
   box.onclick = e => { if (e.target === box) close(); };
   if (!editing && notes) {
     card.innerHTML = `${head}<div class="mn-b">${linkifyNotes(notes)}</div><div class="mn-k">Tap the notes to edit</div>
@@ -836,5 +1058,5 @@ function mNotes(id, editing) {
     };
     setTimeout(() => { fit(); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
   }
-  closeMenu(); box.classList.add('on');
+  box.classList.remove('m-low'); mAskFit(); box.classList.add('on');   // (the task menu stays open under it: mMenuBack)
 }

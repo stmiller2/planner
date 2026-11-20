@@ -171,6 +171,7 @@ function openTaskMenu(id, btn, at, el) {
     + (fails.length ? '<hr>' + unfailBtn(f.task, fails[0], true) + fails.map(x => failRmBtn(x, fails.length > 1)).join('') : '')
     + '<hr>' + menuBtn('arch-k', id, ICON.archive, 'Archive') + menuBtn('del-k', id, ICON.trash, 'Delete');
   placeMenu(btn, at);
+  if (MOBILE) menu.dataset.kid = id;   // (which task: mMenuBack draws it again after a box opened from it)
 }
 const failRmBtn = (x, dated) => `<button data-act="fail-rm" data-fid="${x.id}"><span class="k">${ICON.x}</span>Remove failed attempt${dated ? ` · ${fmtShort(x.date)}` : ''}</button>`;
 // unmark the latest failed attempt (unfailTask): the task goes back to that day; dated = say which day when it isn't there
@@ -242,7 +243,7 @@ function openProjectMenu(id, btn) {
 // show the menu below btn (above it if there's no room), kept inside the window; at = { x, y }: at that point instead
 function placeMenu(btn, at) {
   const r = at ? { left: at.x, top: at.y, bottom: at.y } : btn.getBoundingClientRect();
-  delete menu.dataset.for;   // (which menu it is, where that matters: openAccount)
+  delete menu.dataset.for; delete menu.dataset.kid;   // (which menu it is, where that matters: openAccount, mMenuBack)
   menu.style.display = 'block';
   menu.style.left = Math.max(8, Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + 'px';
   menu.style.top = (r.bottom + menu.offsetHeight + 6 > innerHeight ? r.top - menu.offsetHeight - 4 : r.bottom + 4) + 'px';

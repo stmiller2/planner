@@ -17,7 +17,7 @@ function showHelp() {
   <h4>Day view</h4>
   <p>To plan the timing of tasks within a single day, enter day view with the view switcher, pressing <kbd>d</kbd>, or by clicking the date number from calendar view. Drag tasks onto the timeline, then drag or click blocks to set their times.</p>
   <h4>On a phone</h4>
-  <p>Tap a task for its menu (mark done, reschedule, set a time, rename). Press and hold a task to drag it to another day, or in day view to another time; drop it on the header to unschedule it. Swipe in from the left edge for the sidebar, and drag day view’s task list up or down by its handle.</p>
+  <p>Tap a task for its menu (mark done, reschedule, set a time, rename). Press and hold a task to drag it to another day, or in day view to another time; drop it on the header to unschedule it. Hold a moment longer before dragging to move just that task, as <kbd>⌥ Option</kbd> does (Reschedule… has an <b>Only this task</b> switch for the same). Swipe in from the left edge for the sidebar, drag day view’s task list up or down by its handle, and pull the header down to refresh.</p>
   <h4>Timeline</h4>
   <p>Press <kbd>-</kbd> or use the view switcher to enter timeline view, where you can view everything you’ve finished over time. No functionality here, it just looks nice.</p>
   <h4>Conflicts</h4>

@@ -3,7 +3,7 @@
    serve_planner.py hands out; Planner.html is also index.html so the site opens at "/". */
 const fs = require('fs'), path = require('path');
 const ROOT = path.join(__dirname, '..'), OUT = path.join(ROOT, 'dist');
-const FILES = ['Planner.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+const FILES = ['Planner.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 const DIRS = ['css', 'js'];
 
 fs.rmSync(OUT, { recursive: true, force: true });
