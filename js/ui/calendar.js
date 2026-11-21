@@ -29,7 +29,7 @@ function renderCal() {
   dow.innerHTML = Array.from({ length: 7 }, (_, i) => `<div>${DOW[(ui.weekStart + i) % 7]}</div>`).join('');
   const grid = $('#grid');
   grid.style.gridTemplateColumns = cols;
-  const { days, bars } = calWeeksHTML(ui.viewStart, ui.weeks, 0);
+  const { days, bars } = calWeeksHTML(ui.viewStart, weeksShown(), 0);
   // days scrolled down to tasks further down their list stay where they were
   const keepScroll = new Map(); $$('.day .items', grid).forEach(it => { if (it.scrollTop) keepScroll.set(it.parentElement.dataset.date, it.scrollTop); });
   // no scrollbar while it's laid out and measured: the new days can overflow for a moment (the old rows still apply),
@@ -171,10 +171,11 @@ const rowHeights = () => { const ds = viewDays(); return Array.from({ length: Ma
 function weekShift(dir, m = 1) {
   if (weekAnim) weekAnim.finish();
   if (MOBILE) { if (mFocusEnd) mFocusEnd(); mFocus = null; mFocusBar($('#grid')); }   // (a week opened up to show all its tasks goes back to its usual size: mFocusSet)
+  if (cfMove) cfPreview(null);   // (a conflict being moved: where it would land is shown again for the new weeks, cfAim)
   clearTimeout(nbTimer);
   const g = $('#grid'), pulled = weekPull;   // how far a swipe's pull already moved it: the slide goes on from there
   setPull(0);
-  const oldStart = ui.viewStart, oldRows = rowHeights(), n = ui.weeks;
+  const oldStart = ui.viewStart, oldRows = rowHeights(), n = weeksShown();
   ui.viewStart = addDays(oldStart, 7 * dir * m); renderHeader();
   if (oldRows.length !== n || !g.clientHeight || calStale) return renderWeeks();
   // strip of n+m weeks: the old view at strip row oi, the new one at ni. The days already shown stay as they are;
@@ -279,9 +280,9 @@ const laterNeighbours = () => { clearTimeout(nbTimer); nbTimer = setTimeout(buil
 function buildNeighbours() {
   const g = $('#grid');
   if (weekAnim || drag || calStale || ui.dayView || admOpen || !g.clientHeight) return;
-  const days = viewDays(g); if (days.length !== ui.weeks * 7) return;
+  const days = viewDays(g); if (days.length !== weeksShown() * 7) return;
   const rows = rowHeights(); g.style.setProperty('--nbh', (rows.reduce((x, y) => x + y, 0) / rows.length).toFixed(1) + 'px');
-  for (const [side, ws] of [['above', addDays(ui.viewStart, -7)], ['below', addDays(ui.viewStart, 7 * ui.weeks)]]) {
+  for (const [side, ws] of [['above', addDays(ui.viewStart, -7)], ['below', addDays(ui.viewStart, 7 * weeksShown())]]) {
     if (g.querySelector(`:scope > .day.nb.${side}`)) continue;
     const { days: dh, bars: bh } = calWeeksHTML(ws, 1, side === 'above' ? 0 : 1);   // (above: its first day says the month)
     const f = document.createRange().createContextualFragment(dh + bh);

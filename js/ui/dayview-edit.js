@@ -87,6 +87,7 @@ function openTimePop(id, x, y) {
   const w = tpEl.offsetWidth, h = tpEl.offsetHeight;
   tpEl.style.left = clamp(x + 12, 8, innerWidth - w - 8) + 'px';
   tpEl.style.top = (y + 12 + h < innerHeight - 8 ? y + 12 : Math.max(8, y - h - 12)) + 'px';
+  if (MOBILE) mTpFit();   // (mobile: above the number pad)
   const si = tpEl.querySelector('.tp-s'); si.focus(); si.select();
 }
 // put the task's current times in the fields (blank for a task that isn't on the timeline yet)
@@ -194,21 +195,13 @@ document.addEventListener('scroll', e => {
   const i = e.target.classList.contains('dv-scroll') ? 0 : e.target.classList.contains('dv-list') ? 1 : -1;
   if (i >= 0 && Math.abs(e.target.scrollTop - tpop.scroll[i]) > 30) closeTimePop(true);
 }, true);
-// conflicts in day view: drag the strip's bars (move / stretch an end) or a tag in the list onto another day (move)
-const dvDayAt = x => {   // the day column under x (counting on past the visible days, so you can drag beyond them)
-  const cols = $$('#dayview .dv-col'); if (!cols.length) return null;
-  const r = cols[0].getBoundingClientRect(), w = r.width || 1;
-  return addDays(cols[0].dataset.date, Math.floor((x - r.left) / w));
-};
-const dvListDayAt = (x, y) => {   // a day's section in the list, or a day column, under the pointer
-  const el = document.elementsFromPoint(x, y).find(n => n.dataset && n.dataset.date && (n.classList.contains('dv-day') || n.classList.contains('dv-col')));
-  return el ? el.dataset.date : null;
-};
+// conflicts in day view: drag the strip's bars (move / stretch an end) or a tag in the list onto another day (move),
+// as on the calendar (cfPress … cfLand, conflicts.js: CF_DV)
 $('#dayview').addEventListener('pointerdown', e => {
   if (MOBILE || e.button !== 0 || e.ctrlKey || e.target.closest('.inl')) return;   // (no dragging on mobile yet)   // (Ctrl-click on a Mac = right-click)
   const b = e.target.closest('.dv-cfb'), t = e.target.closest('.dv-cfp');
-  if (b) cfDragStart(e, b.dataset.cid, e.target.closest('.h.l') ? 'l' : e.target.closest('.h.r') ? 'r' : 'move', (x) => dvDayAt(x), () => renderDay());
-  else if (t) cfDragStart(e, t.dataset.cid, 'move', dvListDayAt, () => renderDay(), t.dataset.day);
+  if (b) cfPress(e, CF_DV, b, e.target.closest('.h.l') ? 'l' : e.target.closest('.h.r') ? 'r' : 'move');
+  else if (t) cfPress(e, CF_DV, t, 'move');
 }, true);
 // dragging: list item -> timeline (place) or to another spot in the list (reorder), block body (move),
 // block edge (resize), block -> list (remove)

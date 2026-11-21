@@ -42,7 +42,7 @@ function renderHeader() {
 function setRange(first = ui.dayView) {
   if (MOBILE && admOpen) { $('#range').textContent = 'Timeline'; return; }   // (mobile: the header's title; css/mobile.css shows it)
   if (first) { $('#range').textContent = dvTitle(first); return; }
-  const end = addDays(ui.viewStart, ui.weeks * 7 - 1);
+  const end = addDays(ui.viewStart, weeksShown() * 7 - 1);
   const s = parseD(ui.viewStart), e = parseD(end);
   // (mobile: just the months, and the year when it isn't this one: the day numbers say the rest)
   if (MOBILE) {   // (a year that isn't this one: in full after one month, short after two, "Jan – Feb ’27", to fit)
@@ -108,6 +108,10 @@ document.addEventListener('click', e => {
     case 'color-reset': { const f = findThread(id); if (f) mutate(() => f.t.color = null); break; }
     case 'linkmenu': openLinkMenu(id, a); break;
     case 'setlink': closeMenu(); setLink(id, a.dataset.v); break;
+    case 'm-link': {   // (mobile's task menu: stays open, drawn again with the link as it now is)
+      const f = findTask(id); if (!f || (f.task.linkToPrev || '') === a.dataset.v) break;
+      setLink(id, a.dataset.v); mUndo(a.dataset.v ? 'Linked' : 'Unlinked'); mMenuBack(menu.dataset.kid); break;
+    }
     case 'unsched': moveTask(id, null); break;
     case 'kmenu': openTaskMenu(id, a); break;
     case 'k-notes': if (MOBILE) mNotes(id); else { closeMenu(); editNotes(id, menuTask); } break;   // (mobile: a card of its own over the menu, which stays open: mobile.js)
@@ -204,7 +208,7 @@ document.addEventListener('mousedown', e => {
 // header: ‹ Today › (and ← / → / T) step the calendar a week or day view a day, sliding just like a scroll does
 function navStep(dir) {
   if (!ui.dayView) return weekShift(dir);
-  if (!dv && !cfDrag) daySlide(dir);
+  if (!dv && !cfMove) daySlide(dir);
 }
 // Today: a quick slide to it. From far away, the view first jumps to TODAY_SLIDE steps short of today and slides
 // the rest of the way, so the slide stays short. (Already there: day view just scrolls the hours to now, as openDay does.)
@@ -213,7 +217,7 @@ function navToday() {
   const t = todayISO();
   if (ui.dayView) {
     const n = diffDays(t, ui.dayView);
-    if (!n || dv || cfDrag) return openDay(t);
+    if (!n || dv || cfMove) return openDay(t);
     if (dayAnim) dayAnim.finish();
     const dir = Math.sign(n), m = Math.min(Math.abs(n), TODAY_SLIDE);
     if (Math.abs(n) > m) { ui.dayView = addDays(t, -dir * m); dvAdd = null; renderDay(); }
@@ -238,13 +242,13 @@ $('#dvcount').onclick = e => { const b = e.target.closest('button'); if (b) { b.
 $('#wkcount').innerHTML = [1, 2, 3, 4, 5].map(n => `<button data-n="${n}"><span>${n}</span><span class="dl">${n > 1 ? ' weeks' : ' week'}</span></button>`).join('');
 $('#wkcount').onclick = e => { const b = e.target.closest('button'); if (b) { b.blur(); setWeekCount(+b.dataset.n); } };
 function setWeekCount(n) {
-  if (ui.dayView || admOpen || n === ui.weeks) return;
+  if (ui.dayView || admOpen || MOBILE || n === ui.weeks) return;   // (mobile: fixed, weeksShown)
   if (weekAnim) weekAnim.finish();
   ui.weeks = n; saveUI(); render();
 }
 // day view: (also keys 1–5) a slide in progress lands first
 function setDayCount(n) {
-  if (!ui.dayView || dv || cfDrag || n === ui.dayCount) return;
+  if (!ui.dayView || dv || cfMove || n === ui.dayCount) return;
   if (dayAnim) dayAnim.finish(); else if (dayStrip) exitStrip(null);
   ui.dayCount = n; dvAdd = null; saveUI(); renderDay();
 }
@@ -281,10 +285,11 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) rend
 // when the calendar is on other weeks. toggle (the - key): in the timeline, - goes back to the view it covered.
 function switchView(k, toggle) {
   if (k === '-') { if (!admOpen) openAdmire(); else if (toggle) closeAdmire(); return; }
+  const wasAdm = admOpen;
   if (admOpen) closeAdmire();
-  if (k === 'c' && ui.dayView) closeDay();
+  if (k === 'c' && ui.dayView) closeDay(wasAdm);   // (from the Timeline: at once, not slid away)
   else if (k === 'd' && !ui.dayView) {
-    const t = todayISO(), shown = t >= ui.viewStart && t <= addDays(ui.viewStart, ui.weeks * 7 - 1);
+    const t = todayISO(), shown = t >= ui.viewStart && t <= addDays(ui.viewStart, weeksShown() * 7 - 1);
     openDay(shown ? t : ui.viewStart);
   }
 }

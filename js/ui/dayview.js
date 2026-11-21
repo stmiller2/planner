@@ -25,6 +25,7 @@ function layoutBlocks(bs) {
 let dvScrollTo = null;
 let dvAdd = null;   // open new-task box in the day list, right below a task: { tid, afterId, day }
 function openDay(d) {
+  if (MOBILE && mDayA && mDayA.out) mDayStop();   // (mobile: sliding out to the calendar still: out first)
   const first = !ui.dayView;
   ui.dayView = d; if (first) scratchForView(); closeMenu(); hideInsline(); closeTimePop(false); dvAdd = null;
   // start scrolled to the earliest planned block in view; otherwise to about now (today) or 8am
@@ -34,8 +35,13 @@ function openDay(d) {
   if (first) inserting = addOpen = null;
   if (first && MOBILE) mSheetAuto(d);   // (mobile: how far the task list's sheet is pulled up, for this day)
   render();
+  if (first && MOBILE) mDayIn();   // (mobile: slides in over the calendar)
 }
-function closeDay() { closeTimePop(false); ui.dayView = null; dvAdd = null; scratchForView(); render(); }
+// now: at once (mobile otherwise slides day view away first: mDayOut, which calls this again with now set)
+function closeDay(now) {
+  if (MOBILE && !now && mDayOut()) return;
+  closeTimePop(false); ui.dayView = null; dvAdd = null; scratchForView(); render();
+}
 
 // add tasks dated to `day`, right after a listed task in its thread (joining its chain same-day if it's linked to
 // the next one), or right before one (beforeId). Without either: after the thread's last task dated on or before
@@ -311,7 +317,7 @@ function daySlide(dir, m = 1) {
 }
 const dayWheel = wheelSteps({
   pull: DAY_PULL,
-  skip: e => !ui.dayView || e.ctrlKey || dv || cfDrag,
+  skip: e => !ui.dayView || e.ctrlKey || dv || cfMove,
   axis: e => [wheelPx(e, e.deltaX), wheelPx(e, e.deltaY)],
   claim: (e, dx, dy) => Math.abs(dx) > Math.abs(dy),                     // an up / down scroll: hours or list scroll as usual
   busy: () => !!dayAnim, waitWhileBusy: true,

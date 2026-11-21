@@ -100,8 +100,8 @@ function editDateIn(btn, opt) {
 const menu = $('#menu');
 function closeMenu() { menu.style.display = 'none'; delete menu.dataset.for; }
 // it stays put while what it belongs to moves: scrolling (or a wheel step to other weeks / days) closes it
-// (mobile: not for the scroll a phone's keyboard makes as a box opened from the task menu takes focus: mPopOpen)
-document.addEventListener('scroll', e => { if (menu.style.display === 'block' && !menu.contains(e.target) && !(MOBILE && mPopOpen())) closeMenu(); }, true);
+// (mobile: never; it's a sheet along the bottom, not beside its task, and what's behind it scrolls freely: mMenuEat)
+document.addEventListener('scroll', e => { if (menu.style.display === 'block' && !menu.contains(e.target) && !MOBILE) closeMenu(); }, true);
 document.addEventListener('wheel', e => { if (menu.style.display === 'block' && !menu.contains(e.target)) closeMenu(); }, { capture: true, passive: true });
 
 /* ---------- hover tips: warm after the first ---------- */

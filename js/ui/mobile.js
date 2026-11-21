@@ -18,6 +18,15 @@
    arrows (timeline.js). */
 const MOBILE_MQ = matchMedia('(max-width: 700px), (pointer: coarse) and (max-height: 500px)');
 let MOBILE = MOBILE_MQ.matches;
+// weeks shown on the calendar: on a phone always 4 upright and 2 on its side (no setting); otherwise ui.weeks (the
+// header's buttons, keys 1–5). Read this, not ui.weeks, for what's on screen.
+const M_LAND = matchMedia('(orientation: landscape)');
+const weeksShown = () => MOBILE ? (M_LAND.matches ? 2 : 4) : ui.weeks;
+M_LAND.addEventListener('change', () => {
+  if (!MOBILE || !dataLoaded) return;
+  setPull(0); if (weekAnim) weekAnim.finish(); if (mFocusEnd) mFocusEnd(); mFocus = null;
+  render();
+});
 document.body.classList.toggle('mobile', MOBILE);
 MOBILE_MQ.addEventListener('change', () => {
   MOBILE = MOBILE_MQ.matches; document.body.classList.toggle('mobile', MOBILE);
@@ -100,15 +109,13 @@ $('#mScrim').onclick = () => mDrawer(false);
 // going to another view or day closes it
 document.addEventListener('click', e => { if (MOBILE && e.target.closest && e.target.closest('.views button, [data-act="openday"]')) mDrawer(false); }, true);
 // the sidebar drawer's bar at the top stands in for the header's right side: save status, style, Settings, Help,
-// account (online), weeks shown. Its buttons click the header's own (data-m), so those stay the only code for them.
+// account (online). (Weeks shown is fixed on a phone: weeksShown.) Its buttons click the header's own (data-m), so those stay the only code for them.
 $('aside').insertAdjacentHTML('afterbegin', `<div class="m-bar">
   <div class="m-row"><button class="m-status" data-m="status"></button><span class="m-sp"></span>
   <button class="ic" data-m="themeBtn" aria-label="Style"></button><button class="ic" data-m="setBtn" aria-label="Settings"></button>
-  <button class="btn" data-m="helpBtn" aria-label="Help">?</button><button class="m-acct" data-act="acct" aria-label="Account" hidden></button></div>
-  <div class="m-row"><span class="m-wkl">Weeks shown</span><div class="seg m-wk">${[1, 2, 3, 4, 5].map(n => `<button data-n="${n}">${n}</button>`).join('')}</div></div></div>`);
+  <button class="btn" data-m="helpBtn" aria-label="Help">?</button><button class="m-acct" data-act="acct" aria-label="Account" hidden></button></div></div>`);
 function mBarSync() {
   const f = $('aside .m-bar');
-  $$('.m-wk button', f).forEach(b => b.classList.toggle('on', +b.dataset.n === ui.weeks));
   ['themeBtn', 'setBtn'].forEach(id => { $(`[data-m="${id}"]`, f).innerHTML = $('#' + id).innerHTML; });
   $('[data-m="status"]', f).textContent = $('#status').textContent;
   const acct = $('#acctBtn'), a = $('.m-acct', f); a.hidden = acct.hidden; a.textContent = acct.textContent;
@@ -117,8 +124,6 @@ function mBarSync() {
 $('#tree').insertAdjacentHTML('afterend', `<div class="m-foot"><button class="btn m-addk">${svg('<path d="M12 5v14M5 12h14"/>')}Add task</button></div>`);
 $('aside .m-addk').onclick = () => mAddTask();
 $('aside .m-bar').addEventListener('click', e => {
-  const w = e.target.closest('.m-wk button');
-  if (w) { setPull(0); mFocus = null; setWeekCount(+w.dataset.n); mBarSync(); return; }
   const b = e.target.closest('[data-m]'); if (!b) return;
   $('#' + b.dataset.m).click(); mBarSync();
 });
@@ -146,7 +151,7 @@ window.addEventListener('touchstart', e => {
   if (!MOBILE || e.touches.length !== 1 || $('#modal').style.display === 'grid' || menu.style.display === 'block') return;
   const el = mDrawerEl();
   if (!el) {   // day view (no drawer): in from the edge goes back to the calendar instead
-    if (ui.dayView && !admOpen && !dayAnim && !dv && e.touches[0].clientX <= M_EDGE) { mEdge = mTouch(e); mEdge.W = innerWidth; mFollow(e, mBackMove, mBackEnd); }
+    if (ui.dayView && !admOpen && !dayAnim && !dv && !mDayA && e.touches[0].clientX <= M_EDGE) { mEdge = mTouch(e); mEdge.W = innerWidth; mFollow(e, mBackMove, mBackEnd); }
     return;
   }
   if (!mIsOpen()) {
@@ -188,9 +193,53 @@ function mBackEnd(cancelled) {
   const back = !cancelled && (mFlick(s) ? s.vx > 0 : s.dx > s.W * 0.35);
   dvBox.style.transition = 'transform .22s cubic-bezier(.2,.8,.2,1)'; dvBox.style.transform = back ? `translateX(${s.W}px)` : '';
   setTimeout(() => {
-    if (back) closeDay();
+    if (back) closeDay(true);
     dvBox.style.transition = dvBox.style.transform = ''; $('#app').classList.remove('m-backing');
   }, 230);
+}
+/* Into and out of day view by a tap (a day, its "+N more", Open day, the view switcher; the back button, the view
+   switcher, Esc): a zoom. Going in, the calendar grows around the day's square as if coming closer to it, fading, while
+   day view grows out of that square to fill the screen, fading in; going back, the reverse (the calendar drawn first,
+   as mBackMove does), day view shrinking back into the day's square. (A day whose square isn't on screen: a plain zoom
+   about the middle.) Sliding sideways is only for the edge swipe (mBackMove). Meanwhile the calendar shows under day view
+   (css #app.m-zoom). openDay calls mDayIn after drawing day view; closeDay(now) hands over to mDayOut, which calls
+   closeDay(true) once it's out. The header's title changes with it, faded across. mDayA: the zoom under way. */
+const M_DAYIN = 380, M_DAYOUT = 320, M_ZEASE = 'cubic-bezier(.32,.72,0,1)';
+let mDayA = null;
+const mTitleFade = () => { const r = $('#range'); if (r.animate && MOTION()) r.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' }); };
+function mDayZoom(out) {
+  const main = $('main'), box = dvBox.getBoundingClientRect(), mr = main.getBoundingClientRect();
+  const cell = $(`#grid .day:not(.nb)[data-date="${ui.dayView}"]`), cr = cell && cell.getBoundingClientRect();
+  const seen = cr && cr.width && cr.bottom > mr.top && cr.top < mr.bottom;
+  // P: the day's square (its middle), C: day view's middle; S: how much the calendar grows (the square to about the screen)
+  const C = { x: box.left + box.width / 2, y: box.top + box.height / 2 }, P = seen ? { x: cr.left + cr.width / 2, y: cr.top + cr.height / 2 } : C;
+  const S = seen ? clamp(Math.min(box.width / cr.width, box.height / cr.height), 1.6, 4) : 1.25;
+  const calT = `translate(${(C.x - P.x).toFixed(1)}px,${(C.y - P.y).toFixed(1)}px) scale(${S.toFixed(3)})`, dvT = `translate(${(P.x - C.x).toFixed(1)}px,${(P.y - C.y).toFixed(1)}px) scale(${(1 / S).toFixed(3)})`;
+  main.style.transformOrigin = `${(P.x - mr.left).toFixed(1)}px ${(P.y - mr.top).toFixed(1)}px`;
+  $('#app').classList.add('m-zoom');
+  const o = { duration: out ? M_DAYOUT : M_DAYIN, easing: M_ZEASE, fill: 'both' };
+  const cal = main.animate(out ? [{ transform: calT, opacity: 0 }, { opacity: 0, offset: .25 }, { transform: 'none', opacity: 1 }]
+    : [{ transform: 'none', opacity: 1 }, { opacity: 0, offset: .55 }, { transform: calT, opacity: 0 }], o);
+  const a = dvBox.animate(out ? [{ transform: 'none', opacity: 1 }, { opacity: 1, offset: .3 }, { transform: dvT, opacity: 0 }]
+    : [{ transform: dvT, opacity: 0 }, { opacity: 1, offset: .45 }, { transform: 'none', opacity: 1 }], o);
+  const h = mDayA = { a, out, done() {
+    if (mDayA !== h) return; mDayA = null;
+    if (out) closeDay(true);
+    a.cancel(); cal.cancel(); main.style.transformOrigin = ''; $('#app').classList.remove('m-zoom');
+  } };
+  a.onfinish = h.done;
+}
+// a slide under way: to its end now
+function mDayStop() { const h = mDayA; if (h) h.done(); }
+function mDayIn() { if (MOTION() && !admOpen && dvBox.animate) { mDayStop(); mDayZoom(false); } mTitleFade(); }
+function mDayOut() {
+  if (!MOTION() || admOpen || !ui.dayView || !dvBox.animate) return false;
+  if (mDayA && mDayA.out) return true;   // (already on its way)
+  mDayStop();
+  if (dayAnim) dayAnim.finish(); else if (dayStrip) exitStrip(null);
+  closeMenu(); closeTimePop(true); renderCal();
+  mDayZoom(true); mTitleFade(); setRange(null);   // (the calendar's title from the start)
+  return true;
 }
 function mCloseMove(e) {
   const s = mClose; if (!s) return;
@@ -304,42 +353,66 @@ let mFocus = null, mAnimT = 0, mFocusEnd = null;   // mFocus: the first day of t
 function mFocusSet(ws) {
   const g = $('#grid');
   if (mFocusEnd) mFocusEnd();
+  // where a day's "…" (or "+N more") is: its foot sits on it (ex: how far above the bottom of the day's list it ends);
+  // 0 when there's none, or it sits over the last chip's corner (.on)
+  const footOf = (it, m) => m && !m.classList.contains('on') && !m.classList.contains('m-hid') ? Math.max(0, it.getBoundingClientRect().bottom - m.getBoundingClientRect().bottom) : 0;
+  const padOf = d => parseFloat(getComputedStyle(d).paddingBottom) || 0;
   // what each day shows now: the ones whose rows shrink keep it while their foot comes up
-  const snap = new Map(viewDays(g).map(d => { const it = d.querySelector('.items'); return [d, { hid: [...it.querySelectorAll('.m-hid')], more: it.querySelector(':scope > .m-more') }]; }));
+  const snap = new Map(viewDays(g).map(d => {
+    const it = d.querySelector('.items'), more = it.querySelector(':scope > .m-more');
+    return [d, { hid: [...it.querySelectorAll('.m-hid')], more, pad: padOf(d), ex: footOf(it, more) }];
+  }));
   const from = g.style.gridTemplateRows, before = rowHeights();
   mFocus = ws;
   g.classList.remove('m-anim');
   mClipMode = 'quiet'; fitRows(); mClipMode = null;   // (the rows where they end up, and what each day shows there)
   if (!MOTION() || !from) return;
-  const to = g.style.gridTemplateRows, after = to.split(' ').map(parseFloat), moving = [];
-  viewDays(g).forEach((d, i) => {
-    const w = Math.floor(i / 7), it = d.querySelector('.items'), sn = snap.get(d) || { hid: [], more: null };
-    if (!(Math.abs(after[w] - before[w]) > 0.5)) return;
-    const end = it.querySelector(':scope > .m-more');
-    if (after[w] < before[w]) {   // shrinking: as it was, until the end
+  const to = g.style.gridTemplateRows, after = to.split(' ').map(parseFloat);
+  // the days that move, and how each ends (all measured before anything changes)
+  const moving = viewDays(g).map((d, i) => {
+    const w = Math.floor(i / 7); if (!(Math.abs(after[w] - before[w]) > 0.5)) return null;
+    const it = d.querySelector('.items'), end = it.querySelector(':scope > .m-more');
+    return { d, it, end, shrink: after[w] < before[w], sn: snap.get(d) || { hid: [], more: null, pad: padOf(d), ex: 0 }, pad: padOf(d), ex: footOf(it, end) };
+  }).filter(Boolean);
+  /* Each day's foot (the bottom of what it shows, softly faded: .m-moving's mask) moves with its row, from where its "…"
+     is now to where it will be (the day's bottom padding eases along with the row: .m-anim), so a "…" riding it
+     (.m-ride) leaves the one there and lands on the new one, and the tasks show or go as it passes them (css .m-cut /
+     .m-soft): nothing shows or goes before it moves, and nothing at the end. */
+  for (const m of moving) {
+    const { d, it, end, sn } = m;
+    if (m.shrink) {   // shrinking: as it was (the foot comes up over it)
       for (const c of it.querySelectorAll('.m-hid')) c.classList.remove('m-hid'); if (end) end.remove();
       sn.hid.forEach(c => c.classList.add('m-hid')); if (sn.more) it.appendChild(sn.more);
     }
     const cur = it.querySelector(':scope > .m-more'); if (cur) cur.classList.add('m-hid');   // (the rider stands in for it)
-    d.classList.add('m-moving'); moving.push(d);
+    d.classList.add('m-moving'); d.style.paddingBottom = (sn.pad + sn.ex) + 'px';
     if (sn.more || end) {
       d.insertAdjacentHTML('beforeend', `<div class="m-ride">…</div>`);
-      const r = d.lastElementChild; r.style.bottom = (parseFloat(getComputedStyle(d).paddingBottom) + 1) + 'px';
-      if (!sn.more) r.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 100 });   // (only coming now)
+      m.ride = d.lastElementChild; m.ride.style.bottom = (sn.pad + sn.ex) + 'px';
+      d.classList.add(end && !end.classList.contains('on') ? 'm-cut' : 'm-soft');
+      if (!sn.more) m.ride.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 100 });   // (only coming now)
     }
-  });
+  }
   g.style.gridTemplateRows = from; void g.offsetHeight;   // back where they were, then ease over
   g.classList.add('m-anim'); g.style.gridTemplateRows = to;
-  mFocusEnd = () => {
-    clearTimeout(mAnimT); mFocusEnd = null; g.classList.remove('m-anim');
-    moving.forEach(d => {
-      d.classList.remove('m-moving'); if (!d.isConnected) return;   // (redrawn meanwhile: nothing to land)
+  for (const m of moving) { m.d.style.paddingBottom = (m.pad + m.ex) + 'px'; if (m.ride) m.ride.style.bottom = (m.pad + m.ex) + 'px'; }
+  let landed = false;
+  const land = mFocusEnd = () => {
+    if (landed) return; landed = true;
+    clearTimeout(mAnimT); if (mFocusEnd === land) mFocusEnd = null; g.classList.remove('m-anim');
+    for (const { d, end, ride } of moving) {
+      d.classList.remove('m-moving', 'm-cut', 'm-soft'); d.style.paddingBottom = ''; if (!d.isConnected) continue;   // (redrawn meanwhile: nothing to land)
       const it = d.querySelector('.items'), m = it && it.querySelector(':scope > .m-more'); if (m) m.remove();
-      if (it) { mWas.delete(it); mClip(d, 'more'); }
-      for (const r of d.querySelectorAll(':scope > .m-ride')) { if (r.animate && MOTION()) r.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140 }).onfinish = () => r.remove(); else r.remove(); }
-    });
+      // its "…" where the rider came to rest: one swaps for the other; a "+N more" fades in as the rider fades out
+      const swap = !!(end && ride && !end.classList.contains('m-plus') && !end.classList.contains('on'));
+      if (it) { mWas.delete(it); mClip(d, swap ? 'quiet' : 'more'); }
+      for (const r of d.querySelectorAll(':scope > .m-ride')) { if (!swap && r.animate) r.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140 }).onfinish = () => r.remove(); else r.remove(); }
+    }
   };
-  mAnimT = setTimeout(mFocusEnd, M_EASE + 20);
+  // landed when the rows have (a phone can start the ease late: a timer alone could land it partway)
+  const eases = g.getAnimations ? g.getAnimations().filter(a => a.transitionProperty === 'grid-template-rows') : [];
+  if (eases.length) Promise.all(eases.map(a => a.finished)).then(land, () => {});
+  mAnimT = setTimeout(land, eases.length ? M_EASE * 8 : M_EASE + 20);
 }
 // the "Show less" under the week opened up (a grid item along the bottom of its row). A new one fades in once the rows
 // have eased over (css .m-less), so it doesn't show at the foot of the row's old height first; one already there stays
@@ -403,7 +476,7 @@ function mCalMove(e) {
     if (s.axis === 'y' && mFocus) { mSw = null; mSwipedAt = Date.now(); mFocusSet(null); return; }
     // (R: how far it follows before resisting, and what a step is measured against: a week's usual share of the
     // calendar)
-    if (s.axis === 'y') { clearTimeout(nbTimer); buildNeighbours(); const g = $('#grid'); s.R = Math.min(rowHeights()[0] || 100, g.clientHeight / ui.weeks); }
+    if (s.axis === 'y') { clearTimeout(nbTimer); buildNeighbours(); const g = $('#grid'); s.R = Math.min(rowHeights()[0] || 100, g.clientHeight / weeksShown()); }
   }
   if (s.axis !== 'y') return;
   if (e.cancelable) e.preventDefault();
@@ -426,7 +499,7 @@ function mCalEnd(cancelled) {
 let mDs = null;
 const dvBox = $('#dayview');
 dvBox.addEventListener('touchstart', e => {
-  if (!MOBILE || !ui.dayView || admOpen || dayAnim || dv || mDs || mEdge || e.touches.length !== 1 || !e.target.closest('.dv-main, .dv-list')) return;
+  if (!MOBILE || !ui.dayView || admOpen || dayAnim || dv || mDs || mEdge || mDayA || e.touches.length !== 1 || !e.target.closest('.dv-main, .dv-list')) return;
   mDs = mTouch(e); mFollow(e, mDayMove, mDayEnd);
 }, { passive: true });
 function mDayMove(e) {
@@ -795,7 +868,7 @@ function mAskFit() {
   box.style.top = low && vv ? vv.offsetTop + 'px' : ''; box.style.height = low && vv ? vv.height + 'px' : '';
   box.classList.toggle('m-kb', !!(low && vv && vv.height < innerHeight - 120));   // (keyboard up: no room kept for the home bar)
 }
-if (window.visualViewport) { visualViewport.addEventListener('resize', mAskFit); visualViewport.addEventListener('scroll', mAskFit); }
+if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, () => { mAskFit(); mTpFit(); });
 // day view's: in the sheet's heading (renderDay puts it there)
 const mDayAddBtn = () => `<button class="dv-madd" aria-label="Add task to this day">${M_PLUS}<span>Add task</span></button>`;
 
@@ -1002,34 +1075,27 @@ function mCalDrop(s, cancelled) {
   calDropOn(s.day, !!s.split);
   if (was !== date) { if (navigator.vibrate) navigator.vibrate(8); mUndo(`Moved to ${fmtShort(date)}`); }
 }
-/* a conflict bar on the calendar: held, it lifts; moved, the conflict follows the finger day by day (its length kept;
-   shown live, as dragging it on desktop does, touch() and a redraw), and near the top or bottom the weeks step on.
-   Let go: one undoable change (mutate), or back where it was. */
+/* a conflict bar on the calendar: held, it lifts and moves as on desktop (cfLift / cfAim / cfLand, conflicts.js: a copy
+   follows the finger, an outline and room open where it would land); near the top or bottom the weeks step on. Let go:
+   one undoable change, or back where it was. */
 function mCfLift(s) {
-  const c = confs().find(x => x.id === s.el.dataset.cid); if (!c || !c.start) { mLp = null; return; }
-  s.cf = { id: c.id, d0: calDayAt(s.x0, s.y0) || c.start, s0: c.start, e0: c.end };
-  mCfMark(s); document.body.classList.add('m-lifting');
+  if (!cfLift(CF_CAL, s.el, s.x0, s.y0, 'move')) { mLp = null; return; }
+  s.cf = true; document.body.classList.add('m-lifting');
 }
-const mCfMark = s => $$(`#grid .cfb[data-cid="${s.cf.id}"]`).forEach(b => b.classList.add('m-cflift'));
 function mCfDrag(s) {
-  const c = confs().find(x => x.id === s.cf.id), d = calDayAt(s.x, s.y);
-  if (c && d) {
-    const k = diffDays(d, s.cf.d0), a = addDays(s.cf.s0, k), b = addDays(s.cf.e0, k);
-    if (a !== c.start) { c.start = a; c.end = b; touch(); renderCal(); mCfMark(s); }
-  }
+  cfAim(s.x, s.y);
   const g = $('#grid').getBoundingClientRect(), Z = 34, dir = s.y < g.top + Z ? -1 : s.y > g.bottom - Z ? 1 : 0;
   if (dir !== s.edge) {
     clearTimeout(s.edgeT); s.edge = dir;
-    const step = () => { if (mLp !== s) return; weekShift(dir); s.edgeT = setTimeout(step, 800); };
+    // (what it would cover is shown again once the weeks have slid: the finger may not move meanwhile)
+    const step = () => { if (mLp !== s) return; cfPreview(null); weekShift(dir); setTimeout(() => { if (mLp === s) cfAim(s.x, s.y); }, WEEK_SLIDE_MS + 40); s.edgeT = setTimeout(step, 800); };
     if (dir) s.edgeT = setTimeout(step, 550);
   }
 }
 function mCfDrop(s, cancelled) {
   clearTimeout(s.edgeT); document.body.classList.remove('m-lifting');
-  const c = confs().find(x => x.id === s.cf.id); if (!c) return;
-  const a = c.start, b = c.end; c.start = s.cf.s0; c.end = s.cf.e0; touch();   // (put back, then the move as one step)
-  if (!cancelled && a !== s.cf.s0) { mutate(() => { c.start = a; c.end = b; }); if (navigator.vibrate) navigator.vibrate(8); mUndo(`Moved to ${cfSpan(c)}`); }
-  else renderCal();
+  const id = cfMove && cfMove.id;
+  if (cfLand(cancelled || !s.moved)) { const c = confs().find(x => x.id === id); if (navigator.vibrate) navigator.vibrate(8); if (c) mUndo(`Moved to ${cfSpan(c)}`); }
 }
 // day view: the desktop's drag (dv), started here and fed these touches as pointer positions
 const mDvE = s => ({ clientX: s.x, clientY: s.y, target: document.elementFromPoint(s.x, s.y) || document.body, altKey: !!s.split });   // (peeled off: as Option)
@@ -1053,6 +1119,14 @@ function mDvDrop(s, cancelled) {
 }
 
 /* ---------- the task menu ---------- */
+/* its links: to the task before it in its thread and to the one after, each a row of three (Not linked, Same day,
+   Next day: the later task's linkToPrev, setLink; app.js m-link). A tap changes it; the menu stays open, drawn again. */
+function mLinkRows(f) {
+  const ks = f.t.tasks, prev = ks[f.i - 1], next = ks[f.i + 1];
+  const row = (k, head) => `<div class="m-lk"><div class="m-lk-h">${ICON.link}<span>${head}</span></div><div class="m-lk-seg">${
+    [['', 'Not linked'], ['sameDay', 'Same day'], ['nextDay', 'Next day']].map(([v, l]) => `<button data-act="m-link" data-id="${k.id}" data-v="${v}" class="${(k.linkToPrev || '') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
+  return (prev ? row(f.task, `<b>${esc(prev.title)}</b> → this task`) : '') + (next ? row(next, `This task → <b>${esc(next.title)}</b>`) : '');
+}
 // its title bar: which task (and where it sits), as a block in the task's color, like its chip (done: as a done chip);
 // it's also where the menu is swiped down from
 const mTaskHead = (k, color, sub) => `<div class="m-mh m-mhk${k.done ? ' done' : ''}" style="--c:${esc(color)}"><div class="m-mh-t"><b>${esc(k.title)}</b><span>${esc(sub)}</span></div></div>`;
@@ -1060,8 +1134,8 @@ function mMenuHead(f) { return mTaskHead(f.task, colorOf(f.t), [f.t.name, f.task
 // the same for a thread or project (no color: no dot)
 const mMenuHeadOf = (title, sub, color) => `<div class="m-mh" ${color ? `style="--c:${esc(color)}"` : ''}>${color ? '<span class="m-mh-d"></span>' : ''}<div class="m-mh-t"><b>${esc(title)}</b><span>${esc(sub)}</span></div></div>`;
 /* While a menu is open, a tap anywhere outside it only closes it: nothing under the tap reacts. A tap on another task
-   (chip, block, list item, the drawer's tree) still goes to it, so its menu takes this one's place. A swipe that
-   starts outside closes it too, and lets the swipe through. */
+   (chip, block, list item, the drawer's tree) still goes to it, so its menu takes this one's place. A swipe or scroll
+   that starts outside goes through to what's under it (other weeks, other days, the hours) and leaves the menu open. */
 const M_TASKS = '#grid .chip[data-id], #grid .chip[data-fid], #dayview .dv-blk[data-id], #dayview .dv-blk[data-fid], #dayview .dv-item[data-id], #dayview .dv-item[data-fid], .mt-task, #grid .cfb, #dayview .dv-cfb, #dayview .dv-cfp, #tree .cfrow';
 let mMenuEat = null;
 window.addEventListener('pointerdown', e => {
@@ -1072,7 +1146,7 @@ window.addEventListener('pointerdown', e => {
 }, true);
 window.addEventListener('touchmove', e => {
   const k = mMenuEat; if (!k) return;
-  const t = e.touches[0]; if (Math.hypot(t.clientX - k.x, t.clientY - k.y) > 10) { mMenuEat = null; closeMenu(); }
+  const t = e.touches[0]; if (Math.hypot(t.clientX - k.x, t.clientY - k.y) > 10) mMenuEat = null;
 }, { capture: true, passive: true });
 window.addEventListener('click', e => {
   const k = mMenuEat; mMenuEat = null;
@@ -1157,6 +1231,13 @@ function mMenuEnd(cancelled) {
 /* The time box's fields bring up a number pad here (openTimePop: inputmode), typed as anywhere ("930", "14"); the row
    above them sets the minutes of the field last focused (start, to begin with) to :00 / :15 / :30 / :45, and (12-hour
    clock) moves it into the morning or afternoon, keeping its hour. The field keeps the focus, so the pad stays up. */
+// the box sits at the foot of what's visible: just above the number pad while it's up (as mAskFit; with no keyboard,
+// clear of the home bar). openTimePop calls it once it's drawn; css eases it up as the keyboard opens
+function mTpFit() {
+  const el = $('#tpop'); if (!MOBILE || el.style.display !== 'block') return;   // (#tpop itself: this can run before dayview-edit.js has loaded)
+  const vv = window.visualViewport, top = vv ? vv.offsetTop : 0, foot = vv ? top + vv.height : innerHeight, kb = !!(vv && vv.height < innerHeight - 120);
+  el.style.top = `max(${top + 8}px, calc(${foot - el.offsetHeight - 8}px${kb ? '' : ' - env(safe-area-inset-bottom)'}))`;
+}
 const mTpBtns = () => `<div class="tp-q">${[0, 15, 30, 45].map(m => `<button data-q="${m}">:${String(m).padStart(2, '0')}</button>`).join('')}`
   + (ui.clock === '12' ? '<span class="tp-qs"></span><button data-ap="am">AM</button><button data-ap="pm">PM</button>' : '') + '</div>';
 let mTpField = null;

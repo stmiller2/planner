@@ -50,3 +50,18 @@ body.cf-sizing,body.cf-sizing *{cursor:ew-resize !important;user-select:none}
 .chip.arch{cursor:default}
 .chip.arch input{pointer-events:none}
 .day.cf,.day.we.cf{background-image:repeating-linear-gradient(135deg,color-mix(in srgb,var(--cf) 9%,transparent) 0 5px,transparent 5px 11px)}
+/* moving or stretching a conflict (cfLift … cfLand, conflicts.js): the copy that follows the pointer, the bar being stretched,
+   an outline where its bar would land, and room opening for it in the days it would cover (a gap, as for a dragged task,
+   with no tint of its own) */
+body .cf-ghost{position:fixed;z-index:70;pointer-events:none;box-shadow:0 10px 24px rgba(0,0,0,.28);transform:scale(1.03);opacity:.96}
+body.mobile .cf-ghost{transform:scale(1.04) rotate(-1deg)}
+.cf-slot{align-self:start;position:relative;z-index:2;height:18px;pointer-events:none;background:color-mix(in srgb,var(--accent) 9%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--accent) 45%,transparent)}
+.cf-slot.s{margin-left:4px;border-top-left-radius:5px;border-bottom-left-radius:5px}
+.cf-slot.e{margin-right:4px;border-top-right-radius:5px;border-bottom-right-radius:5px}
+.dgap.cf-room{background:none;box-shadow:none;margin:0;pointer-events:none}
+.cfb.cf-stretch,.dv-cfb.cf-stretch{z-index:4;box-shadow:0 4px 14px rgba(0,0,0,.22)}
+/* day view's strip: a line's height, opening when it's a new line */
+.cf-slot.dv-slot{height:20px;margin:0 -1px;transition:height .18s cubic-bezier(.2,.75,.3,1)}
+.cf-slot.dv-slot.s{margin-left:4px}
+.cf-slot.dv-slot.e{margin-right:4px}
+@media (prefers-reduced-motion: reduce){.cf-slot.dv-slot{transition:none}}

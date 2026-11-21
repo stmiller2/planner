@@ -63,8 +63,11 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         `mDrawerEl`: the sidebar, or the Timeline's list; none in day view) from ☰ or a swipe in from
                         the left edge, swiped back to close (`mEdge` / `mClose`, `mDrawerAt` / `mDrawerLet`); in day
                         view a back button (#mBack) in ☰'s place, and the edge swipe goes back to the calendar
-                        (`mBackMove` / `mBackEnd`, the calendar drawn under it: #app.m-backing); the sidebar's top bar
-                        (.m-bar) stands in for the header's right side; the sidebar's own tree (`mTree`: rows fold in
+                        (`mBackMove` / `mBackEnd`, the calendar drawn under it: #app.m-backing), and going in or back
+                        by a tap zooms into the day's square and back out of it (`mDayZoom`: `mDayIn` from openDay,
+                        `mDayOut` from closeDay; #app.m-zoom; `mDayA`: the zoom under way; closeDay(true): at once; only
+                        the edge swipe slides); the sidebar's top bar
+                        (.m-bar) stands in for the header's right side (no weeks-shown buttons: fixed, `weeksShown`); the sidebar's own tree (`mTree`: rows fold in
                         place, no redraw); week heights (`mFit`: what each week needs, as desktop's fitSizes; the
                         weeks built ahead sized to match, `mNbFit`) and "…" for full days (`mClip`, chip by chip; on a
                         day already shown, what comes and goes fades: `mNote` / `mWas`, copies fading out, `mFadeOut`,
@@ -74,9 +77,10 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         there that still can't show everything ends in a "+N more" chip (.m-plus) → that day in day
                         view; a swipe or a step to other weeks puts it back); conflicts: a tap on one (calendar bar,
                         day view's, the drawer's row) → `openConflictMenu` (Change dates…: `mCfDates`, Rename…, Delete),
-                        a long press on a calendar bar moves it (`mCfLift` / `mCfDrag` / `mCfDrop`); the task menu's
-                        title a block like the task's chip (`mTaskHead`, also the notes card's); one "Add task" at the
-                        drawer's foot (.m-foot) and one in day view's sheet heading (`mDayAddBtn`, put there by
+                        a long press on a calendar bar moves it as on desktop (`mCfLift` / `mCfDrag` / `mCfDrop` →
+                        conflicts.js's cfLift / cfAim / cfLand); the task menu's
+                        title a block like the task's chip (`mTaskHead`, also the notes card's); one "Add task" floating
+                        over the foot of the drawer's list (.m-foot; #tree keeps room below its last row) and one in day view's sheet heading (`mDayAddBtn`, put there by
                         renderDay), and Add task in a thread's menu (`mAddTask`: opens on the name, just above the
                         keyboard, #mAsk.m-low placed on the visual viewport by `mAskFit`; the thread is a best guess,
                         `mGuessThread`: last added to on this device in the last few hours, localStorage
@@ -97,10 +101,13 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         positions: `mDvE`); the task menu's Reschedule… / Rename… (`mAsk`, a box at the top; Reschedule's "Only this task" switch, `toggle`,
                         moves it as Option would) and Set a
                         time… (openTimePop: a number pad, inputmode, and taps for :00 / :15 / :30 / :45 and AM / PM
-                        acting on the field last focused, `mTpBtns`), opened over the menu, which stays open and is drawn again when they close
+                        acting on the field last focused, `mTpBtns`; the box just above the number pad, `mTpFit`), opened over the menu, which stays open and is drawn again when they close
                         (`mPopOpen`, `mMenuBack`; menu.dataset.kid: its task); an Undo bar after touch changes (`mUndo`, in #toast); the task menu as
-                        a sheet with a title bar (`mMenuHead`), swiped down to close, and while it's open a tap
-                        outside it only closes it (`mMenuEat`); notes in a card of their own (`mNotes`); swipe up / down → setPull / weekShift (`mSw`,
+                        a sheet with a title bar (`mMenuHead`) and, after Rename…, its links to the tasks before and
+                        after it in its thread (`mLinkRows`: Not linked / Same day / Next day, the later task's
+                        linkToPrev; app.js `m-link`, the menu staying open), swiped down to close, and while it's open a tap
+                        outside it only closes it (`mMenuEat`), while swipes and scrolls outside it go through to what's
+                        under it and leave it open (dom.js's scroll close skips mobile); notes in a card of their own (`mNotes`); swipe up / down → setPull / weekShift (`mSw`,
                         one week per swipe; R, the pull before resistance, is a week's usual share, not an opened
                         week's height; a step needs M_WTURN of it or an M_WFLICK flick); day-view touch swipes over the timeline or the list (enterStrip / setStripX /
                         daySlide; the list holds the same days side by side and moves with it: `.m-lrow`); day view's list as a bottom sheet (`mSheetSet`, set per day on entering
@@ -119,7 +126,11 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         (renderSelBar / selAct)
   calendar.js           renderCal (calWeeksHTML), fitRows (weekNeeds + fitSizes), week scrolling (weekShift), day drops, selRuns, next-day link lines;
                         failChip, tryBadge
-  conflicts.js          sidebar conflicts + form, dragging conflict bars, conflict hover
+  conflicts.js          sidebar conflicts + form, dragging conflicts, conflict hover. Moving a bar or day view's tag lifts
+                        it as a task is (a copy following the pointer), stretching an end follows the pointer smoothly;
+                        both show an outline and room where it would land and ease into place on the drop (cfPress /
+                        cfLift / cfAim / cfPreview / cfLand). Where: CF_CAL (the calendar) or CF_DV (day view's strip
+                        and list): dayAt, bars, row, place (outline and room for a span), snap (the easing after)
   dialogs.js            Help and Settings
   timeline-data.js      admireData(): lanes, spans, per-day counts. Unordered threads are `loose` lanes drawn on
                         L.host's row (nearest ordered thread above; null = project ribbon row); vs..ve = span a row
@@ -136,7 +147,9 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         global click / change / dblclick / keydown dispatch (data-act="…"), contextmenu → task menu
 js/storage.js           start(), loading + saving in the three storage modes, conflicts, backups
 apple-touch-icon.png    the iOS home-screen icon (Planner.html; iOS ignores the manifest's icons and fills transparency
-                        black, so it's icon-512's square, full bleed, 180 px); served like the other icons
+                        black, so it's icon-512's square, full bleed, 180 px); served like the other icons. Web clips get no dark or
+                        tinted variant: iOS reads one icon when it's added (no media queries), and fills its
+                        transparency black in light mode too
 js/main.js              calls start(); loaded last
 ```
 
@@ -219,7 +232,7 @@ for live preview) must call `touch()`.
 | loading / saving online, accounts | `load` / `save` / `signedInEmail` (worker/index.js), `server` (js/storage.js); keep /api/data the same as serve_planner.py |
 | which files go online | `FILES` / `DIRS` in worker/build.js |
 | reading old files | `migrate` / `migThread` (core/model.js) |
-| mobile layout or touch | ui/mobile.js, css/mobile.css; hooks that check `MOBILE`: `renderTree` (→ `mTree`), `openThreadMenu` / `openProjectMenu` (title bar, Add task / Add thread, Rename…: `m-add-k`, `m-ren-t`, `m-ren-p` in app.js), `startRename` (dom.js: no row to type in → `mRenameAny`, so new threads and projects ask for a name; `fresh` from addProject / addThread / addSubThread: Cancel removes them), `renderDayList` (the days side by side while `dayStrip` is set), `renderDay` (`mDayAddBtn` in the sheet's heading), `enterStrip` / `setStripX` / `daySlide` (dayview.js: the list moves sideways with the timeline), `openTaskMenu` (title bar, Mark done, Open day, Reschedule…, Set a time…, Rename…, View/edit notes: `k-day` / `k-resched` / `k-time` / `k-rename`, and `k-notes` → mNotes, in app.js, none of which close the menu; menu.dataset.kid), the document click handler (app.js) and the menu's scroll close (dom.js) leaving the menu open under #mAsk / #tpop, `closeTimePop` (→ mMenuBack), conflicts.js (the bars' pointerdown left to mobile.js), app.js (`m-cf-dates`, `m-ren-c`, `del-c` closing the menu; no inline rename of a conflict on a double tap), `placeMenu` (menu.dataset.cid), `weekShift` (`mFocusEnd`), `setPull` (pulls "Show less" too), `buildNeighbours` (→ mNbFit), `renderDay` (the sheet's count), dvMove / dvAutoScroll (the list is a sheet along the bottom: `overSide` by y), the calendar's hover highlight, `chip` / `failChip` / archived chips (`mChip`), `fitRows`, `buildNeighbours`, `weekShift` (equal rows, "…" on arriving weeks) (calendar.js), `dayN` (dayview.js, one day), `openDay` (`mSheetAuto` when entering day view), the sheet's handle in `buildDaySkeleton`, the day-view click / pointerdown handlers (dayview-edit.js), `setSbw`, `setRange` (app.js: months only; "Timeline"), `openTaskMenu` (Mark done), the notes hover (notes.js), `renderAdmire` (no list column, wider days), the Timeline's hover handlers and fold arrows (timeline.js) |
+| mobile layout or touch | ui/mobile.js, css/mobile.css; hooks that check `MOBILE`: `renderTree` (→ `mTree`), `openThreadMenu` / `openProjectMenu` (title bar, Add task / Add thread, Rename…: `m-add-k`, `m-ren-t`, `m-ren-p` in app.js), `startRename` (dom.js: no row to type in → `mRenameAny`, so new threads and projects ask for a name; `fresh` from addProject / addThread / addSubThread: Cancel removes them), `renderDayList` (the days side by side while `dayStrip` is set), `renderDay` (`mDayAddBtn` in the sheet's heading), `enterStrip` / `setStripX` / `daySlide` (dayview.js: the list moves sideways with the timeline), `openTaskMenu` (title bar, Mark done, Open day, Reschedule…, Set a time…, Rename…, View/edit notes: `k-day` / `k-resched` / `k-time` / `k-rename`, and `k-notes` → mNotes, in app.js, none of which close the menu; menu.dataset.kid), the document click handler (app.js) leaving the menu open under #mAsk / #tpop, the menu's scroll close (dom.js: never on mobile), `closeTimePop` (→ mMenuBack), conflicts.js (the bars' pointerdown left to mobile.js), app.js (`m-cf-dates`, `m-ren-c`, `del-c` closing the menu; no inline rename of a conflict on a double tap), `placeMenu` (menu.dataset.cid), `weekShift` (`mFocusEnd`), `setPull` (pulls "Show less" too), `buildNeighbours` (→ mNbFit), `renderDay` (the sheet's count), dvMove / dvAutoScroll (the list is a sheet along the bottom: `overSide` by y), the calendar's hover highlight, `chip` / `failChip` / archived chips (`mChip`), `fitRows`, `buildNeighbours`, `weekShift` (equal rows, "…" on arriving weeks) (calendar.js), `dayN` (dayview.js, one day), `openDay` (`mSheetAuto` and `mDayIn` when entering day view), `closeDay` (`mDayOut` unless `now`), `switchView` (from the Timeline: closeDay at once), `openTimePop` (`mTpFit`), the sheet's handle in `buildDaySkeleton`, the day-view click / pointerdown handlers (dayview-edit.js), `setSbw`, `setRange` (app.js: months only; "Timeline"), `openTaskMenu` (Mark done), the notes hover (notes.js), `renderAdmire` (no list column, wider days), the Timeline's hover handlers and fold arrows (timeline.js) |
 
 Styles for each are in the matching css/ file.
 
@@ -318,8 +331,11 @@ Four places can need text when something changes. Update them only where the cha
   the calendar while a week is opened up only puts it back. What days show is worked out for where rows end up, before
   they move: mFocusSet lays the end rows out (fitRows with `mClipMode` 'quiet'), keeps that on growing days, puts the
   previous state back on shrinking ones, then puts the old rows back and eases (.m-anim, during which fitRows skips
-  mClip; in-flow "…" hidden, a .m-ride per day with more than shows); `mFocusEnd` clips the shrunk days ('more': only
-  the "…" fades in) and fades the riders. weekShift gives each day of a row changing height its end height for mClip
+  mClip; in-flow "…" hidden, a .m-ride per day with more than shows). Each moving day's bottom padding eases too
+  (inline, from where its "…" is now to where it will be), so its foot and rider leave the old "…" and land on the new
+  one, and .m-cut's mask keeps the "…"'s room clear; it lands when the rows' transition has finished (its `finished`,
+  not a timer alone). `mFocusEnd` clips the moved days (a "…" swapped for the rider at once; a "+N more" fades in as
+  the rider fades). weekShift gives each day of a row changing height its end height for mClip
   before frame(0), so nothing is hidden or shown when it lands. mClip fades only on a day it has clipped before (`mSeen`); the fading copies (.m-fade) sit in the day, outside `.items`, so look for a
   day's "…" as `.items > .m-more`. Day view's list in its strip (`.m-lstrip` / `.m-lrow`) is drawn by renderDayList
   whenever `dayStrip` is set (mobile), the days beside the current one offset down by its scroll; their timeline
@@ -385,7 +401,9 @@ keeps one copy per day (last 14), made by the server or, in fs mode, the page.
 The Settings-window preferences (`setting: true` in UI_PREFS, js/core/prefs.js), and the view preferences marked
 `sync: true` (weeks shown, collapsed threads, days shown in day view, the Timeline's future tasks), are saved in the
 plan as `state.settings`, so they follow the plan to every browser and device; the rest of `ui` (sizes, theme) stays
-in each browser's localStorage. Weeks shown is kept per kind of screen (`phoneKey`: `weeksPhone` on mobile, `planKey`).
+in each browser's localStorage. Weeks shown is kept per kind of screen (`phoneKey`: `weeksPhone` on mobile, `planKey`), though a phone no longer
+uses it: it always shows 4 weeks upright and 2 on its side (`weeksShown()`, mobile.js; read that, not `ui.weeks`, for
+the weeks on screen; turning the phone redraws). The phone's key stays so a phone never writes the desktop's choice.
 View preferences are changed in place (`ui.collapsed[id] = …`), so `saveUI` also writes the plan's copy and saves it
 (once the plan is loaded); the plan's copy is a copy, never `ui`'s own object. The plan's copy wins: `render()` applies it first (`planSettings` -> `settingsFromPlan`), so
 code (and tests) must change a setting through `applySetting`, which writes it to the plan (`settingsToPlan`) and

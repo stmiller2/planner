@@ -53,6 +53,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.strictEqual((await task('a6')).date, '2026-11-10');
     });
     await check('undo', async () => { await page.keyboard.press('Control+z'); assert.strictEqual((await task('a6')).date, '2026-11-02'); });
+    await check('dragging a conflict bar shows where it would land, moves it, and undoes in one step', async () => {
+      const conf = () => page.evaluate(() => { const c = confs().find(x => x.title === 'Conference'); return c && { id: c.id, start: c.start, end: c.end }; });
+      const c0 = await conf();
+      const b = await page.locator(`#grid .cfb[data-cid="${c0.id}"]:not(.nb)`).first().boundingBox(), d = await page.locator('#grid .day[data-date="2026-11-11"]').boundingBox();
+      const x0 = b.x + b.width / 2, y0 = b.y + b.height / 2, x1 = d.x + d.width / 2, y1 = d.y + 40;
+      await page.mouse.move(x0, y0); await page.mouse.down();
+      for (let i = 1; i <= 10; i++) { await page.mouse.move(x0 + (x1 - x0) * i / 10, y0 + (y1 - y0) * i / 10); await sleep(20); }
+      assert.strictEqual(await page.locator('.cf-ghost').count(), 1);
+      assert.ok(await page.locator('#grid .cf-slot').count() >= 1);
+      await page.mouse.up(); await sleep(300);
+      assert.strictEqual(await page.locator('.cf-ghost, #grid .cf-slot, #grid .cf-room').count(), 0);
+      const c1 = await conf();
+      assert.strictEqual(c0.start, '2026-11-03'); assert.deepStrictEqual([c1.start, c1.end], ['2026-11-10', '2026-11-12']);
+      await page.keyboard.press('Control+z');
+      assert.deepStrictEqual(await conf(), c0);
+    });
     await check('completed tasks are collapsed by default', async () => {
       assert.strictEqual(await page.evaluate(() => ui.collapseDone), true);
       await page.evaluate(() => applySetting('collapseDone', false));   // (the checks below were written with them shown)

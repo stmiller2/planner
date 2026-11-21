@@ -35,10 +35,9 @@ body.mobile #app.mdrawer:not(.admon) aside,body.mobile #app.mdrawer.admon .adm-s
 body.mobile #mScrim{display:block;position:fixed;inset:0;z-index:44;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .22s}
 body.mobile #app.mdrawer #mScrim{opacity:1;pointer-events:auto}
 body.mobile .m-bar{display:flex;flex-direction:column;gap:8px;flex:none;order:-1;padding:calc(10px + env(safe-area-inset-top)) 10px 12px;border-bottom:1px solid var(--line)}
-body.mobile aside .m-bar + .sb-head{padding-top:30px}   /* (some room between the bar and the projects) */
+body.mobile aside .m-bar + .sb-head{padding-top:22px}   /* (some room between the bar and the projects) */
 .m-bar .m-row{display:flex;align-items:center;gap:6px}
 .m-bar .seg button{padding:4px 11px}
-.m-bar .m-wkl{flex:1;font-size:12.5px;color:var(--muted)}
 .m-bar .m-sp{flex:1}
 .m-bar .ic{width:36px;height:36px}
 .m-bar .ic svg{width:17px;height:17px}
@@ -94,6 +93,9 @@ body.mobile #app.dayon main{visibility:hidden}
 /* swiping back from day view (mBackMove, mobile.js): the calendar shows under it, kept beneath it by a z-index */
 body.mobile #app.dayon.m-backing main{visibility:visible}
 body.mobile #app.m-backing #dayview{z-index:6;box-shadow:-10px 0 30px rgba(0,0,0,.18)}
+/* zooming into a day and back out (mDayZoom): the calendar shows under day view, which fades over it */
+body.mobile #app.dayon.m-zoom main{visibility:visible}
+body.mobile #app.m-zoom #dayview{z-index:6}
 body.mobile #dow div{padding:4px 0;text-align:center;font-size:10px;letter-spacing:.03em}
 body.mobile .day{padding:4px 2px 2px}   /* (the top padding and .dn's height match CF_TOP, where conflict bars start) */
 body.mobile .dn{padding-left:0;padding-right:0}
@@ -113,7 +115,6 @@ body.mobile .m-more{position:relative}
 body.mobile .m-more::before{content:'';position:absolute;inset:-8px -6px}
 body.mobile .m-more.on{position:absolute;right:2px;bottom:2px;height:auto;padding:1px 3px 5px;line-height:6px;border-radius:5px;background:var(--bg);z-index:1}
 body.mobile #grid .cfb{font-size:10px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}   /* (a tap: its menu; a long press moves it: mobile.js) */
-body.mobile #grid .cfb.m-cflift{scale:1.03;box-shadow:0 6px 16px rgba(0,0,0,.3);z-index:6;transition:scale .15s}
 body.mobile .cfb .h{display:none}
 
 /* day view: the timeline, one day, full width, with room kept below it for the task list's sheet when it's down */
@@ -211,11 +212,17 @@ body.mobile #tree{padding:0}
 /* where each thread ends (a lifted task can be dropped there: mTreeAim) */
 .mt-end{height:8px}
 .mt-empty.mt-end{height:auto}
-/* adding a task (mAddTask): one button at the drawer's foot, and one in day view's sheet heading */
+/* adding a task (mAddTask): one button floating over the foot of the drawer's list, and one in day view's sheet heading */
 .m-foot,.dv-madd{display:none}
-body.mobile .m-foot{display:block;flex:none;padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line2)}
-.m-addk{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px;border:0;border-radius:10px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font-size:14.5px;font-weight:600}
-.m-addk svg{width:16px;height:16px;stroke-width:2.4}
+/* (the list keeps room below its last row, so it can scroll clear of the button; the button steps aside while a row is lifted) */
+body.mobile .m-foot{display:flex;justify-content:center;position:absolute;left:0;right:0;bottom:0;z-index:2;padding:0 16px calc(26px + env(safe-area-inset-bottom));pointer-events:none;transition:opacity .15s,translate .15s}
+body.mobile aside #tree{padding-bottom:calc(104px + env(safe-area-inset-bottom))}
+body.mobile.m-lifting .m-foot{opacity:0;translate:0 8px}
+.m-addk{display:flex;align-items:center;justify-content:center;gap:7px;min-height:48px;padding:0 24px 0 19px;border:0;border-radius:99px;background:var(--accent);color:#fff;font-size:15.5px;font-weight:620;
+  box-shadow:0 8px 22px -6px color-mix(in srgb,var(--accent) 60%,transparent),0 2px 6px rgba(0,0,0,.14);pointer-events:auto;-webkit-tap-highlight-color:transparent;transition:scale .12s}
+.m-addk:hover{background:var(--accent)}
+.m-addk:active{scale:.96}
+.m-addk svg{width:18px;height:18px;stroke-width:2.5}
 body.mobile .dv-madd{display:flex;align-items:center;gap:5px;margin-left:auto;padding:5px 12px 5px 9px;border:0;border-radius:99px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .dv-madd svg{width:15px;height:15px;stroke-width:2.4}
 /* first which thread (a list as the drawer shows them: projects, then threads and sub-threads, indented, with their
@@ -288,8 +295,8 @@ body.mobile .dv-madd{display:flex;align-items:center;gap:5px;margin-left:auto;pa
 body.mobile #toast{align-items:center;gap:12px;padding:8px 8px 8px 14px}
 #toast .mu-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #toast .mu-b{flex:none;border:0;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-weight:650;border-radius:8px;padding:7px 14px}
-/* "Set a time…" (the day view's time box): at the top too */
-body.mobile #tpop{left:8px !important;right:8px;top:68px !important;width:auto;padding:14px 16px;font-size:15px;z-index:62}   /* (over the task menu, which stays open under it) */
+/* "Set a time…" (the day view's time box): just above the number pad, riding up with it as it opens (top: mTpFit) */
+body.mobile #tpop{left:8px !important;right:8px;width:auto;padding:14px 16px;font-size:15px;z-index:62;transition:top .25s cubic-bezier(.2,.8,.2,1)}   /* (over the task menu, which stays open under it) */
 body.mobile #tpop input{font-size:17px;padding:7px 8px}
 body.mobile #tpop .tp-k{display:none}   /* (keyboard hints; a tap outside saves) */
 /* above the fields: the quarter hours, and am / pm (mTpBtns); the field they change is outlined */
@@ -340,8 +347,14 @@ body.mobile :is(input:not([type=checkbox]):not([type=color]):not([type=range]),t
 
 /* a week opened to show all its tasks (tap "…"): the others shrink; "Show less" at its foot puts them back */
 #grid.m-anim{transition:grid-template-rows .25s cubic-bezier(.25,.8,.25,1)}   /* (M_EASE, mobile.js) */
-/* while it eases (mFocusSet): the foot of each day whose row moves, softly faded, and a "…" riding it where there's more */
-body.mobile #grid .day.m-moving .items{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent)}
+/* (each moving day's bottom padding, and the "…" riding its foot, ease with the rows: mFocusSet) */
+body.mobile #grid.m-anim .day.m-moving{transition:padding-bottom .25s cubic-bezier(.25,.8,.25,1)}
+body.mobile #grid.m-anim .m-ride{transition:bottom .25s cubic-bezier(.25,.8,.25,1)}
+/* while it eases (mFocusSet): the foot of each day whose row moves, and a "…" riding it where there's more */
+/* (with more than shows, before or after: the tasks show or go as the foot passes them, softly; ending on a "…" (m-cut),
+   clear down to its room, where the rider is, so nothing under it is left to go when it lands) */
+body.mobile #grid .day.m-moving.m-soft .items{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 13px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 13px),transparent)}
+body.mobile #grid .day.m-moving.m-cut .items{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 13px),transparent calc(100% - 11px));mask-image:linear-gradient(to bottom,#000 calc(100% - 13px),transparent calc(100% - 11px))}
 body.mobile .m-ride{position:absolute;left:0;right:0;z-index:2;height:11px;font-size:13px;line-height:6px;font-weight:700;letter-spacing:.15em;text-align:center;color:var(--muted);pointer-events:none}
 /* a week opened up, a day that still can't show everything: a chip saying how many more (a tap: that day) */
 body.mobile .m-more.m-plus{height:auto;margin-top:0;padding:1px 4px 1px 4px;border-left:2px solid var(--muted);border-radius:3px;background:var(--chip);
@@ -355,4 +368,14 @@ body.mobile .m-less{animation:mLessIn .16s ease-out .22s backwards}   /* (once t
 body.mobile #grid.settle>.m-less{transition:translate .18s ease-out}   /* (pulled along by a swipe with its week: setPull) */
 /* a chip, group or "…" going: a copy fading out where it was, over the day (mFadeOut) */
 body.mobile #grid .m-fade{position:absolute;z-index:1;margin:0;box-sizing:border-box;pointer-events:none}
-@media (prefers-reduced-motion: reduce){#grid.m-anim{transition:none}body.mobile .m-less{animation:none}}
+@media (prefers-reduced-motion: reduce){#grid.m-anim,#grid.m-anim :is(.day,.m-ride){transition:none}body.mobile .m-less{animation:none}}
+/* the task menu's links (mLinkRows): which two tasks, then a segmented row (Not linked / Same day / Next day) */
+.m-lk{padding:4px 12px 8px}
+.m-lk+.m-lk{padding-top:6px}
+.m-lk-h{display:flex;align-items:center;gap:8px;margin:0 0 6px 2px;font-size:13px;color:var(--muted);min-width:0}
+.m-lk-h svg{flex:none;width:14px;height:14px}
+.m-lk-h span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-lk-h b{font-weight:600;color:var(--ink)}
+.m-lk-seg{display:flex;gap:2px;padding:2px;border-radius:10px;background:var(--hover)}
+body.mobile #menu .m-lk-seg button{flex:1;min-width:0;justify-content:center;padding:8px 4px;border-radius:8px;font-size:13.5px;font-weight:560;color:var(--muted);white-space:nowrap;-webkit-tap-highlight-color:transparent}
+body.mobile #menu .m-lk-seg button.on{background:color-mix(in srgb,var(--accent) 16%,var(--panel));color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
