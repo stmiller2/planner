@@ -1,17 +1,16 @@
 'use strict';
 /* The planner's data and its rules (no DOM).
-   state = { version, title?, projects: [{ id, name, threads, unordered? }], archive: [...], conflicts: [...], scratch: [...] }
+   state = { version, title?, projects: [{ id, name, threads, unordered? }], archive: [...], conflicts: [...] }
      thread = { id, name, color (null = shade of its parent's), tasks: [...], threads: [sub-threads], afterTask, unordered? }
      task   = { id, title, date (YYYY-MM-DD or null), done, linkToPrev (null | 'sameDay' | 'nextDay'), plan?, notes?, fails? }
        fails = earlier failed attempts [{ id, date, start?, dur?, done?, prev?, next?, joined? }]: drawn where they happened (see failTasks)
-     scratch = day view's "Other to-do": [{ id, title, done }], small to-dos outside every project (no dates)
    Every change goes through mutate(), which normalizes, records undo, re-renders, saves and raises warnings. */
 
 // link types a task can have to the task before it (the "+1d" kind adds a day; see offsets())
 const LINKS = { sameDay: { badge: '=', label: 'Same day as' }, nextDay: { badge: '+1d', label: 'Day after' } };
 
 /* ---------- state ---------- */
-let state = { version: 5, projects: [], archive: [], conflicts: [], scratch: [] };
+let state = { version: 5, projects: [], archive: [], conflicts: [] };
 const undoStack = [], redoStack = [];
 // stateGen counts changes to `state`; anything derived from it (index, colors, warnings, JSON) is cached per generation.
 // Call touch() after changing state in place outside mutate().
@@ -103,9 +102,6 @@ function migrate(d) {
     const st = okD(c.start) ? c.start : null, en = st && okD(c.end) && c.end >= st ? c.end : st;
     return { ...c, id: c.id || uid(), title: String(c.title ?? 'Conflict'), start: st, end: en };
   });
-  // scratch tasks (day view's "Other to-do"): { id, title, done }
-  s.scratch = (d && Array.isArray(d.scratch) ? d.scratch : []).filter(x => x && typeof x === 'object')
-    .map(x => ({ id: x.id || uid(), title: String(x.title ?? ''), done: !!x.done })).filter(x => x.title.trim());
   // the Settings-window preferences (see settingsToPlan, prefs.js); each value is checked when it's applied
   if (d && d.settings && typeof d.settings === 'object' && !Array.isArray(d.settings)) s.settings = { ...d.settings };
   return s;

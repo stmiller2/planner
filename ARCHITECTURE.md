@@ -36,7 +36,6 @@ css/  (one file per area; later files override earlier ones)
   conflicts.css         conflict rows, add form, calendar bars, date boxes, chip close button
   calendar.css          grid, days, chips, same-day groups, highlight, #linkline
   dayview.css           list, timeline, blocks, conflict strip, tooltip, time popover
-  scratch.css           scratch board, its collapsed tab and resize edge
   dialogs.css           warning bar, toast, modals, Settings, Archive, task notes
   timeline.css          Timeline view and its hover list
   mobile.css            mobile mode (all under body.mobile; loaded last): one column, 60px header, drawer, day view's
@@ -49,7 +48,7 @@ js/core/  (no DOM; also loaded by the unit tests)
   prefs.js              `ui`: per-browser prefs (UI_PREFS) + new-task-box state
   model.js              `state`, migrate, the index (findTask / findThread / dayTasks / dayFails / findFail), chains and links, sub-thread
                         layout, order + conflict warnings, memo, mutate / undo / redo
-  ops.js                every edit (tasks, threads, projects, conflicts, scratch), archive / restore; multi-task ops
+  ops.js                every edit (tasks, threads, projects, conflicts), archive / restore; multi-task ops
                         (dateTasks, linkTasks, unlinkTasks, setTasksDone, archiveTasks, delTasks, moveManyTo);
                         failed attempts (failTasks, failLater, unscheduleLater, unfailTask, removeFail);
                         sidebar drops into a chain (moveTasksTo(…, inChain), dropSingle)
@@ -64,10 +63,10 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         the left edge, swiped back to close (`mEdge` / `mClose`, `mDrawerAt` / `mDrawerLet`); in day
                         view a back button (#mBack) in ☰'s place, and the edge swipe goes back to the calendar
                         (`mBackMove` / `mBackEnd`, the calendar drawn under it: #app.m-backing), and going in or back
-                        by a tap opens day view out of the day's square and shrinks it back in (`mDayZoom`: a clip-path
-                        from the square to the whole box, its contents fading; `mDayIn` from openDay, `mDayOut` from
-                        closeDay; #app.m-zoom; `mDayA`: the one under way; closeDay(true): at once; only the edge swipe
-                        slides); the sidebar's top bar
+                        by a tap: the day's square fills the screen and back (`mDayZoom`: a clip-path from the square to
+                        the whole box with an outline riding its edge, .m-zframe; inside, a copy of the day's square,
+                        .m-zcopy, crossfades with day view's contents; `mDayIn` from openDay, `mDayOut` from closeDay;
+                        #app.m-zoom; `mDayA`: the one under way; closeDay(true): at once; only the edge swipe slides); the sidebar's top bar
                         (.m-bar) stands in for the header's right side (no weeks-shown buttons: fixed, `weeksShown`); the sidebar's own tree (`mTree`: rows fold in
                         place, no redraw); week heights (`mFit`: what each week needs, as desktop's fitSizes; the
                         weeks built ahead sized to match, `mNbFit`) and "…" for full days (`mClip`, chip by chip; on a
@@ -142,8 +141,6 @@ js/ui/  (each view draws its part of the page and handles its own events)
   dayview-edit.js       time popover, dragging / resizing blocks, conflict drag, thread-heading tooltip
   notes.js              noteMark, the hover note (after 1 s), which is also the note editor (editInTip, editNotes);
                         ntWants: short day-view blocks get the note too
-  scratch.js            scratch board (third column of #app): edits, resize, open / close (prefs scratchCal,
-                        scratchDay, scratchRemember, scratchOpen), width ui.scw / --scw
   app.js                render(), renderWeeks() (header + calendar only), header (view switcher, ‹ Today ›, weekShift / daySlide), sidebar width, theme,
                         global click / change / dblclick / keydown dispatch (data-act="…"), contextmenu → task menu
 js/storage.js           start(), loading + saving in the three storage modes, conflicts, backups
@@ -157,7 +154,7 @@ js/main.js              calls start(); loaded last
 ## The data (planner.json)
 
 ```
-state    = { version: 5, title?, projects: [project], archive: [entry], conflicts: [conflict], scratch: [scratch] }
+state    = { version: 5, title?, projects: [project], archive: [entry], conflicts: [conflict] }
 project  = { id, name, threads: [thread], unordered? }
 thread   = { id, name, color, tasks: [task], threads: [sub-thread], afterTask, unordered? }
 task     = { id, title, date: 'YYYY-MM-DD' | null, done, linkToPrev: null | 'sameDay' | 'nextDay', plan?, notes?, fails? }
@@ -168,7 +165,6 @@ fail     = { id, date, start?, dur?, done?, prev?, next?, joined? }   a failed a
            it (migrate infers it from the links); early version-5 ones say `true` (migrate finds the attempt).
 entry    = { id, kind: 'task' | 'thread' | 'project', at, item, from }   at = date archived, from = where it was
 conflict = { id, title, start, end }   end inclusive; start null = undated
-scratch  = { id, title, done }         one-off to-dos outside projects; no dates
 ```
 
 - `color`: '#rrggbb' on top-level threads; null on a sub-thread = a shade of its parent's.
@@ -219,7 +215,6 @@ for live preview) must call `touch()`.
 | a calendar chip or day cell | `chip`, `renderCal` (ui/calendar.js) |
 | lines between next-day-linked chips | `showLinkLines` / `linkRoute` / `drawLinkLines` (ui/calendar.js) |
 | day view list or blocks | `renderDayList`, `renderDayTimeline` (ui/dayview.js) |
-| scratch board edits | `addScratch` … `moveScratch` (core/ops.js) |
 | Timeline | `admireData` (ui/timeline-data.js), `renderAdmire`, `admTipHTML` (ui/timeline.js) |
 | multi-select, selection bar | end of ui/sidebar.js; ops under "several tasks at once" in core/ops.js |
 | task notes | ui/notes.js, `setTaskNotes`, task menu `openTaskMenu` (ui/sidebar.js) |

@@ -360,13 +360,13 @@ function archiveTasks(ids) {
     detachTask({ ...f, i: f.t.tasks.indexOf(f.task) });
     archiveEntry('task', { ...f.task, linkToPrev: null }, from);
   }), true);
-  toast(`Archived ${plural(fs.length, 'task')}. They’re under Archive at the top of the sidebar; ⌘Z to undo.`, 4500);
+  toast(`Archived ${plural(fs.length, 'task')}`, 4500);
 }
 function delTasks(ids) {
   const fs = inOrder(ids).map(findTask); if (!fs.length) return false;
-  if (fs.length > 1 && ui.confirmDelete && !confirm(`Delete ${plural(fs.length, 'task')}? (Undo is available.)`)) return false;
+  if (fs.length > 1 && ui.confirmDelete && !confirm(`Delete ${plural(fs.length, 'task')}?`)) return false;
   mutate(() => fs.forEach(f => detachTask({ ...f, i: f.t.tasks.indexOf(f.task) })));
-  if (fs.length > 1 && !ui.confirmDelete) toast(`Deleted ${plural(fs.length, 'task')} — ⌘Z to undo.`);
+  if (fs.length > 1 && !ui.confirmDelete) toast(`Deleted ${plural(fs.length, 'task')}`);
   return true;
 }
 // move several tasks (with their chains unless `single`) to a drop spot in the sidebar, in sidebar order. Links
@@ -389,9 +389,9 @@ function moveManyTo(ids, single, spot) {
 function delProject(id) {
   const p = state.projects.find(x => x.id === id); if (!p) return;
   const n = p.threads.reduce((a, t) => a + subtreeTasks(t).length, 0);
-  if (n && ui.confirmDelete && !confirm(`Delete project "${p.name}" and its ${plural(n, 'task')}? (Undo is available.)`)) return;
+  if (n && ui.confirmDelete && !confirm(`Delete project "${p.name}" and its ${plural(n, 'task')}?`)) return;
   mutate(() => state.projects.splice(state.projects.indexOf(p), 1));
-  if (n && !ui.confirmDelete) toast(`Deleted project “${p.name}” — ⌘Z to undo.`);
+  if (n && !ui.confirmDelete) toast(`Deleted project “${p.name}”`);
 }
 function moveProject(id, dir) {
   const i = state.projects.findIndex(x => x.id === id), j = i + dir;
@@ -401,9 +401,9 @@ function moveProject(id, dir) {
 function delThread(id) {
   const f = findThread(id); if (!f) return;
   const n = subtreeTasks(f.t).length, subs = f.t.threads.length;
-  if ((n || subs) && ui.confirmDelete && !confirm(`Delete thread "${f.t.name}"${subs ? ', its sub-threads' : ''} and ${plural(n, 'task')}? (Undo is available.)`)) return;
+  if ((n || subs) && ui.confirmDelete && !confirm(`Delete thread "${f.t.name}"${subs ? ', its sub-threads' : ''} and ${plural(n, 'task')}?`)) return;
   mutate(() => f.siblings.splice(f.siblings.indexOf(f.t), 1));
-  if ((n || subs) && !ui.confirmDelete) toast(`Deleted thread “${f.t.name}” — ⌘Z to undo.`);
+  if ((n || subs) && !ui.confirmDelete) toast(`Deleted thread “${f.t.name}”`);
 }
 /* ---------- archive ----------
    Archiving takes a project, thread (with its sub-threads) or task out of the planner and files it in
@@ -414,7 +414,7 @@ function delThread(id) {
 function archiveEntry(kind, item, from) { state.archive = state.archive || []; state.archive.unshift({ id: uid(), kind, at: todayISO(), item, from }); }
 // ids of the items just before and after `obj` in a list of {obj} (a thread's layout, or a project's threads)
 function neighbours(list, obj) { const i = list.findIndex(x => (x.obj || x) === obj); return { prevId: i > 0 ? (list[i - 1].obj || list[i - 1]).id : null, nextId: i >= 0 && i + 1 < list.length ? (list[i + 1].obj || list[i + 1]).id : null }; }
-function archivedToast(name) { toast(`Archived “${name}”. It’s under Archive at the top of the sidebar; ⌘Z to undo.`, 4500); }
+function archivedToast(name) { toast(`Archived “${name}”`, 4500); }
 function archiveTask(id) {
   const f = findTask(id); if (!f) return;
   mutate(() => {
@@ -450,14 +450,14 @@ function restoreTarget(e) {
   const p = state.projects.find(x => x.id === e.from.pid);
   if (e.kind === 'task') {
     const t = findThread(e.from.tid);
-    return t ? { ok: true, t: t.t } : { ok: false, why: `Its thread “${e.from.path[e.from.path.length - 1]}” isn’t in the planner (archived or deleted). Restore that first.` };
+    return t ? { ok: true, t: t.t } : { ok: false, why: `Parent thread “${e.from.path[e.from.path.length - 1]}” was archived or deleted. Restore that first.` };
   }
   if (e.from.parentTid) {
     const t = findThread(e.from.parentTid);
     if (t) return { ok: true, t: t.t };
-    if (p) return { ok: true, p, note: 'as a top-level thread (its parent thread isn’t in the planner)' };
+    if (p) return { ok: true, p, note: 'as a top-level thread (its parent thread isn’t in the planner)' };   // (note: not shown in the toast)
   } else if (p) return { ok: true, p };
-  return { ok: false, why: `Its project “${e.from.path[0]}” isn’t in the planner (archived or deleted). Restore that first.` };
+  return { ok: false, why: `Parent project “${e.from.path[0]}” was archived or deleted. Restore that first.` };
 }
 function restoreEntry(entryId) {
   const e = (state.archive || []).find(x => x.id === entryId); if (!e) return;
@@ -481,12 +481,12 @@ function restoreEntry(entryId) {
     }
   });
   const name = e.kind === 'task' ? e.item.title : e.item.name;
-  toast(`Restored “${name}”${tg.note ? ' ' + tg.note : ''}.`);
+  toast(`Restored “${name}”.`);
 }
 function deleteEntry(entryId) {
   const e = (state.archive || []).find(x => x.id === entryId); if (!e) return;
   const name = e.kind === 'task' ? e.item.title : e.item.name;
-  if (ui.confirmDelete && !confirm(`Permanently delete “${name}” from the archive? (Undo is available.)`)) return;
+  if (ui.confirmDelete && !confirm(`Permanently delete “${name}” from the archive?`)) return;
   mutate(() => state.archive.splice(state.archive.indexOf(e), 1));
 }
 
@@ -501,33 +501,3 @@ function setConflictDates(id, start, end) {
   });
 }
 
-/* scratch tasks (day view's "Other to-do"): small to-dos outside every project; no dates, they stay until deleted */
-const scratchList = () => (state.scratch = state.scratch || []);
-// add one task per title, before the scratch task beforeId (none = at the end); returns the new ids
-function addScratch(titles, beforeId) {
-  titles = titles.map(s => s.trim()).filter(Boolean); if (!titles.length) return [];
-  const news = titles.map(title => ({ id: uid(), title, done: false }));
-  mutate(() => {
-    const L = scratchList(), at = beforeId ? L.findIndex(x => x.id === beforeId) : -1;
-    L.splice(at < 0 ? L.length : at, 0, ...news);
-  });
-  return news.map(n => n.id);
-}
-function setScratchDone(id, done) { const x = scratchList().find(s => s.id === id); if (x) mutate(() => { x.done = !!done; }); }
-function renameScratch(id, title) { const x = scratchList().find(s => s.id === id); if (x && title.trim()) mutate(() => { x.title = title.trim(); }); }
-function delScratch(id) { mutate(() => { state.scratch = scratchList().filter(s => s.id !== id); }); }
-// delete every ticked-off scratch task; returns how many
-function clearDoneScratch() {
-  const n = scratchList().filter(s => s.done).length; if (!n) return 0;
-  mutate(() => { state.scratch = scratchList().filter(s => !s.done); });
-  return n;
-}
-// move a scratch task to just before beforeId (none = the end)
-function moveScratch(id, beforeId) {
-  if (id === beforeId) return;
-  mutate(() => {
-    const L = scratchList(), i = L.findIndex(s => s.id === id); if (i < 0) return;
-    const [x] = L.splice(i, 1), at = beforeId ? L.findIndex(s => s.id === beforeId) : -1;
-    L.splice(at < 0 ? L.length : at, 0, x);
-  });
-}

@@ -64,7 +64,7 @@ function renderAdmire() {
     <div class="seg" id="admRange">${[['all', 'All time'], [12, '12 weeks'], [4, '4 weeks']].map(([v, l]) => `<button data-v="${v}" class="${String(admRange) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div></div></div>`;
   const foot = D.undated ? `<p class="adm-foot"><span data-tip="undated">+${plural(D.undated, 'finished task')} without a date</span></p>` : '';
   if (!D.total && !D.planned && !D.failed) {
-    el.innerHTML = `<div class="adm-wrap">${top}<div class="adm-empty">${D.everTotal ? 'Nothing finished in this stretch. Try a longer range.' : 'Nothing finished yet. Tick off a task and it will show up here, on its day.'}</div>${foot}</div>`;
+    el.innerHTML = `<div class="adm-wrap">${top}<div class="adm-empty">${D.everTotal ? 'No completed tasks in this range' : 'No completed tasks yet'}</div>${foot}</div>`;
     return;
   }
   el.innerHTML = `<div class="adm-wrap">${top}<div class="adm-tl"></div>${foot}</div>`;

@@ -5,32 +5,21 @@ function showHelp() {
   const body = framedModal('How it works', `
   <h4>Projects, (sub)threads, and tasks</h4>
   <p><b>Tasks</b> (e.g., “purify GoldenGate reaction”) are organized into <b>threads</b> (e.g., “cloning”), which are organized into <b>projects</b> (e.g., “build library”). To get started, create a project with ${ui_('+ Project')} and make a thread with ${ui_('+ thread')}. You can then add tasks to your thread, or create subthreads to any depth <span class="nw">through <span class="hic">${ICON.gear}</span>.</span></p>
-  <p>Tasks, threads, projects, and the planner itself can be renamed by double-clicking the title in calendar or day view.</p>
-  <p>To add additional notes to a task, choose <b>Add notes</b> from the task’s settings menu <span class="hic">${ICON.gear}</span> in the sidebar or by right-clicking. Hover to read notes and double-click to edit the text.</p>
   <h4>Scheduling</h4>
-  <p>To schedule a task, drag it onto the calendar, or click the date box and type e.g. “fri”, “11/26”, “td”, "tm". Tasks can also be scheduled relative to one another: click the link icon <span class="hic">${ICON.link}</span> to link two tasks to the <b>same day</b> (e.g., “do transformation” and “plate cells”) or <b>next day</b> (e.g., “start overnights” and “miniprep plasmids”).</p>
-  <p>Tasks are expected to be ordered based on their number in the sidebar. If scheduled out of order, a warning will display. This can be turned off in Settings, or for a specific thread/project by switching off <b>Ordered tasks</b> in its settings <span class="nw">menu <span class="hic">${ICON.gear}</span>.</span></p>
+  <p>To schedule a task, drag it onto the calendar, or click the date box and type e.g. “fri”, “11/26”, “td”, “tm”. Tasks can also be scheduled relative to one another: click the link icon <span class="hic">${ICON.link}</span> to link two tasks to the <b>same day</b> (e.g., “do transformation” and “plate cells”) or <b>next day</b> (e.g., “start overnights” and “miniprep plasmids”).</p>
+  <p>Tasks are expected to be ordered based on their number in the sidebar. Out-of-order warnings can be turned off in Settings, or for a specific thread/project by disabling <b>Ordered tasks</b> in its settings <span class="nw">menu <span class="hic">${ICON.gear}</span>.</span></p>
   <h4>Rescheduling</h4>
   <p>When rescheduling tasks, linked tasks move too, unless holding <kbd>⌥ Option</kbd> while dropping the task (this breaks links and moves only the dragged task).</p>
-  <p>By default, all tasks within a thread get shifted relative to each other when rescheduling. This can be turned off in Settings, or bypassed by holding <kbd>⌥ Option</kbd>.</p>
-  <p>If an experiment fails and needs to be rescheduled, you can also choose <b>Mark failed</b> from the task’s settings menu <span class="hic">${ICON.gear}</span> or by right-clicking. This allows the task to be rescheduled without removing the original attempt from calendar or timeline views.</p>
+  <p>Incomplete tasks within a thread are shifted relative to each other when rescheduling. This can be turned off in Settings, or bypassed by holding <kbd>⌥ Option</kbd>.</p>
+  <p>If an experiment fails and needs to be rescheduled, you can also choose <b>Mark failed</b>, which allows the task to be rescheduled without removing the original attempt from calendar or timeline views.</p>
   <h4>Day view</h4>
-  <p>To plan the timing of tasks within a single day, enter day view with the view switcher, pressing <kbd>d</kbd>, or by clicking the date number from calendar view. Drag tasks onto the timeline, then drag or click blocks to set their times.</p>
-  <h4>On a phone</h4>
-  <p>Tap a task for its menu (mark done, reschedule, set a time, rename). Press and hold a task to drag it to another day, or in day view to another time; drop it on the header to unschedule it. Hold a moment longer before dragging to move just that task, as <kbd>⌥ Option</kbd> does (Reschedule… has an <b>Only this task</b> switch for the same). Swipe in from the left edge for the sidebar, drag day view’s task list up or down by its handle, and pull the header down to refresh.</p>
-  <h4>Timeline</h4>
+  <p>To plan the timing of tasks within a single day, enter day view with the view switcher, pressing <kbd>d</kbd>, or by clicking the date number from calendar view.</p>
+  <h4>Timeline view</h4>
   <p>Press <kbd>-</kbd> or use the view switcher to enter timeline view, where you can view everything you’ve finished over time. No functionality here, it just looks nice.</p>
   <h4>Conflicts</h4>
-  <p>Add holidays or travel with ${ui_('+ Conflict')} in the <b>Conflicts</b> section of the sidebar. Tasks can still be scheduled over conflicts but will display a warning, which can be turned off in Settings.</p>
-  <h4>Scratch board</h4>
-  <p>One-off tasks that don’t deserve their own project or scheduling (e.g., “clean tubes”) can be added to the scratch board, on the right of the calendar and day view. These tasks can’t be scheduled; they stay on the board until you delete them. All finished scratch tasks can be deleted at once with the <span class="hic">${ICON.clearDone}</span> button.</p>
-  <p>Off by default for simplicity but can be turned on in settings.</p>
+  <p>Add holidays or travel with ${ui_('+ Conflict')} in the <b>Conflicts</b> section of the sidebar.</p>
   <h4>Archive</h4>
-  <p>To remove a task, thread, or project from the sidebar without deleting it, choose <b>Archive</b> from its settings menu <span class="hic">${ICON.gear}</span> (<b>Delete</b> is there too). Archived tasks still appear in the timeline and calendar.</p>
-  <h4>Your data</h4>
-  ${MODE === 'server' && server.hosted
-    ? `<p>Your plan is saved to ${dataWhereHTML()} as you go, with a copy kept each day (last 14 days). To copy it to or from a <code>planner.json</code> file, use Export and Import in the account menu (the round button at the top right).</p>`
-    : `<p>Your plan is saved to ${dataWhereHTML()}${MODE === 'fallback' ? '' : ' as you go, with a dated copy each day in <code>backups/</code> next to it (last 14 days)'}. You can change where in Settings, under <b>Data file</b>.</p>`}
+  <p>To remove a task, thread, or project from the sidebar without deleting it, choose <b>Archive</b> from its settings menu <span class="hic">${ICON.gear}</span>. Archived tasks still appear in the timeline and calendar.</p>
   <div class="hkeys"><h4>Keyboard shortcuts</h4><div class="keys">${shortcutsHTML()}</div></div>
   <div class="row"><button class="btn primary" id="mClose">Close</button></div>`);
   body.parentElement.classList.add('help'); $('#modal').dataset.kind = 'help';
@@ -50,8 +39,6 @@ function shortcutsHTML() {
     ['<kbd>S</kbd>', 'Open Settings'],
     ['<kbd>H</kbd>', 'Open Help'],
     ['<kbd>1</kbd> – <kbd>5</kbd>', 'Set number of weeks shown (days in day view)'],
-    ['<kbd>X</kbd>', 'Open / close the scratch board (must be turned on in settings first)'],
-    ['<kbd>N</kbd>', 'New task on the scratch board'],
   ].map(([k, d]) => `<div class="kd">${k}</div><div>${d}</div>`).join('');
 }
 
@@ -83,8 +70,6 @@ function applySetting(key, v) {
   } else if (key === 'weekStart') { ui.weekStart = +v; ui.viewStart = weekStartOf(addDays(ui.viewStart, 3)); }   // mid-week anchor keeps the view on the same week
   else if (key === 'snap' || key === 'dayHours') ui[key] = +v;
   else ui[key] = v;
-  // the scratch board in the view you're in follows at once (scratchForView does nothing while remembering)
-  if (key === null || key === 'scratchOn' || key === 'scratchRemember' || (key === 'scratchDay') === !!ui.dayView && /^scratch(Cal|Day)$/.test(key)) scratchForView();
   if (!warnings().length) hideWarn();
   saveUI(); if (settingsToPlan()) scheduleSave();   // (they travel with the plan; not undoable)
   render(); renderSettings();
@@ -94,47 +79,26 @@ function renderSettings() {
   const top = body.scrollTop;
   const sw = (key, off) => `<label class="switch"><input type="checkbox" data-set="${key}" ${ui[key] ? 'checked' : ''} ${off ? 'disabled' : ''}><span class="track"></span></label>`;
   const seg = (key, opts) => `<div class="seg" data-set="${key}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(ui[key]) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  const row = (title, desc, ctl) => `<div class="srow"><div class="sl"><b>${title}</b><div class="sd">${desc}</div></div>${ctl ? `<div class="sc">${ctl}</div>` : ''}</div>`;
-  // little before/after strip: task 2 dragged from Tue to Thu
-  const strip = (label, cells, cur) => `<div class="erl ${cur ? 'cur' : ''}">${label}</div>` +
-    [0, 1, 2, 3, 4].map(i => `<div class="ec">${cells[i] ? `<div class="ek ${cells[i][1] || ''}">${cells[i][0]}</div>` : ''}</div>`).join('');
-  const example = `<div class="ex"><div></div>${['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(d => `<div class="eh">${d}</div>`).join('')}
-    ${strip('Before', { 0: [1], 1: [2, 'mv'], 2: [3] })}
-    ${strip('Shift on', { 0: [1], 3: [2, 'mv'], 4: [3] }, ui.shiftLater)}
-    ${strip('Shift off', { 0: [1], 2: ['3 !', 'bad'], 3: [2, 'mv'] }, !ui.shiftLater)}</div>`;
+  const row = (title, desc, ctl) => `<div class="srow${desc ? '' : ' nd'}"><div class="sl"><b>${title}</b>${desc ? `<div class="sd">${desc}</div>` : ''}</div>${ctl ? `<div class="sc">${ctl}</div>` : ''}</div>`;
   body.innerHTML = `
     <h4>Scheduling</h4>
-    ${row('Shift later tasks', `<p>When you drag a scheduled task to a different day, every scheduled task <i>after</i> it in the same thread (unless the thread is unordered) moves by the same number of days, so the rest of the thread keeps its spacing. That includes later sub-threads and everything in them.</p>
-      <p>Fully completed chains never move. Hold <b>⌥ Option</b> while dropping to just move that task.</p>
-      <div>Dragging task 2 from Tue to Thu (+2 days):</div>${example}`, sw('shiftLater'))}
+    ${row('Shift later tasks', 'When you drag a scheduled task to a different day, every subsequent incomplete task in the same thread moves by the same number of days, so the thread’s tasks keep their spacing. Hold <b>⌥ Option</b> while dropping to just move that task.', sw('shiftLater'))}
     ${row('Keep day-view times', 'When a task moves to another day, its time on the day-view timeline moves with it.', sw('keepTimes'))}
     <h4>Calendar view</h4>
-    ${row('Narrow weekends', 'Make the Saturday and Sunday columns narrower, leaving more room for weekdays.', sw('narrowWe'))}
-    ${row('Week starts on', 'The first column of the calendar.', seg('weekStart', [[1, 'Monday'], [0, 'Sunday']]))}
-    ${row('Sidebar dates', 'How the date button on each task in the sidebar reads.', seg('dateLabels', [['relative', 'Tues, Next Wed'], ['absolute', 'Oct 22']]))}
-    ${row('Collapse completed tasks', 'In the sidebar, two or more completed tasks in a row fold into one “+ N completed” line (click it to show them). Threads that are fully completed stay as they are.', sw('collapseDone'))}
+    ${row('Narrow weekends', '', sw('narrowWe'))}
+    ${row('Week starts on', '', seg('weekStart', [[1, 'Monday'], [0, 'Sunday']]))}
+    ${row('Sidebar dates', '', seg('dateLabels', [['relative', 'Tues, Next Wed'], ['absolute', 'Oct 22']]))}
+    ${row('Collapse completed tasks', 'Collapse two or more completed tasks in a row in the sidebar.', sw('collapseDone'))}
     <h4>Day view</h4>
-    ${row('Hours in view', 'How many hours of the timeline fit in the window.', seg('dayHours', DAY_HOURS.map(h => [h, h === 24 ? '24 h' : String(h)])))}
+    ${row('Hours in view', '', seg('dayHours', DAY_HOURS.map(h => [h, h === 24 ? '24 h' : String(h)])))}
     ${row('Time steps', 'Blocks snap to this grid when you place, move or resize them.', seg('snap', [[5, '5'], [10, '10'], [15, '15'], [30, '30 min']]))}
-    ${row('Time format', 'Hours and block times.', seg('clock', [['12', '12-hour (2pm)'], ['24', '24-hour (14:00)']]))}
-    <h4>Scratch board</h4>
-    ${row('Enable scratch board', 'A panel on the right of the calendar and day view for quick one-off tasks that don’t belong to a project and don’t need a date.', sw('scratchOn'))}
-    <div class="sgrp ${ui.scratchOn ? '' : 'off'}">
-    ${row('Remember open / closed', 'Keep the scratch board open or closed the way you left it, in every view and the next time you open the planner.', sw('scratchRemember', !ui.scratchOn))}
-    <div class="ssub ${ui.scratchOn && ui.scratchRemember ? 'off' : ''}">
-      <div class="sh">${ui.scratchRemember ? 'Not used while remembering. Otherwise, open' : 'Open'} the scratch board when you go to:</div>
-      <div class="sline"><span>Calendar view</span>${sw('scratchCal', !ui.scratchOn || ui.scratchRemember)}</div>
-      <div class="sline"><span>Day view</span>${sw('scratchDay', !ui.scratchOn || ui.scratchRemember)}</div>
-    </div>
-    <p class="sub snote">Either way, you can always open or close it by clicking its » / tab or pressing <kbd>X</kbd>.</p>
-    </div>
+    ${row('Time format', '', seg('clock', [['12', '12-hour (2pm)'], ['24', '24-hour (14:00)']]))}
     <h4>Warnings</h4>
-    ${row('Confirm before deleting', 'Ask before deleting a project or thread that still has tasks.', sw('confirmDelete'))}
+    ${row('Confirm before deleting', '', sw('confirmDelete'))}
     ${row('Out-of-order warning', 'Show a warning when a change puts a task before an earlier task in its thread (ordered threads only).', sw('orderWarn'))}
     ${row('Conflict warning', 'Show a warning when an uncompleted task lands on the same day as a Conflict.', sw('conflictWarn'))}
     <h4>Data file</h4>
     ${dataFileRows(row)}
-    <p class="sub" style="margin-top:18px">Settings are saved with your plan, so they’re the same in every browser and on every device that opens it. The theme and the layout (sidebar width, how many weeks or days are shown) stay with each browser.</p>
     <div class="row"><button class="btn primary" id="sClose">Done</button><button class="btn" id="sReset">Restore defaults</button></div>`;
   body.scrollTop = top;
 }
@@ -144,8 +108,8 @@ function renderSettings() {
 // remembers it); with a folder chosen in Chrome, pick another one; in a browser without file access, Export;
 // online (server.hosted), the account, Export / Import and Sign out
 function dataFileRows(row) {
-  if (MODE === 'server' && server.hosted) return row('Saved to', `<p>${dataWhereHTML()}, as you go.</p><p>A copy is kept each day (last 14).</p>`) +
-    row('Copy to or from a file', `<p>Export saves your plan as a <code>planner.json</code> file. Import replaces the plan here with one from a file (<kbd>⌘Z</kbd> undoes it).</p><p>Use these to move a plan between this site and Planner on your own computer.</p>`,
+  if (MODE === 'server' && server.hosted) return row('Saved to', `<p>${dataWhereHTML()}, as you go.</p><p>Backups kept for previous 14 days</p>`) +
+    row('Copy to or from a file', '',
       `<span style="display:flex;gap:6px"><button class="btn" id="dfExport">Export</button><button class="btn" id="dfImport">Import</button></span>`) +
     row('Signed in as', `<p><code>${esc(server.user)}</code></p>`, `<button class="btn" id="dfSignOut">Sign out</button>`);
   if (MODE === 'server') {
@@ -172,10 +136,10 @@ async function moveDataFolder(action) {
     if (action === 'check') {
       const c = await server.setFolder(folder, 'check');
       if (c.same) return say('That’s already where your plan is saved.');
-      if (c.has) return say(`<b>${esc(c.folder)}</b> already has a <code>planner.json</code> (last changed ${esc(c.modified)}). Open that plan instead of this one? This one stays where it is.
+      if (c.has) return say(`<b>${esc(c.folder)}</b> already has a <code>planner.json</code> (last changed ${esc(c.modified)}). Open that plan instead?
         <div class="row"><button class="btn primary" id="dfOpen">Open that plan</button><button class="btn" id="dfCancel">Cancel</button></div>`);
       await server.setFolder(folder, 'move');
-      renderSettings(); toast('Moved. Your plan is now saved in ' + server.file);
+      renderSettings(); toast('Your plan is now saved in ' + server.file);
     } else {
       await server.setFolder(folder, 'open');
       await server.reload(); toast('Opened ' + server.file);

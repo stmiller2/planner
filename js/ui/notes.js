@@ -112,7 +112,7 @@ function editInTip() {
   const id = ntId, cur = f.task.notes || '', b = ntip.querySelector('.nt-b');
   ntip.style.width = clamp(Math.max(ntip.offsetWidth, 300), 0, Math.min(340, innerWidth - 16)) + 'px';   // room to type
   const ta = document.createElement('textarea'); ta.className = 'nt-ed'; ta.value = cur; ta.spellcheck = true;
-  ta.placeholder = 'Anything to remember for this task';
+  ta.placeholder = 'Additional notes';
   const k = document.createElement('div'); k.className = 'nt-k'; k.textContent = '↩ to save · Esc to cancel';
   if (b) b.replaceWith(ta); else ntip.append(ta);   // (no notes yet: below the title)
   ta.after(k);

@@ -26,7 +26,7 @@ function renderTree() {
   for (const id of sel) if (!findTask(id)) sel.delete(id);   // (deleted, archived, or gone with an undo)
   renderSelBar();
   if (MOBILE) return mTree();   // (mobile: its own tree, folded and unfolded by tapping rows: mobile.js)
-  if (!state.projects.length) { tree.innerHTML = `<div class="empty">No projects yet. Click <b>+ Project</b> to start, then add threads and tasks.</div>` + renderConflicts(); return; }
+  if (!state.projects.length) { tree.innerHTML = `<div class="empty">No projects yet</div>` + renderConflicts(); return; }
   // keep any half-typed text in an open new-task box across re-renders
   const keep = {}; $$('.add', tree).forEach(i => { if (i.value) keep[(i.classList.contains('ins') ? 'ins:' : 'end:') + i.dataset.tid] = i.value; });
   tree.innerHTML = state.projects.map((p, pi) => {
@@ -42,7 +42,7 @@ function renderTree() {
           <button class="ic" data-act="pmenu" data-id="${p.id}" title="Project settings">${ICON.gear}</button>
         </span>
       </div>
-      ${pc ? '' : `<div class="threads">${p.threads.map(t => renderThread(p, t, false)).join('') || `<div class="empty small">No threads yet — hover the project and click <b>+ thread</b>.</div>`}</div>`}
+      ${pc ? '' : `<div class="threads">${p.threads.map(t => renderThread(p, t, false)).join('') || `<div class="empty small">No threads yet</div>`}</div>`}
     </section>`;
   }).join('') + renderConflicts();
   $$('.add', tree).forEach(i => { const v = keep[(i.classList.contains('ins') ? 'ins:' : 'end:') + i.dataset.tid]; if (v) i.value = v; });
@@ -60,7 +60,7 @@ function renderThread(p, t, isSub) {
   if (!tc) {
     const L = layout(t); let i = 0;
     const insAt = inserting && inserting.tid === t.id ? layoutIndex(L, inserting.refId, inserting.side) : -1;
-    const insBox = () => `<input class="add ins" data-tid="${t.id}" placeholder="New task (Enter to add, Esc to stop)">`;
+    const insBox = () => `<input class="add ins" data-tid="${t.id}" placeholder="New task">`;
     // collapse completed tasks: runs of 2+ done tasks in a row (no sub-thread between) fold into one line, unless the
     // whole thread is done. layout index where a run starts -> index just past it
     const runs = new Map();
@@ -86,7 +86,7 @@ function renderThread(p, t, isSub) {
     }
     if (insAt === L.length) body += insBox();
     const empty = !L.length;
-    if (empty || addOpen === t.id) body += `<input class="add${empty && addOpen !== t.id ? ' idle' : ''}" data-tid="${t.id}" placeholder="${empty && addOpen !== t.id ? '+ Add task' : 'New task at the end (Enter to add, Esc to stop)'}">`;
+    if (empty || addOpen === t.id) body += `<input class="add${empty && addOpen !== t.id ? ' idle' : ''}" data-tid="${t.id}" placeholder="${empty && addOpen !== t.id ? '+ Add task' : 'New task'}">`;
   }
   return `<div class="thread" data-tid="${t.id}" style="--c:${esc(c)}">
     <div class="trow ${allDone ? 'alldone' : ''}" draggable="true" data-tdrag="${t.id}">
@@ -112,7 +112,7 @@ function doneRunLine(t, ks, open, loose) {
   const up = a > 0 ? ks[0].linkToPrev : null, dn = open ? up : nx && nx.linkToPrev;
   const k = { sameDay: 's', nextDay: 'n' };
   const cls = ['drun', open && 'open', up && 'lu', dn && 'ld', up && 'u-' + k[up], dn && 'd-' + k[dn]].filter(Boolean).join(' ');
-  return `<div class="${cls}" data-act="dr-toggle" data-has="${ks.map(x => x.id).join(' ')}" title="${open ? 'Hide' : 'Show'} these completed tasks">
+  return `<div class="${cls}" data-act="dr-toggle" data-has="${ks.map(x => x.id).join(' ')}" title="${open ? 'Hide' : 'Show'} completed tasks">
     <input type="checkbox" class="drk" tabindex="-1" aria-hidden="true" disabled><span class="drn${loose ? ' nn' : ''}"></span><span class="drt">${open ? '−' : '+'} ${ks.length} completed</span></div>`;
 }
 // loose: an unordered thread (isLoose): no number (a linked chain keeps its box)
@@ -144,7 +144,7 @@ function renderTaskRow(t, k, i, loose) {
 /* ---------- link menu ---------- */
 function openLinkMenu(id, btn) {
   const f = findTask(id); if (!f) return;
-  const cur = f.task.linkToPrev, n = isLoose(f.p, f.t) ? 'the task above' : '#' + f.i;
+  const cur = f.task.linkToPrev, n = isLoose(f.p, f.t) ? 'prior task' : '#' + f.i;
   const opt = (v, k, label) => `<button data-act="setlink" data-v="${v}" data-id="${id}" class="${(cur || '') === v ? 'cur' : ''}"><span class="k">${k}</span>${label}</button>`;
   menu.innerHTML = ['nextDay', 'sameDay'].map(v => opt(v, LINKS[v].badge, `${LINKS[v].label} ${n}`)).join('') + opt('', '—', 'Not linked');
   placeMenu(btn);
@@ -220,14 +220,14 @@ function quickAct(kind) {
 }
 // a thread's / project's settings menu (its gear button): (+ subthread,) "Ordered tasks" switch, archive, delete.
 // In an unordered project, a thread's switch shows off and can't be changed.
-const orderSwitch = (act, id, on, off) => `<label class="switch mtog ${off ? 'dis' : ''}" ${off ? 'title="The whole project is unordered"' : ''}><input type="checkbox" data-act="${act}" data-id="${id}" ${on ? 'checked' : ''} ${off ? 'disabled' : ''}><span class="track"></span><span>Ordered tasks</span></label>`;
+const orderSwitch = (act, id, on, off) => `<label class="switch mtog ${off ? 'dis' : ''}" ${off ? `title="Project “${esc(off)}” is unordered"` : ''}><input type="checkbox" data-act="${act}" data-id="${id}" ${on ? 'checked' : ''} ${off ? 'disabled' : ''}><span class="track"></span><span>Ordered tasks</span></label>`;
 const menuBtn = (act, id, icon, label) => `<button data-act="${act}" data-id="${id}"><span class="k">${icon}</span>${label}</button>`;
 function openThreadMenu(id, btn) {
   const f = findThread(id); if (!f) return;
   // (mobile, from a long press on the thread in the drawer: a title bar, and adding a task and renaming, as there's
   // no row to type in)
   menu.innerHTML = (MOBILE ? mMenuHeadOf(f.t.name, [f.p.name, ...f.path.slice(0, -1)].join(' › '), colorOf(f.t)) + menuBtn('m-add-k', id, ICON.plus, 'Add task') + menuBtn('m-ren-t', id, M_PENCIL, 'Rename…') : '')
-    + menuBtn('add-sub', id, ICON.plus, MOBILE ? 'Add subthread' : 'Subthread') + orderSwitch('t-order', id, !isLoose(f.p, f.t), !!f.p.unordered)
+    + menuBtn('add-sub', id, ICON.plus, MOBILE ? 'Add subthread' : 'Subthread') + orderSwitch('t-order', id, !isLoose(f.p, f.t), f.p.unordered ? f.p.name : '')
     + '<hr>' + menuBtn('arch-t', id, ICON.archive, 'Archive') + menuBtn('del-t', id, ICON.trash, 'Delete');
   placeMenu(btn);
 }
@@ -531,17 +531,17 @@ function renderSelBar() {
   const perThread = new Map(); fs.forEach(f => perThread.set(f.t, (perThread.get(f.t) || 0) + 1));
   const canLink = [...perThread.values()].some(n => n > 1), anyLinked = fs.some(f => f.task.linkToPrev);
   const allDone = fs.every(f => f.task.done);
-  const noLink = 'Select two or more tasks in the same thread to link them';
+  const noLink = 'Select 2+ tasks in a thread to link them';
   // (a button that can't be used now says why; aria-disabled, not disabled, so its hint still shows on hover)
   const b = (act, hint, html, off, v) => `<button class="sbb${off ? ' off' : ''}" data-act="${act}" ${v ? `data-v="${v}"` : ''} data-hint="${off || hint}" aria-label="${hint}" ${off ? 'aria-disabled="true"' : ''}>${html}</button>`;
   bar.innerHTML = `<div class="sb-top"><span class="sb-n">${plural(ids.length, 'task')} selected</span>
-      <span class="sb-tip">${ids.length > 1 ? 'drag to a day to schedule all' : '⌘-click to select more'}</span>
+      <span class="sb-tip">${ids.length > 1 ? 'drag to schedule all' : '⌘-click to select more'}</span>
       <button class="ic" data-act="sel-clear" data-hint="Clear selection (Esc)" aria-label="Clear selection">${ICON.x}</button></div>
     <div class="sb-acts">
       ${b('sel-date', 'Set a date for all', `${ICON.calendar}<span>Date</span>`)}
       <span class="sb-grp">
         ${b('sel-link', 'Link: same day', '<span class="k">=</span>', canLink ? '' : noLink, 'sameDay')}
-        ${b('sel-link', 'Link: each the day after the one before', '<span class="k">+1d</span>', canLink ? '' : noLink, 'nextDay')}
+        ${b('sel-link', 'Link: each on subsequent days', '<span class="k">+1d</span>', canLink ? '' : noLink, 'nextDay')}
         ${b('sel-unlink', 'Unlink', ICON.unlink, anyLinked ? '' : 'None of these are linked')}
       </span>
       <span class="sb-sp"></span>
@@ -569,7 +569,7 @@ function selAct(act, a) {
   }
   if (act === 'sel-link') {
     const n = linkTasks(ids, a.dataset.v), threads = new Set(ids.map(id => findTask(id).t.id)).size;
-    if (n && n < threads) toast('Linked within each thread (tasks in different threads can’t be linked to each other).', 4000);
+    if (n && n < threads) toast('Linked within each thread', 4000);
     return;
   }
   if (act === 'sel-unlink') return unlinkTasks(ids);
@@ -589,11 +589,11 @@ tree.addEventListener('click', e => {
 });
 // a plain click off the selection clears it. Not: a selected task itself (sidebar row, calendar chip, day view; its
 // checkbox or date box act on that one task), the selection bar, the header (‹ Today › to find a day to drop on),
-// menus, windows, messages, or the sidebar / scratch board resize edges. (Runs before app.js's click dispatcher.)
+// menus, windows, messages, or the sidebar's resize edge. (Runs before app.js's click dispatcher.)
 document.addEventListener('click', e => {
   if (!sel.size || e.metaKey || e.ctrlKey || e.shiftKey) return;
   const t = e.target; if (!t.closest) return;
-  if (t.closest('#selbar, header, #menu, #modal, #toast, #warn, #ask, #resizer, .sc-rz, #dhint, .inl, .dwrap')) return;
+  if (t.closest('#selbar, header, #menu, #modal, #toast, #warn, #ask, #resizer, #dhint, .inl, .dwrap')) return;
   const el = t.closest(TASK_EL); if (el && sel.has(el.dataset.id)) return;
   clearSel();
 });

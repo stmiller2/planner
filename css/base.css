@@ -27,7 +27,7 @@ html,body{margin:0;height:100%;overscroll-behavior:none}   /* no browser pull-to
 body{background:var(--bg);color:var(--ink);font:13px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 body.resizing{cursor:col-resize;user-select:none}
 button,select,input{font:inherit;color:inherit}
-#app{--sbw:330px;--scw:30px;position:relative;display:grid;grid-template-columns:var(--sbw) minmax(0,1fr) var(--scw);grid-template-rows:50px minmax(0,1fr);height:100vh}
+#app{--sbw:330px;position:relative;display:grid;grid-template-columns:var(--sbw) minmax(0,1fr);grid-template-rows:50px minmax(0,1fr);height:100vh}
 
 /* header */
 /* (above day view and the timeline, so the view switcher's hover labels can hang below it) */
@@ -62,11 +62,8 @@ header .tip-r::after{left:auto;right:0;transform:none}
 /* ‹ Today › and the dates: calendar and day view; 1–5 weeks: calendar only; 1–5 days: day view only */
 #app.admon .calctl{visibility:hidden}
 #app:not(.dayon) #dvcount,#app.dayon #wkcount,#app.admon .dvcount{display:none}
-/* right end of the header. With the scratch board open, it takes that panel's width, so 1–5 weeks / days sits the
-   same 16px left of the panel's edge as the view switcher sits left of the sidebar's (24px margin + 8px gap, as for #prev) */
+/* right end of the header */
 .hright{display:flex;align-items:center;gap:8px;flex:none;justify-content:flex-end}
-#app.scon:not(.admon) .hright{width:calc(var(--scw) - 28px);min-width:max-content}
-#app.scon:not(.admon) .dvcount{margin-right:24px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;flex:none}
 .seg button{border:0;background:transparent;padding:4px 9px;cursor:pointer}
 .seg button.on{background:var(--accent);color:#fff}

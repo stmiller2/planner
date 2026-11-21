@@ -81,7 +81,7 @@ function openTimePop(id, x, y) {
     <div class="tp-h">${esc(f.task.title)}</div>${MOBILE ? mTpBtns() : ''}
     <div class="tp-row"><label>Start<input class="tp-s" spellcheck="false" autocomplete="off"${pad}></label><span class="tp-dash">–</span><label>End<input class="tp-e" spellcheck="false" autocomplete="off"${pad}></label></div>
     <div class="tp-f"><span class="tp-d"></span>${p ? '<button class="mini tp-clear">Take off timeline</button>' : ''}</div>
-    <div class="tp-k" title="Hold ⇧ Shift with ↑ / ↓ to step by an hour">Enter saves · ↑↓ ±${ui.snap} min · Esc cancels</div>`;
+    <div class="tp-k" title="⇧+↑ / ↓ ±1 hour">↑↓ ±${ui.snap} min</div>`;
   fillTimePop();
   tpEl.style.display = 'block';
   const w = tpEl.offsetWidth, h = tpEl.offsetHeight;
@@ -105,8 +105,8 @@ function checkTimePop() {
   const s = parseTime(si.value, p ? p.start : 9 * 60, false), e = parseTime(ei.value, s ?? (p ? p.start + p.dur : 10 * 60), true);
   si.classList.toggle('bad', Number.isNaN(s)); ei.classList.toggle('bad', Number.isNaN(e) || (s != null && e != null && e <= s));
   d.classList.remove('bad');
-  if (s == null && e == null) { d.textContent = p ? '' : 'Not on the timeline yet'; return null; }
-  if (Number.isNaN(s) || Number.isNaN(e) || s == null) { d.textContent = 'Type a time like 9:30, 2pm or 14:00'; d.classList.add('bad'); return null; }
+  if (s == null && e == null) { d.textContent = p ? '' : 'Not on the day planner yet'; return null; }
+  if (Number.isNaN(s) || Number.isNaN(e) || s == null) { d.textContent = 'Type a time'; d.classList.add('bad'); return null; }
   const end = e == null ? Math.min(1440, s + tpop.dur) : e;
   if (end <= s) { d.textContent = 'End must be after start'; d.classList.add('bad'); return null; }
   d.textContent = fmtDur(end - s);
@@ -296,14 +296,14 @@ function dvMove(e, rested) {   // rested: called by dvRest once the pointer has 
     const ln = dvLane(c), W = c.r.width;
     dvAim(dvGhost, { left: c.r.left + ln.fl * W + 3, width: ln.fw * W - 6, top: c.r.top + (soft - lo) * PPM, height: Math.max(14, dur * PPM - 2) });
     if (dv.mode === 'move') dv.el.style.opacity = '0';
-    const other = c.date !== dv.date ? ` · moves${splitHeld(e) ? ' just this task' : ''} to ${DOW[parseD(c.date).getDay()]}` : '';
+    const other = c.date !== dv.date ? ` · move${splitHeld(e) ? ' this task only' : ''} to ${DOW[parseD(c.date).getDay()]}` : '';
     dvGhost.querySelector('.tm').textContent = fmtSpan(start, dur) + other;
   } else {
     dv.res = null; dvRest(e, rested, null, null);
     if (dv.mode === 'move') dv.el.style.opacity = '.25';
     dvAim(dvGhost, { left: e.clientX - 16, width: 220, top: e.clientY - 12, height: Math.max(14, Math.min(dur, 60) * PPM - 2) });
     dvGhost.querySelector('.tm').textContent = dv.mode === 'move' && overSide ? 'Remove from timeline'
-      : dv.listTarget ? (splitHeld(e) ? 'Move just this task here' : 'Move here') : '';
+      : dv.listTarget ? (splitHeld(e) ? 'Move this task only here' : 'Move here') : '';
   }
 }
 /* Motion while dragging on the timeline, kept calm on a busy day: dvAim sets where the dragged ghost (or the block

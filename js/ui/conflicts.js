@@ -32,8 +32,8 @@ function renderConflicts() {
   const today = todayISO(), key = c => c.start || '9999';
   const list = confs().filter(c => !c.start || c.end >= today).sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
   const form = cfAdding ? `<div class="cfadd">
-      <input class="cfa-n" placeholder="Name, e.g. Thanksgiving" spellcheck="false">
-      <div class="cfa-d"><input class="cfa-s" placeholder="Start" spellcheck="false"><span class="cf-to">–</span><input class="cfa-e" placeholder="End (optional)" spellcheck="false">
+      <input class="cfa-n" placeholder="New conflict" spellcheck="false">
+      <div class="cfa-d"><input class="cfa-s" placeholder="Start" spellcheck="false"><span class="cf-to">–</span><input class="cfa-e" placeholder="End" spellcheck="false">
         <button class="ic" data-act="cf-cancel">${ICON.x}</button></div>
     </div>` : '';
   return `<section class="cfsec">

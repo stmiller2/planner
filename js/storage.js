@@ -24,7 +24,7 @@ function readData(text, fix, buttons = '') {
   try { return JSON.parse(text); }
   catch (e) {
     blocked = true; setStatus('File unreadable', 'err');
-    showModal(`<h3>planner.json couldn’t be read</h3><p>It isn’t valid JSON (${esc(e.message)}). Nothing has been overwritten. Fix the file or copy a version from <code>backups/</code>${fix}</p>${buttons}`, false);
+    showModal(`<h3>planner.json couldn’t be read</h3><p>Not a valid JSON (${esc(e.message)}). Fix or copy a version from backups, then reload.</p>${buttons}`, false);
     return undefined;
   }
 }
@@ -60,11 +60,11 @@ async function writeNow(force) {
 function changedOnDisk(b) {
   setStatus('Conflict', 'err');
   if (b === server && server.hosted) showModal(`<h3>Your plan was changed elsewhere</h3>
-    <p>It was saved from another window or device after this window loaded it. Which version do you want to keep?</p>
-    <div class="row"><button class="btn primary" id="mLoad">Load the saved version</button><button class="btn" id="mKeep">Keep this window’s version</button></div>`, false);
+    <p>Plan was modified outside this window. Which version do you want to keep?</p>
+    <div class="row"><button class="btn primary" id="mLoad">Load the saved version</button><button class="btn" id="mKeep">Keep this version</button></div>`, false);
   else showModal(`<h3>planner.json changed on disk</h3>
-    <p>The file was modified outside this window (${b.others}, or an edit). Which version do you want to keep?</p>
-    <div class="row"><button class="btn primary" id="mLoad">Load the file’s version</button><button class="btn" id="mKeep">Keep this window’s version</button></div>`, false);
+    <p>Plan was modified outside this window. Which version do you want to keep?</p>
+    <div class="row"><button class="btn primary" id="mLoad">Load the saved version</button><button class="btn" id="mKeep">Keep this version</button></div>`, false);
   $('#mLoad').onclick = () => { dirty = false; b.reload(); };
   $('#mKeep').onclick = () => { hideModal(); clearTimeout(saveTimer); saveChain = saveChain.then(() => writeNow(true)); };
 }
@@ -106,8 +106,8 @@ window.addEventListener('beforeunload', e => {
 function dataWhereHTML() {
   if (MODE === 'server' && server.hosted) return `your online account (<code>${esc(server.user)}</code>)`;
   if (MODE === 'server') return `<code class="path">${esc(server.file)}</code>`;
-  if (MODE === 'fs' && folder.dir) return `<code>planner.json</code> in the folder “${esc(folder.dir.name)}” you chose (browsers don’t reveal a folder’s full path)`;
-  if (MODE === 'fallback') return 'this browser’s own storage, not a file (Export saves a copy as <code>planner.json</code>)';
+  if (MODE === 'fs' && folder.dir) return `<code>planner.json</code> in the folder “${esc(folder.dir.name)}”`;
+  if (MODE === 'fallback') return 'browser storage (Export to save a copy)';
   return 'nowhere yet (no data file connected)';
 }
 function showStorageInfo() { if (MODE === 'fs') showConnect(folder.dir, null, true); else if (MODE === 'server') server.info(); }
@@ -183,15 +183,15 @@ const server = {
     let data; try { data = migrate(JSON.parse(p.text)); } catch (e) { return this.dropPending(); }
     const when = new Date(p.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     showModal(`<h3>Restore unsaved changes?</h3>
-      <p>This browser kept changes from ${esc(when)} that didn’t reach your account (you were signed out, offline, or the window closed before they were saved).</p>
-      <p class="sub">Restoring replaces the plan you see now with that version; <kbd>⌘Z</kbd> undoes it.</p>
-      <div class="row"><button class="btn primary" id="mRestore">Restore them</button><button class="btn" id="mDiscard">Discard them</button></div>`, false);
+      <p>The browser kept changes from ${esc(when)} that didn’t reach your account.</p>
+      <p class="sub">Restoring replaces the plan you see now with that version.</p>
+      <div class="row"><button class="btn primary" id="mRestore">Restore</button><button class="btn" id="mDiscard">Discard</button></div>`, false);
     $('#mRestore').onclick = () => { this.dropPending(); hideModal(); mutate(() => { state = data; }); toast('Restored your unsaved changes.'); };
     $('#mDiscard').onclick = () => { this.dropPending(); hideModal(); };
   },
   signedOut() {
     showModal(`<h3>You’ve been signed out</h3>
-      <p>Your sign-in expired, so the latest changes couldn’t be saved. They’re kept in this browser: sign in again and you’ll be offered them back.</p>
+      <p>Your sign-in expired, so the latest changes couldn’t be saved. They’re kept in this browser: sign in again to save changes.</p>
       <div class="row"><button class="btn primary" id="mSignIn">Sign in again</button></div>`, false);
     $('#mSignIn').onclick = () => { dirty = false; location.reload(); };
   },
@@ -210,12 +210,12 @@ const server = {
   async reload() { this.tag = null; try { await this.open(await this.fetch()); } catch (e) { setStatus('Not connected', 'err'); } },
   info() {
     if (this.hosted) {
-      showModal(`<h3>Your data</h3><p>Saving to your online account (<code>${esc(this.user)}</code>) as you go. A copy is kept each day (last 14). Export and Import are in the account menu (the round button at the top right).</p>
+      showModal(`<h3>Your data</h3><p>Saving to your online account (<code>${esc(this.user)}</code>).</p>
       <div class="row"><button class="btn primary" id="mClose">Close</button><button class="btn" id="mOut">Sign out</button></div>`);
       $('#mClose').onclick = hideModal; $('#mOut').onclick = () => this.signOut();
       return;
     }
-    showModal(`<h3>Data file</h3><p>Saving to <code>${esc(this.file)}</code> through the Planner server on this computer. One copy per day is kept in the <code>backups</code> folder next to it (last 14).</p>
+    showModal(`<h3>Data file</h3><p>Saving to <code>${esc(this.file)}</code>.</p>
     <div class="row"><button class="btn primary" id="mClose">Close</button></div>`);
     $('#mClose').onclick = hideModal;
   },
@@ -301,16 +301,16 @@ function showConnect(h, err, fromStatus) {
   const fh = folder.file, open = fromStatus && fh;
   setStatus(fh ? (dirty ? 'Unsaved' : 'Saved') : 'Not connected', fh ? (dirty ? 'busy' : 'ok') : 'err');
   showModal(`<h3>${open ? 'Data folder' : 'Open your planner data'}</h3>
-    ${open ? `<p>Saving to <code>${esc(folder.dir.name)}/planner.json</code>. Backups are in <code>${esc(folder.dir.name)}/backups/</code>.</p>` :
-    `<p>Choose the folder that holds (or should hold) your <code>planner.json</code>. The file is created if it doesn’t exist, and saved automatically after every change.</p>
-    <p class="sub">A folder of its own, such as <code>PlannerData</code> in your home folder, keeps your plan apart from the app’s code (it’s also where the Planner server keeps it, so you can switch between the two).</p>`}
+    ${open ? `<p>Saving to <code>${esc(folder.dir.name)}/planner.json</code></p>` :
+    `<p>Choose the folder that holds (or should hold) your <code>planner.json</code></p>
+    <p class="sub">A folder of its own, such as <code>PlannerData</code> in your home folder, to store your plan</p>`}
     ${err ? `<p style="color:var(--danger)">${esc(err)}</p>` : ''}
     <div class="row">
       ${h && !open ? `<button class="btn primary" id="mRe">Open “${esc(h.name)}”</button>` : ''}
       <button class="btn ${h ? '' : 'primary'}" id="mChoose">${h ? 'Choose a different folder…' : 'Choose folder…'}</button>
       ${open ? `<button class="btn primary" id="mClose">Close</button>` : ''}
     </div>
-    ${h && !open ? `<p class="sub" style="margin-top:14px">When Planner is installed as an app, Chrome remembers this permission. Otherwise it asks once per session; if it offers “Allow on every visit”, choose that.</p>` : ''}`,
+    ${h && !open ? `<p class="sub" style="margin-top:14px">When Planner is installed as an app, Chrome remembers this permission</p>` : ''}`,
     !!open);
   if ($('#mRe')) $('#mRe').onclick = async () => {
     try { if (await h.requestPermission({ mode: 'readwrite' }) === 'granted') folder.open(h); }
@@ -337,7 +337,7 @@ function fbStatus() {
   const u = unexported();
   setStatus(u ? 'Not exported' : 'Exported', u ? 'busy' : 'ok');
   $('#exportBtn').classList.toggle('primary', u);
-  $('#exportBtn').title = u ? 'Changes since your last export — export to save them to a file' : 'planner.json is up to date';
+  $('#exportBtn').title = u ? 'Export your unsaved changes' : 'planner.json is up to date';
 }
 function markExported() { lastExported = JSON.stringify(state); try { localStorage.setItem('planner.exported', lastExported); } catch (e) {} }
 function startFallback() {
@@ -366,7 +366,7 @@ $('#importFile').onchange = async e => {
     if (!d.settings && state.settings) d.settings = state.settings;   // a file without settings keeps the ones in use
     mutate(() => { state = d; });
     if (MODE === 'fallback') { markExported(); fbStatus(); toast('Imported ' + f.name); }
-    else toast(`Imported ${f.name}. ⌘Z undoes it.`, 5000);
+    else toast(`Imported ${f.name}.`, 5000);
   }
   catch (err) { toast('Import failed: ' + err.message); }
   e.target.value = '';

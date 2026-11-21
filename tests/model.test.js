@@ -105,12 +105,9 @@ test('colors: sub-threads without their own color take shades of the parent', ()
   assert.strictEqual(P.colorOf(P.findThread('s2').t), '#123456');
 });
 
-test('loading scratch tasks: kept in order, bad entries dropped; files without them get an empty list', () => {
-  const P = load({ projects: [], scratch: [{ id: 's1', title: 'buy tips', done: true }, null, { title: '  ' }, { title: 'email Bob' }, 'x'] });
-  const s = JSON.parse(JSON.stringify(P.state.scratch));
-  assert.deepStrictEqual(s.map(x => [x.title, x.done]), [['buy tips', true], ['email Bob', false]]);
-  assert.strictEqual(s[0].id, 's1'); assert.ok(s[1].id);
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(load({ projects: [] }).state.scratch)), []);
+test('a file from before the scratch board was removed: its scratch tasks are dropped on load', () => {
+  const P = load({ projects: [], scratch: [{ id: 's1', title: 'buy tips', done: true }] });
+  assert.strictEqual(P.state.scratch, undefined);
 });
 
 test('unordered threads: no order warnings among their tasks; the flag loads, saves and toggles', () => {

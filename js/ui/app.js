@@ -7,7 +7,7 @@ let rendering = false;     // true while render() runs (focus changes during it 
 let calStale = false;      // the calendar skipped a render while day view / the timeline covered it
 function render() {
   planSettings();
-  rendering = true; computeColors(); renderHeader(); renderTree(); renderScratch();
+  rendering = true; computeColors(); renderHeader(); renderTree();
   if (ui.dayView || admOpen) calStale = true; else { calStale = false; renderCal(); }
   renderDay(); renderAdmire(); rendering = false; if (hl) setHL(hl, true);
 }
@@ -16,7 +16,6 @@ function render() {
 function planSettings() {
   const ch = settingsFromPlan(); if (!ch.length) return;
   if (ch.includes('weekStart')) ui.viewStart = weekStartOf(addDays(ui.viewStart, 3));   // (stays on the same week)
-  if (ch.some(k => /^scratch/.test(k))) scratchForView();
 }
 // a new range of weeks, nothing else changed: just the header and the calendar (the sidebar and the rest stay as they
 // are; redrawing them made each week step stall on a big plan)
@@ -53,7 +52,7 @@ function setRange(first = ui.dayView) {
 }
 
 /* ---------- sidebar resize ---------- */
-// collapsed (ui.sbw = 0), the sidebar and day view's task list keep a slim labeled tab (like the scratch board's)
+// collapsed (ui.sbw = 0), the sidebar and day view's task list keep a slim labeled tab
 const SB_TAB = 30;
 function setSbw(w) {
   ui.sbw = w; if (w) ui.sbwLast = w;
@@ -69,7 +68,7 @@ rz.addEventListener('pointerdown', e => {
   rz.addEventListener('pointermove', move); rz.addEventListener('pointerup', up);
 });
 rz.addEventListener('dblclick', () => { setSbw(ui.sbw ? 0 : (ui.sbwLast || 330)); saveUI(); render(); });
-const sbTab = label => `<button class="sc-tab sb-tab" data-act="sb-show" title="Show sidebar (double-click its edge)">${ICON.dright}<span>${label}</span></button>`;
+const sbTab = label => `<button class="sb-tab" data-act="sb-show" title="Double-click to show">${ICON.dright}<span>${label}</span></button>`;
 $('aside').insertAdjacentHTML('afterbegin', sbTab('Projects / Conflicts'));
 
 /* ---------- events ---------- */
@@ -137,10 +136,6 @@ document.addEventListener('click', e => {
     case 'date': { const f = findTask(id); if (f) editDateIn(a, { value: f.task.date, allowEmpty: true, emptyText: 'no date (unscheduled)', commit: v => moveTask(id, v), clear: f.task.date ? () => moveTask(id, null) : null }); break; }
     case 'reveal': clearTimeout(revealTimer); if (e.detail === 1) revealTimer = setTimeout(() => reveal(id), 250); break;
     case 'openday': openDay(a.dataset.date); break;
-    case 'sc-del': delScratch(id); break;
-    case 'sc-clear': { const n = clearDoneScratch(); if (n) toast(`Deleted ${plural(n, 'completed task')}. ⌘Z to undo.`); break; }
-    case 'sc-hide': toggleScratch(false); break;
-    case 'sc-show': toggleScratch(true); break;
     case 'sb-show': setSbw(Math.max(100, ui.sbwLast || 330)); saveUI(); render(); break;
     case 'dr-toggle': {   // a "+ N completed" line in the sidebar: show / hide those tasks
       const ids = a.dataset.has.split(' '), open = ids.some(x => drOpen.has(x));
@@ -174,7 +169,6 @@ document.addEventListener('pointerdown', () => { ctxEat = false; }, true);
 document.addEventListener('change', e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   if (a.dataset.act === 'done') { const f = findTask(a.dataset.id); if (f) mutate(() => f.task.done = a.checked); }
-  else if (a.dataset.act === 'sc-done') setScratchDone(a.dataset.id, a.checked);
   else if (a.dataset.act === 't-order') setThreadOrdered(a.dataset.id, a.checked);
   else if (a.dataset.act === 'p-order') setProjectOrdered(a.dataset.id, a.checked);
   else if (a.dataset.act === 'color') { const f = findThread(a.dataset.id); if (f) mutate(() => f.t.color = a.value); }
@@ -318,8 +312,6 @@ document.addEventListener('keydown', e => {
   else if (!mod && !e.altKey && e.key.toLowerCase() === 'h') { closeMenu(); showHelp(); }
   else if (!mod && !e.altKey && e.key.toLowerCase() === 's') showSettings();
   else if (admOpen) return;
-  else if (!mod && !e.altKey && e.key.toLowerCase() === 'x') toggleScratch();
-  else if (!mod && !e.altKey && e.key.toLowerCase() === 'n' && ui.scratchOn && ui.scw) { e.preventDefault(); scNew(); }   // (no 'n' typed into the box)
   else if (!mod && !e.altKey && /^[1-5]$/.test(e.key)) ui.dayView ? setDayCount(+e.key) : setWeekCount(+e.key);
   else if (!mod && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) { e.preventDefault(); navStep(-1); }
   else if (!mod && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) { e.preventDefault(); navStep(1); }

@@ -59,7 +59,7 @@ function renderArchive(first) {
   const hadFocus = document.activeElement && document.activeElement.classList.contains('arch-q');
   body.innerHTML = `
     <input class="arch-q" placeholder="Search the archive" value="${esc(archQuery)}" spellcheck="false">
-    ${list.length || pastConfs().length ? '' : '<p class="sub">Nothing archived yet. Hover a project, thread or task in the sidebar and click the box icon to archive it: it disappears from the sidebar but is kept here (and stays on the calendar), and can be restored to where it was.</p>'}
+    ${list.length || pastConfs().length ? '' : '<p class="sub">Nothing archived yet</p>'}
     ${(list.length || pastConfs().length) && !shown.length && !pastC.length ? '<p class="sub">Nothing matches.</p>' : ''}
     <div class="ar-list">${rows}${pastC.map(c => `<div class="ar" data-cfid="${c.id}">
       <div class="ar-main"><div class="ar-t"><span class="kind">conflict</span><b>${esc(c.title)}</b></div>

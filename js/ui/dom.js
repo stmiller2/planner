@@ -60,7 +60,7 @@ function dateHint(inp, opt = {}) {
   const v = parseDateText(inp.value), bad = v === null || (v === '' && !opt.allowEmpty && inp.value.trim() !== '') || (v && opt.min && v < opt.min);
   inp.classList.toggle('bad', !!bad);
   dhint.textContent = v ? (opt.min && v < opt.min ? `before ${fmtShort(opt.min)}` : dayLabel(v)) : v === '' ? (opt.emptyText || '')
-    : 'try Nov 26, 11/26, fri, td, tm, +3' + (opt.allowEmpty ? ', none' : '');
+    : 'try td, tm, Nov 26, etc.';
   if (!dhint.textContent || document.activeElement !== inp) { dhint.style.display = 'none'; return bad ? null : v; }
   const r = inp.getBoundingClientRect(); dhint.style.display = 'block';
   dhint.style.left = Math.min(innerWidth - dhint.offsetWidth - 8, Math.max(8, r.left)) + 'px';
@@ -135,7 +135,6 @@ function startRename(kind, id, el, fresh) {
   if (kind === 'p') { const p = state.projects.find(x => x.id === id); cur = p.name; commit = v => mutate(() => p.name = v); }
   else if (kind === 't') { const f = findThread(id); cur = f.t.name; commit = v => mutate(() => f.t.name = v); }
   else if (kind === 'c') { const c = confs().find(x => x.id === id); cur = c.title; commit = v => mutate(() => c.title = v); }
-  else if (kind === 's') { const x = (state.scratch || []).find(s => s.id === id); if (!x) return; cur = x.title; commit = v => renameScratch(id, v); }
   else if (kind === 'b') { cur = state.title || DEFAULT_TITLE; commit = v => mutate(() => { if (v === DEFAULT_TITLE) delete state.title; else state.title = v; }); }
   else { const f = findTask(id); cur = f.task.title; commit = v => mutate(() => f.task.title = v); }
   const inp = document.createElement('input'); inp.className = 'inl'; inp.value = cur;
@@ -154,10 +153,10 @@ function showWarn(list) {
     return `<div><b>Conflict</b>: ${one ? `“${esc(one.task.title)}” is` : `${ks.size} tasks are`} scheduled during “${esc(c.title)}” (${cfSpan(c)}).</div>`;
   });
   list = list.filter(v => v.kind !== 'cf');
-  // a task as its title, then its own (sub-)thread and number there and its date: “Submit” (Sequencing #3, Nov 4)
-  const where = (k, path, i) => `“${esc(k.title)}” (${esc(path[path.length - 1])} #${i + 1}, ${fmtShort(k.date)})`;
+  // a task as its title: “Submit”
+  const where = k => `“${esc(k.title)}”`;
   const lines = [...cfLines, ...list.slice(0, Math.max(0, 3 - cfLines.length)).map(v => { const pf = findTask(v.prev.id);
-    return `<div><b>Out of order</b>: ${where(v.task, v.path, v.i)} comes before ${where(v.prev, v.prevPath, pf ? pf.i : 0)}, which should be done first.</div>`; })];
+    return `<div><b>Out of order</b>: ${where(v.task)} comes before ${where(v.prev)}, which should be done first.</div>`; })];
   const extra = list.length - Math.max(0, 3 - cfLines.length); if (extra > 0) lines.push(`<div>…and ${extra} more out of order.</div>`);
   $('#warn .msg').innerHTML = lines.join('');
   $('#warn').style.display = 'flex';
@@ -188,8 +187,8 @@ function framedModal(title, body) {
   return card.querySelector('.mbody');
 }
 /* ---------- hover hints (data-hint) ----------
-   Like the header's labels (data-tip), but drawn on top of everything, so panels that hide their overflow (the scratch
-   board) can't clip them: below the element after a moment, kept inside the window. */
+   Like the header's labels (data-tip), but drawn on top of everything, so panels that hide their
+   overflow can't clip them: below the element after a moment, kept inside the window. */
 const hintEl = document.createElement('div'); hintEl.id = 'hint'; document.body.appendChild(hintEl);
 let hintFor = null;
 function hideHint() { hintFor = null; hintEl.classList.remove('on'); }
@@ -216,7 +215,7 @@ function showGuide(el, y, x, right) {
   Object.assign(el.style, { display: 'block', top: (y - (el === insline ? 0.5 : 1)) + 'px', left: (x + inset) + 'px', width: Math.max(20, right - x - inset - 8) + 'px' });
 }
 function hideInsline() { insline.style.display = 'none'; }
-// any scroll (sidebar, day list, scratch board) moves the rows out from under the line: hide it until the next mousemove
+// any scroll (sidebar, day list) moves the rows out from under the line: hide it until the next mousemove
 document.addEventListener('scroll', hideInsline, true);
 
 /* ---------- motion ---------- */

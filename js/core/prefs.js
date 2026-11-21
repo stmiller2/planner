@@ -3,7 +3,7 @@
    this browser (localStorage); the Settings-window ones (setting: true) and some view preferences (sync: true: weeks
    shown, collapsed threads…) also travel with the plan (state.settings in planner.json / the online account:
    settingsToPlan / settingsFromPlan below), so every browser and device using the plan shows the same. Sizes (sidebar,
-   scratch board, Timeline list) and the theme stay per browser.
+   Timeline list) and the theme stay per browser.
    Every saved preference is declared once in UI_PREFS:
      def      default value
      ok(v)    whether a stored value is acceptable (otherwise the default is used)
@@ -34,12 +34,6 @@ const UI_PREFS = {
   sbw:           { def: 330, ok: isNum },                                     // sidebar width (0 = hidden)
   sbwLast:       { def: 330, ok: isNum },
   dayCount:      { def: 1, ok: oneOf(1, 2, 3, 4, 5), sync: true },             // days shown side by side in day view
-  scratchOn:     { def: false, was: true, ok: isBool, setting: true },         // false: no scratch board at all (Settings)
-  scratchCal:    { def: false, ok: isBool, setting: true },                    // scratch board open when you go to the calendar
-  scratchDay:    { def: true, ok: isBool, setting: true },                     // … and when you go to day view
-  scratchRemember: { def: true, ok: isBool, setting: true },                   // true: it stays open / closed as you left it (the two above are ignored)
-  scratchOpen:   { def: false, ok: isBool },                                   // whether it was open last (used when remembering)
-  scwLast:       { def: 280, ok: isNum },                                      // scratch board width (while open)
   admPlanned:    { def: false, ok: isBool, sync: true },                       // timeline: show future tasks
   admSide:       { def: null, ok: isNum },                                     // timeline: list width (null = automatic)
   admWave:       { def: null, ok: isNum },                                     // timeline: wave height
@@ -51,9 +45,8 @@ function loadUI() {
   try { u = JSON.parse(localStorage.getItem('planner.ui') || '{}'); } catch (e) {}
   const out = {}, fresh = !Object.keys(u).length;   // (fresh: nothing saved yet, a new install)
   for (const [k, p] of Object.entries(UI_PREFS)) { const v = u[p.key || k]; out[k] = p.ok(v) ? v : !fresh && 'was' in p ? p.was : prefDefault(k); }
-  // dayView: the date open in day view (null = calendar); scw: the scratch board's width now (0 = closed; it opens or
-  // closes per view as set in Settings, or stays as last left: see scratchForView)
-  return { ...out, dayView: null, scw: (out.scratchRemember ? out.scratchOpen : out.scratchCal) ? out.scwLast : 0 };
+  // dayView: the date open in day view (null = calendar)
+  return { ...out, dayView: null };
 }
 function saveUI() {
   const out = {};

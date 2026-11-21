@@ -2,7 +2,7 @@
 .dn .n{cursor:pointer}
 .dn .n:hover{background:var(--hover);box-shadow:0 0 0 1px var(--line)}
 .day.today .dn .n:hover{background:var(--today);filter:brightness(1.1)}
-#dayview{position:absolute;top:50px;left:0;right:var(--scw);bottom:0;display:none;grid-template-columns:var(--sbw) minmax(0,1fr);background:var(--bg);z-index:8}
+#dayview{position:absolute;top:50px;left:0;right:0;bottom:0;display:none;grid-template-columns:var(--sbw) minmax(0,1fr);background:var(--bg);z-index:8}
 #app.dayon #dayview{display:grid}
 #app.dayon #resizer{z-index:9}
 .dv-side{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}

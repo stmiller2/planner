@@ -262,87 +262,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       });
       assert.ok(/\bd-n\b/.test(x[0]), x[0]); assert.strictEqual(x[1], x[2]);
     });
-    await check('scratch board: off for a new install (remember open / closed on, if turned on)', async () => {
-      assert.deepStrictEqual(await page.evaluate(() => [ui.scratchOn, ui.scratchRemember, ui.scratchCal, ui.scratchDay]), [false, true, false, true]);
-      assert.ok(!(await page.isVisible('#scratch')));
-      await page.keyboard.press('x'); assert.ok(!(await page.isVisible('#scratch')), 'X does nothing while off');
-      // on, and per view, for the checks below
-      await page.keyboard.press('s'); await page.click('#modal input[data-set="scratchOn"] + .track');
-      await page.click('#modal input[data-set="scratchRemember"] + .track'); await page.click('#sClose');
-      assert.ok(await page.isVisible('#scratch .sc-tab'));
-    });
-    await check('scratch board (per view): closed in calendar view, open in day view; X opens / closes it', async () => {
-      const open = () => page.isVisible('#scratch .sc-head');
-      assert.ok(!(await open()) && await page.isVisible('#scratch .sc-tab'), 'closed in calendar view');
-      const g0 = (await page.locator('main').boundingBox()).width;
-      await page.keyboard.press('x'); await sleep(100);
-      assert.ok(await open()); assert.strictEqual(await page.textContent('#scratch .sc-head h2'), 'Scratch board');
-      assert.ok((await page.locator('main').boundingBox()).width < g0, 'calendar makes room');
-      await page.keyboard.press('s'); await page.keyboard.press('x'); assert.ok(!(await page.isVisible('#modal'))); assert.ok(!(await open()));
-      await page.keyboard.press('d'); assert.ok(await open(), 'open in day view');
-      await page.keyboard.press('x'); assert.ok(!(await open()));
-      await page.keyboard.press('c'); assert.ok(!(await open()));
-      // Settings: open in calendar view too (takes effect right away in the view you're in)
-      await page.keyboard.press('s'); await page.click('#modal input[data-set="scratchCal"] + .track'); await page.click('#sClose');
-      assert.ok(await open());
-      await page.keyboard.press('s'); await page.click('#modal input[data-set="scratchCal"] + .track'); await page.click('#sClose');
-      assert.ok(!(await open()));
-      // Remember: the per-view switches grey out, and the board stays as you left it across views
-      await page.keyboard.press('s'); await page.click('#modal input[data-set="scratchRemember"] + .track');
-      assert.ok(await page.evaluate(() => $('#modal .ssub').classList.contains('off') && $('#modal input[data-set="scratchDay"]').disabled));
-      await page.click('#sClose');
-      await page.keyboard.press('d'); assert.ok(!(await open()), 'stays closed in day view');
-      await page.keyboard.press('x'); await page.keyboard.press('c'); assert.ok(await open(), 'stays open in the calendar');
-      assert.strictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('planner.ui')).scratchOpen), true);
-      await page.keyboard.press('s'); await page.click('#modal input[data-set="scratchRemember"] + .track'); await page.click('#sClose');
-      assert.ok(!(await open()), 'back to per view: closed in the calendar');
-    });
-    await check('scratch board turned off in Settings: no panel or tab, X does nothing, the calendar takes the room', async () => {
-      const g0 = (await page.locator('main').boundingBox()).width;
-      await page.keyboard.press('s'); await page.click('#modal input[data-set="scratchOn"] + .track');
-      assert.ok(await page.evaluate(() => $('#modal .sgrp').classList.contains('off') && $('#modal input[data-set="scratchRemember"]').disabled));
-      await page.click('#sClose');
-      assert.ok(!(await page.isVisible('#scratch')) && !(await page.isVisible('.sc-rz')));
-      assert.ok((await page.locator('main').boundingBox()).width > g0, 'no collapsed tab column');
-      await page.keyboard.press('x'); assert.ok(!(await page.isVisible('#scratch')));
-      await page.keyboard.press('d'); assert.ok(!(await page.isVisible('#scratch')), 'not in day view either');
-      await page.keyboard.press('s'); await page.click('#modal input[data-set="scratchOn"] + .track'); await page.click('#sClose');
-      assert.ok(await page.isVisible('#scratch .sc-head'), 'back on: open in day view, as set');
-      await page.keyboard.press('c'); assert.ok(await page.isVisible('#scratch .sc-tab'));
-    });
-    await check('day view: scratch board (add, insert, tick, rename, clear done, delete, collapse)', async () => {
-      await page.keyboard.press('d');
-      const titles = () => page.evaluate(() => (state.scratch || []).map(s => s.title + (s.done ? ' ✓' : '')));
-      assert.ok(await page.isVisible('#scratch .sc-head'));
-      await page.click('#scratch .sc-add.idle'); await page.keyboard.type('Order tips'); await page.keyboard.press('Enter');
-      await page.keyboard.type('Call facilities'); await page.keyboard.press('Enter');
-      assert.ok(await page.evaluate(() => document.activeElement.classList.contains('sc-add')), 'box stays open for the next one');
-      await page.keyboard.press('Escape');
-      assert.deepStrictEqual(await titles(), ['Order tips', 'Call facilities']);
-      assert.strictEqual(await page.evaluate(() => ui.dayView), '2026-10-28', 'Esc in the box should not close day view');
-      // click the seam between the two rows: a box right there
-      const r = await page.locator('#scratch .sc-row').nth(1).boundingBox();
-      await page.mouse.move(r.x + 40, r.y + 1); await page.mouse.down(); await page.mouse.up();
-      await page.keyboard.type('Between'); await page.keyboard.press('Enter'); await page.keyboard.press('Escape');
-      assert.deepStrictEqual(await titles(), ['Order tips', 'Between', 'Call facilities']);
-      await page.click('#scratch .sc-row:nth-child(1) input[type=checkbox]');
-      await page.dblclick('#scratch .sc-row:nth-child(3) .title'); await page.keyboard.press('Meta+a'); await page.keyboard.press('Control+a');
-      await page.keyboard.type('Call EHS'); await page.keyboard.press('Enter');
-      assert.deepStrictEqual(await titles(), ['Order tips ✓', 'Between', 'Call EHS']);
-      await page.click('#scratch [data-act="sc-clear"]');
-      assert.deepStrictEqual(await titles(), ['Between', 'Call EHS']);
-      await page.hover('#scratch .sc-row:nth-child(1)'); await page.click('#scratch .sc-row:nth-child(1) [data-act="sc-del"]');
-      assert.deepStrictEqual(await titles(), ['Call EHS']);
-      // the 1–5 days buttons line up 16px left of the panel's edge
-      const al = await page.evaluate(() => [$('#dvcount').getBoundingClientRect().right, $('#scratch').getBoundingClientRect().left]);
-      assert.ok(Math.abs(al[1] - al[0] - 16) <= 2, JSON.stringify(al));
-      await page.click('#scratch [data-act="sc-hide"]');
-      assert.ok(await page.isVisible('#scratch .sc-tab')); assert.strictEqual(await page.evaluate(() => ui.scw), 0);
-      await page.click('#scratch .sc-tab'); assert.ok(await page.evaluate(() => ui.scw > 0));
-      await sleep(600);
-      assert.deepStrictEqual(JSON.parse(fs.readFileSync(DATA, 'utf8')).scratch.map(s => s.title), ['Call EHS']);
-      await page.keyboard.press('c');
-    });
     await check('task gear menu: notes (shown after resting on a task), delete, and the delete button staying 2 s', async () => {
       await page.keyboard.press('Escape'); await page.keyboard.press('c'); await sleep(300);
       const row = id => `#tree .task[data-id="${id}"]`, visible = sel => page.locator(sel).isVisible();
@@ -637,10 +556,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.strictEqual((await task('m3')).date, d1);
       await page.keyboard.press('Control+z'); assert.strictEqual((await task('m3')).date, d0);
     });
-    await check('Help shows where the data is; Settings > Data file moves it to another folder', async () => {
-      await page.keyboard.press('h');
-      assert.ok((await page.textContent('#modal .mbody')).includes(DATA), 'full path in Help');
+    await check('Settings shows where the data is, and Data file moves it to another folder', async () => {
       await page.keyboard.press('s');
+      assert.ok((await page.textContent('#modal .mbody')).includes(DATA), 'full path in Settings');
       const moved = path.join(dir, 'Moved here');
       await page.fill('#modal .dfin', moved); await page.click('#dfGo'); await sleep(400);
       assert.ok(fs.existsSync(path.join(moved, 'planner.json')), 'copied');

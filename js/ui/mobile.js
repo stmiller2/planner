@@ -89,12 +89,12 @@ async function mPtEnd(cancelled) {
   const el = $('#mPtr'); mPtrAt(M_PTR * 0.8, false, true); el.classList.add('spin');
   const why = await refreshPage();   // (nothing comes back if the page reloads)
   el.classList.remove('spin'); mPtrAt(0, false, true);
-  if (why === 'offline') toast('Couldn’t reach your plan to refresh. Check your connection and try again.', 4000);
+  if (why === 'offline') toast('Couldn’t reach your plan. Check your connection and try again.', 4000);
 }
 
 /* ---------- header and drawer ---------- */
 $('header').insertAdjacentHTML('afterbegin', `<button class="ic" id="mBurger" aria-label="Menu">${svg('<path d="M4 6h16M4 12h16M4 18h16"/>')}</button>`
-  + `<button class="ic" id="mBack" aria-label="Back to the calendar">${svg('<path d="m15 18-6-6 6-6"/>')}</button>`);
+  + `<button class="ic" id="mBack" aria-label="Back to calendar">${svg('<path d="m15 18-6-6 6-6"/>')}</button>`);
 // day view has no drawer: in ☰'s place, a way back to the calendar (css shows one or the other)
 $('#mBack').onclick = () => { closeMenu(); closeDay(); };
 $('#app').insertAdjacentHTML('beforeend', '<div id="mScrim"></div>');
@@ -198,15 +198,16 @@ function mBackEnd(cancelled) {
   }, 230);
 }
 /* Into and out of day view by a tap (a day, its "+N more", Open day, the view switcher; the back button, the view
-   switcher, Esc). Going in, day view opens out of the day's own square on the calendar: it starts as that square, its
-   outline picked out, and grows to fill the screen (a clip, so nothing in it is stretched), the calendar staying put
-   under it; day view's own contents fade in as it opens. Going back, the reverse (the calendar drawn first, as mBackMove
-   does): its contents fade, and it shrinks back into the day's square and fades away there. (A day whose square isn't
-   on screen: a square in the middle.) Sliding sideways is only for the edge swipe (mBackMove). Meanwhile the calendar
-   shows under day view (css #app.m-zoom). openDay calls mDayIn after drawing day view; closeDay(now) hands over to
-   mDayOut, which calls closeDay(true) once it's out. The header's title changes with it, faded across. mDayA: the
-   animation under way. */
-const M_DAYIN = 420, M_DAYOUT = 340, M_ZEASE = 'cubic-bezier(.32,.72,0,1)';
+   switcher, Esc). Going in, the day's square on the calendar fills the screen: day view starts clipped to that square,
+   its outline picked out (a frame riding the clip's edge, .m-zframe), and the clip opens quickly to the whole screen
+   (nothing in it is stretched). Inside it, what the day showed on the calendar (a copy of its square, held where it
+   was) fades out as day view's own contents fade in. Going back, the reverse (the calendar drawn first, as mBackMove
+   does): day view's contents fade to the day's square on the calendar as the clip closes down onto it, which is then
+   just the calendar again. (A day whose square isn't on screen: a square in the middle, nothing in it.) Sliding sideways
+   is only for the edge swipe (mBackMove). Meanwhile the calendar shows under day view (css #app.m-zoom). openDay calls
+   mDayIn after drawing day view; closeDay(now) hands over to mDayOut, which calls closeDay(true) once it's out. The
+   header's title changes with it, faded across. mDayA: the animation under way. */
+const M_DAYIN = 340, M_DAYOUT = 300, M_ZEASE = 'cubic-bezier(.2,.8,.2,1)';
 let mDayA = null;
 const mTitleFade = () => { const r = $('#range'); if (r.animate && MOTION()) r.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' }); };
 function mDayZoom(out) {
@@ -214,21 +215,35 @@ function mDayZoom(out) {
   const cell = $(`#grid .day:not(.nb)[data-date="${ui.dayView}"]`), cr = cell && cell.getBoundingClientRect();
   const seen = cr && cr.width && cr.bottom > mr.top && cr.top < mr.bottom;
   const r = seen ? cr : { left: box.left + box.width * .36, right: box.right - box.width * .36, top: box.top + box.height * .36, bottom: box.bottom - box.height * .36 };
-  // the day's square, as a clip of day view's box (top right bottom left), and the whole box
+  // the day's square, as a clip of day view's box (top right bottom left) and as a frame's place; and the whole box
   const px = v => Math.max(0, v).toFixed(1) + 'px';
-  const sq = `inset(${px(r.top - box.top)} ${px(box.right - r.right)} ${px(box.bottom - r.bottom)} ${px(r.left - box.left)} round 4px)`, all = 'inset(0px 0px 0px 0px round 0px)';
-  const ring = 'inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent)', none = 'inset 0 0 0 1.5px transparent';
+  const sq = `inset(${px(r.top - box.top)} ${px(box.right - r.right)} ${px(box.bottom - r.bottom)} ${px(r.left - box.left)} round 3px)`, all = 'inset(0px 0px 0px 0px round 0px)';
+  const fSq = { left: r.left + 'px', top: r.top + 'px', width: (r.right - r.left) + 'px', height: (r.bottom - r.top) + 'px', borderRadius: '3px' };
+  const fAll = { left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', height: box.height + 'px', borderRadius: '0px' };
+  const parts = [...dvBox.children];   // (day view's own contents, before the copy joins them)
+  // what the day showed on the calendar: a copy of its square, held where it is, inside day view (so the clip cuts it too)
+  let copy = null;
+  if (seen) {
+    copy = cell.cloneNode(true); copy.classList.add('m-zcopy'); copy.removeAttribute('data-date');
+    copy.querySelectorAll('[data-id], [data-fid], [data-act]').forEach(n => { delete n.dataset.id; delete n.dataset.fid; n.removeAttribute('data-act'); });
+    Object.assign(copy.style, { left: cr.left + 'px', top: cr.top + 'px', width: cr.width + 'px', height: cr.height + 'px', gridRow: '', gridColumn: '' });
+    dvBox.appendChild(copy);
+  }
+  const frame = document.createElement('div'); frame.className = 'm-zframe'; document.body.appendChild(frame);
   $('#app').classList.add('m-zoom');
-  const o = { duration: out ? M_DAYOUT : M_DAYIN, easing: M_ZEASE, fill: 'both' };
-  const a = dvBox.animate(out
-    ? [{ clipPath: all, boxShadow: none, opacity: 1 }, { opacity: 1, offset: .75 }, { clipPath: sq, boxShadow: ring, opacity: 0 }]
-    : [{ clipPath: sq, boxShadow: ring, opacity: 0 }, { opacity: 1, offset: .18 }, { clipPath: all, boxShadow: none, opacity: 1 }], o);
-  // its contents (the timeline, the task list's sheet): fading in once it has opened a way, or out first
-  const fades = [...dvBox.children].map(el => el.animate(out ? [{ opacity: 1 }, { opacity: 0, offset: .4 }, { opacity: 0 }] : [{ opacity: 0 }, { opacity: 0, offset: .35 }, { opacity: 1 }], o));
+  const o = { duration: out ? M_DAYOUT : M_DAYIN, easing: M_ZEASE, fill: 'both' }, lin = { duration: o.duration, fill: 'both' };
+  const a = dvBox.animate(out ? [{ clipPath: all }, { clipPath: sq }] : [{ clipPath: sq }, { clipPath: all }], o);
+  const anims = [a,
+    frame.animate(out ? [{ ...fAll, opacity: 0 }, { ...fSq, opacity: 1 }] : [{ ...fSq, opacity: 1 }, { ...fAll, opacity: 0 }], o),
+    // the crossfade inside it (by time, not the clip's easing: the calendar's chips go quickly, day view comes in after)
+    ...parts.map(el => el.animate(out ? [{ opacity: 1 }, { opacity: 0, offset: .45 }, { opacity: 0 }] : [{ opacity: 0 }, { opacity: 0, offset: .15 }, { opacity: 1, offset: .7 }, { opacity: 1 }], lin)),
+    ...(copy ? [copy.animate(out ? [{ opacity: 0 }, { opacity: 0, offset: .35 }, { opacity: 1, offset: .8 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0, offset: .45 }, { opacity: 0 }], lin)] : []),
+  ];
   const h = mDayA = { a, out, done() {
     if (mDayA !== h) return; mDayA = null;
+    if (copy) copy.remove(); frame.remove();
     if (out) closeDay(true);
-    a.cancel(); fades.forEach(f => f.cancel()); $('#app').classList.remove('m-zoom');
+    anims.forEach(x => x.cancel()); $('#app').classList.remove('m-zoom');
   } };
   a.onfinish = h.done;
 }
@@ -746,9 +761,9 @@ function mReschedule(id) {
   if (cur) chips.push({ label: '+1 day', value: addDays(cur, 1) }, { label: '+1 week', value: addDays(cur, 7) }, { label: 'No date', value: null });
   else chips.push({ label: 'Next week', value: addDays(t, 7) });
   mAsk({ title: 'Reschedule', menuFor: id, sub: f.task.title + (cur ? ` · now ${fmtShort(cur)}` : ' · not scheduled'), value: cur ? fmtShort(cur) : '', placeholder: 'e.g. fri, Nov 26, +3', chips,
-    read: s => { const v = parseDateText(s); return v === null ? { ok: false, hint: 'try Nov 26, 11/26, fri, td, tm, +3, none' } : v === '' ? { ok: true, hint: 'no date (unscheduled)', value: null } : { ok: true, hint: dayLabel(v), value: v }; },
+    read: s => { const v = parseDateText(s); return v === null ? { ok: false, hint: 'try td, tm, Nov 26, etc.' } : v === '' ? { ok: true, hint: 'no date (unscheduled)', value: null } : { ok: true, hint: dayLabel(v), value: v }; },
     // (as Option on desktop: just this task, its links cut, the rest of its thread left where it is; where that differs)
-    toggle: mSplitMatters(f) ? { label: 'Only this task', note: 'Unlinks it and leaves the rest of its thread where it is' } : null,
+    toggle: mSplitMatters(f) ? { label: 'This task only', note: 'Unlinks and doesn’t shift later tasks' } : null,
     done: (v, only) => {
       if (v === cur || !findTask(id)) return;
       moveTask(id, v, only);
@@ -814,7 +829,7 @@ function mAddTask(tid, day) {
   if (!(tid && findThread(tid))) tid = mGuessThread(day, only);
   const box = $('#mAsk'), card = $('.ma-card', box), off = t => only && !only.has(t.id) ? ' mp-off' : '';
   card.innerHTML = `<div class="ma-h">New task</div>
-    <div class="ma-pick"><div class="ma-sub">${only ? 'Which thread? (those on this day)' : 'Which thread?'}</div><div class="mp-list${only ? ' only' : ''}">${state.projects.map(p => {
+    <div class="ma-pick"><div class="ma-sub">Which thread?</div><div class="mp-list${only ? ' only' : ''}">${state.projects.map(p => {
       const rows = mThreadRows(p), none = only && !rows.some(({ t }) => only.has(t.id)) ? ' mp-off' : '';
       return `<div class="mp-p${none}">${esc(p.name)}</div>` + (rows.map(({ t, depth }) => `<button class="mp-t${off(t)}" data-tid="${t.id}" style="--c:${esc(colorOf(t))};--d:${depth}"><span class="mt-dot"></span><span class="mt-nm">${esc(t.name)}</span></button>`).join('')
         || `<div class="mp-none${none}">No threads yet</div>`);
@@ -828,7 +843,7 @@ function mAddTask(tid, day) {
   if (day) when.value = fmtShort(day);
   let added = null;
   const date = () => parseDateText(when.value);   // '' = none, null = can't read it
-  const check = () => { const d = date(); hint.classList.toggle('bad', d === null); hint.textContent = d === null ? 'try Nov 26, 11/26, fri, td, tm, +3' : added ? `Added “${added}”` : d ? dayLabel(d) : 'No date: at the end of the thread'; return d; };
+  const check = () => { const d = date(); hint.classList.toggle('bad', d === null); hint.textContent = d === null ? 'try td, tm, Nov 26, etc.' : added ? `Added “${added}”` : d ? dayLabel(d) : ''; return d; };
   // the thread: picked (the form, its name typed into straight away) or being picked (the list, the current one marked)
   const pick = id => {
     const f = findThread(id); if (!f) return;
@@ -1189,7 +1204,7 @@ function mCfDates(id) {
   si.value = c.start ? fmtShort(c.start) : ''; ei.value = c.start && c.end !== c.start ? fmtShort(c.end) : '';
   const read = () => {
     const a = parseDateText(si.value), b = ei.value.trim() ? parseDateText(ei.value, a || todayISO()) : '';
-    const bad = !a ? 'Start: try Nov 26, 11/26, fri, +3' : b === null ? 'End: try Nov 26, 11/26, fri, +3' : b && b < a ? 'End is before the start' : '';
+    const bad = !a ? 'Start: try td, tm, Nov 26, etc.' : b === null ? 'End: try td, tm, Nov 26, etc.' : b && b < a ? 'End is earlier than start' : '';
     hint.textContent = bad || (b && b !== a ? `${dayLabel(a)} – ${dayLabel(b)}` : dayLabel(a)); hint.classList.toggle('bad', !!bad); okb.disabled = !!bad;
     return bad ? null : { a, b: b || a };
   };
@@ -1285,14 +1300,14 @@ function mNotes(id, editing) {
   const close = () => { box.classList.remove('on'); const ta = card.querySelector('textarea'); if (ta) ta.blur(); mMenuBack(id); };
   box.onclick = e => { if (e.target === box) close(); };
   if (!editing && notes) {
-    card.innerHTML = `${head}<div class="mn-b">${linkifyNotes(notes)}</div><div class="mn-k">Tap the notes to edit</div>
+    card.innerHTML = `${head}<div class="mn-b">${linkifyNotes(notes)}</div><div class="mn-k">Tap to edit notes</div>
       <div class="ma-btns"><button class="btn ma-no">Close</button><button class="btn primary mn-ed">Edit</button></div>`;
     card.onclick = e => {
       if (e.target.closest('a')) return;   // (a link: just opens it)
       if (e.target.closest('.mn-b, .mn-ed')) mNotes(id, true); else if (e.target.closest('.ma-no')) close();
     };
   } else {
-    card.innerHTML = `${head}<textarea class="mn-ta" spellcheck="true" placeholder="Anything to remember for this task"></textarea>
+    card.innerHTML = `${head}<textarea class="mn-ta" spellcheck="true" placeholder="Additional notes"></textarea>
       <div class="ma-btns">${notes ? '<button class="btn mn-del">Delete</button><span class="m-sp"></span>' : ''}<button class="btn ma-no">Cancel</button><button class="btn primary ma-ok">Save</button></div>`;
     const ta = card.querySelector('textarea'); ta.value = notes;
     const fit = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, innerHeight * 0.45) + 'px'; };

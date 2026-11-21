@@ -29,7 +29,7 @@ export default {
       return reply(405, 'Method not allowed', { Allow: 'GET, HEAD, PUT' });
     } catch (e) {
       console.error(e);
-      return reply(503, `The database couldn’t be reached (${e.message}). If the daily free limit was used up, it resets at midnight UTC.`);
+      return reply(503, `The database couldn’t be reached (${e.message})`);
     }
   },
 };
@@ -55,7 +55,7 @@ async function save(request, env, email, url) {
   if (!(request.headers.get('Content-Type') || '').startsWith('application/json')) return reply(415, 'Expected application/json');
   const body = await request.text();
   const bytes = new TextEncoder().encode(body).length;
-  if (bytes > MAX_BYTES) return reply(413, `Your plan is too large to save online (${(bytes / 1e6).toFixed(2)} MB; the limit is ${MAX_BYTES / 1e6} MB). Archiving or deleting old projects makes it smaller.`);
+  if (bytes > MAX_BYTES) return reply(413, `Your plan is too large to save online (${(bytes / 1e6).toFixed(2)} MB of max ${MAX_BYTES / 1e6} MB). Try archiving or deleting old projects to make it smaller.`);
   try {
     const doc = JSON.parse(body);
     if (!doc || typeof doc !== 'object' || Array.isArray(doc) || !Array.isArray(doc.projects)) throw new Error('not a planner document');

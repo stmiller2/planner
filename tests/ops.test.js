@@ -139,25 +139,6 @@ test('conflicts: changing dates keeps them valid, deleting removes them', () => 
   assert.strictEqual(P.state.conflicts.length, 0);
 });
 
-test('scratch tasks: add (at the end or before one), tick, reorder, clear done, delete; undo', () => {
-  const P = load(plan([TH('t', [T('a')])]));
-  const titles = () => j(P.state.scratch.map(s => s.title));
-  const [x] = P.addScratch(['  first ', '']);
-  P.addScratch(['second', 'third']);
-  assert.deepStrictEqual(titles(), ['first', 'second', 'third']);
-  const third = P.state.scratch[2].id;
-  P.addScratch(['before third'], third);
-  assert.deepStrictEqual(titles(), ['first', 'second', 'before third', 'third']);
-  P.moveScratch(x, null); assert.deepStrictEqual(titles(), ['second', 'before third', 'third', 'first']);
-  P.moveScratch(x, P.state.scratch[0].id); assert.deepStrictEqual(titles(), ['first', 'second', 'before third', 'third']);
-  P.setScratchDone(x, true); P.setScratchDone(third, true);
-  assert.strictEqual(P.clearDoneScratch(), 2);
-  assert.deepStrictEqual(titles(), ['second', 'before third']);
-  P.undo(); assert.deepStrictEqual(titles(), ['first', 'second', 'before third', 'third']);
-  P.delScratch(x); assert.deepStrictEqual(titles(), ['second', 'before third', 'third']);
-  assert.strictEqual(P.findThread('t').t.tasks.length, 1);   // nothing to do with any project
-});
-
 test('task notes: set, trimmed, cleared when empty, one undo step each, and kept through archive / restore', () => {
   const P = load(plan([TH('t', [T('a', '2026-11-02'), T('b')])]));
   P.setTaskNotes('a', '  use 2x buffer\nfreezer B, shelf 3 \n');

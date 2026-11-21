@@ -3,7 +3,7 @@
 body.mobile{touch-action:manipulation}   /* (no double-tap zoom delay) */
 body.mobile #app{grid-template-columns:minmax(0,1fr);grid-template-rows:60px minmax(0,1fr);height:100dvh}
 body.mobile :is(#dayview,#admire){top:60px}   /* (below the taller header) */
-body.mobile :is(#scratch,.sc-rz,#resizer,.sb-tab){display:none !important}
+body.mobile :is(#resizer,.sb-tab){display:none !important}
 
 /* header: ☰ · dates · Today · view switcher (the rest is in the drawer's top bar), sized for thumbs */
 body.mobile header{gap:8px;padding:0 8px 0 4px}
@@ -96,6 +96,9 @@ body.mobile #app.m-backing #dayview{z-index:6;box-shadow:-10px 0 30px rgba(0,0,0
 /* zooming into a day and back out (mDayZoom): the calendar shows under day view, which fades over it */
 body.mobile #app.dayon.m-zoom main{visibility:visible}
 body.mobile #app.m-zoom #dayview{z-index:6}
+/* (the day's square as the calendar showed it, fading inside day view as it opens; the outline riding its edge) */
+body.mobile #dayview .m-zcopy{position:fixed;z-index:40;margin:0;box-sizing:border-box;pointer-events:none}
+.m-zframe{position:fixed;z-index:7;pointer-events:none;box-sizing:border-box;border:1.5px solid color-mix(in srgb,var(--accent) 60%,transparent)}
 body.mobile #dow div{padding:4px 0;text-align:center;font-size:10px;letter-spacing:.03em}
 body.mobile .day{padding:4px 2px 2px}   /* (the top padding and .dn's height match CF_TOP, where conflict bars start) */
 body.mobile .dn{padding-left:0;padding-right:0}

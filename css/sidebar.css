@@ -3,7 +3,11 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 #resizer{position:absolute;top:50px;bottom:0;left:calc(var(--sbw) - 4px);width:8px;cursor:col-resize;z-index:6}
 #resizer::after{content:'';position:absolute;left:3px;top:0;bottom:0;width:2px;background:transparent;transition:background .12s}
 #resizer:hover::after,body.resizing #resizer::after{background:var(--accent)}
-/* collapsed: the sidebar (and day view's task list) shrink to a slim labeled tab (.sc-tab look, scratch.css) */
+/* collapsed: the sidebar (and day view's task list) shrink to a slim labeled tab down the edge */
+.sb-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 0;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase}
+.sb-tab:hover{background:var(--hover);color:var(--ink)}
+.sb-tab svg{width:14px;height:14px;flex:none}
+.sb-tab span{writing-mode:vertical-rl;white-space:nowrap}
 #app:not(.sbhidden) .sb-tab{display:none}
 #app.sbhidden aside>:not(.sb-tab),#app.sbhidden .dv-side>:not(.sb-tab){display:none}
 .sb-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:2px 6px;padding:10px 12px 6px}

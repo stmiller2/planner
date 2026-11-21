@@ -1,8 +1,7 @@
 'use strict';
 /* Day view (click a date number): the list of the day's tasks on the left and an hour-by-hour timeline in the
    middle, for 1–5 days side by side; adding tasks to a day; and swiping sideways between days. Editing on the
-   timeline (dragging blocks, typing times, tooltips) is in dayview-edit.js. (The scratch board on the right belongs
-   to both the calendar and day view: scratch.js.) */
+   timeline (dragging blocks, typing times, tooltips) is in dayview-edit.js. */
 // a task's slot in the day is task.plan (see planOf in core/model.js); nothing here affects the calendar
 let PPM = 64 / 60;            // pixels per minute; recomputed so the chosen hours fill the window
 const MIN_PPM = 0.4;           // floor so blocks stay usable on a short window with many hours in view
@@ -27,7 +26,7 @@ let dvAdd = null;   // open new-task box in the day list, right below a task: { 
 function openDay(d) {
   if (MOBILE && mDayA && mDayA.out) mDayStop();   // (mobile: sliding out to the calendar still: out first)
   const first = !ui.dayView;
-  ui.dayView = d; if (first) scratchForView(); closeMenu(); hideInsline(); closeTimePop(false); dvAdd = null;
+  ui.dayView = d; closeMenu(); hideInsline(); closeTimePop(false); dvAdd = null;
   // start scrolled to the earliest planned block in view; otherwise to about now (today) or 8am
   const starts = dvDays().flatMap(x => dayTasks(x)).map(it => planOf(it.k)).filter(Boolean).map(p => p.start);
   const n = new Date(), nowM = n.getHours() * 60 + n.getMinutes();
@@ -40,7 +39,7 @@ function openDay(d) {
 // now: at once (mobile otherwise slides day view away first: mDayOut, which calls this again with now set)
 function closeDay(now) {
   if (MOBILE && !now && mDayOut()) return;
-  closeTimePop(false); ui.dayView = null; dvAdd = null; scratchForView(); render();
+  closeTimePop(false); ui.dayView = null; dvAdd = null; render();
 }
 
 // add tasks dated to `day`, right after a listed task in its thread (joining its chain same-day if it's linked to
@@ -117,7 +116,7 @@ function renderDayList(box, only, cur = ui.dayView) {
   const row = MOBILE && !!only;
   const days = only || dvDays(), multi = dayN() > 1, solo = !!only && !multi, today = todayISO(), listEl = box.querySelector('.dv-list');
   const keepEl = box.querySelector('.dvadd'), keep = keepEl ? keepEl.value : '', keepTop = listEl.scrollTop;
-  const addBox = tid => `<input class="add dvadd" data-tid="${tid}" placeholder="New task (Enter to add, Esc to stop)">`;
+  const addBox = tid => `<input class="add dvadd" data-tid="${tid}" placeholder="New task">`;
   let html = '';
   days.forEach(day => {
     const items = dayTasks(day), all = dayItems(day);   // failed attempts among them, each where it happened (see dayItems)
