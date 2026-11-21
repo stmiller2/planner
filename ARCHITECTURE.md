@@ -64,9 +64,10 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         the left edge, swiped back to close (`mEdge` / `mClose`, `mDrawerAt` / `mDrawerLet`); in day
                         view a back button (#mBack) in ☰'s place, and the edge swipe goes back to the calendar
                         (`mBackMove` / `mBackEnd`, the calendar drawn under it: #app.m-backing), and going in or back
-                        by a tap zooms into the day's square and back out of it (`mDayZoom`: `mDayIn` from openDay,
-                        `mDayOut` from closeDay; #app.m-zoom; `mDayA`: the zoom under way; closeDay(true): at once; only
-                        the edge swipe slides); the sidebar's top bar
+                        by a tap opens day view out of the day's square and shrinks it back in (`mDayZoom`: a clip-path
+                        from the square to the whole box, its contents fading; `mDayIn` from openDay, `mDayOut` from
+                        closeDay; #app.m-zoom; `mDayA`: the one under way; closeDay(true): at once; only the edge swipe
+                        slides); the sidebar's top bar
                         (.m-bar) stands in for the header's right side (no weeks-shown buttons: fixed, `weeksShown`); the sidebar's own tree (`mTree`: rows fold in
                         place, no redraw); week heights (`mFit`: what each week needs, as desktop's fitSizes; the
                         weeks built ahead sized to match, `mNbFit`) and "…" for full days (`mClip`, chip by chip; on a
@@ -103,9 +104,9 @@ js/ui/  (each view draws its part of the page and handles its own events)
                         time… (openTimePop: a number pad, inputmode, and taps for :00 / :15 / :30 / :45 and AM / PM
                         acting on the field last focused, `mTpBtns`; the box just above the number pad, `mTpFit`), opened over the menu, which stays open and is drawn again when they close
                         (`mPopOpen`, `mMenuBack`; menu.dataset.kid: its task); an Undo bar after touch changes (`mUndo`, in #toast); the task menu as
-                        a sheet with a title bar (`mMenuHead`) and, after Rename…, its links to the tasks before and
-                        after it in its thread (`mLinkRows`: Not linked / Same day / Next day, the later task's
-                        linkToPrev; app.js `m-link`, the menu staying open), swiped down to close, and while it's open a tap
+                        a sheet with a title bar (`mMenuHead`) and, after Rename…, its link to the task before it in its
+                        thread (`mLinkRow`: Off / Same day / Next day, its linkToPrev; app.js `m-link`, the menu
+                        staying open), swiped down to close, and while it's open a tap
                         outside it only closes it (`mMenuEat`), while swipes and scrolls outside it go through to what's
                         under it and leave it open (dom.js's scroll close skips mobile); notes in a card of their own (`mNotes`); swipe up / down → setPull / weekShift (`mSw`,
                         one week per swipe; R, the pull before resistance, is a week's usual share, not an opened

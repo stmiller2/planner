@@ -215,12 +215,14 @@ body.mobile #tree{padding:0}
 /* adding a task (mAddTask): one button floating over the foot of the drawer's list, and one in day view's sheet heading */
 .m-foot,.dv-madd{display:none}
 /* (the list keeps room below its last row, so it can scroll clear of the button; the button steps aside while a row is lifted) */
-body.mobile .m-foot{display:flex;justify-content:center;position:absolute;left:0;right:0;bottom:0;z-index:2;padding:0 16px calc(26px + env(safe-area-inset-bottom));pointer-events:none;transition:opacity .15s,translate .15s}
+body.mobile .m-foot{display:flex;justify-content:center;position:absolute;left:0;right:0;bottom:0;z-index:2;padding:0 24px calc(26px + env(safe-area-inset-bottom));pointer-events:none;transition:opacity .15s,translate .15s}
 body.mobile aside #tree{padding-bottom:calc(104px + env(safe-area-inset-bottom))}
 body.mobile.m-lifting .m-foot{opacity:0;translate:0 8px}
-.m-addk{display:flex;align-items:center;justify-content:center;gap:7px;min-height:48px;padding:0 24px 0 19px;border:0;border-radius:99px;background:var(--accent);color:#fff;font-size:15.5px;font-weight:620;
-  box-shadow:0 8px 22px -6px color-mix(in srgb,var(--accent) 60%,transparent),0 2px 6px rgba(0,0,0,.14);pointer-events:auto;-webkit-tap-highlight-color:transparent;transition:scale .12s}
-.m-addk:hover{background:var(--accent)}
+.m-addk{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;max-width:300px;min-height:46px;padding:0 20px;border:0;border-radius:99px;
+  background:color-mix(in srgb,var(--accent) 82%,#6b6f78);color:#fff;font-size:15.5px;font-weight:600;
+  box-shadow:0 3px 10px -3px rgba(0,0,0,.22);pointer-events:auto;-webkit-tap-highlight-color:transparent;transition:scale .12s}
+.m-addk:hover{background:color-mix(in srgb,var(--accent) 82%,#6b6f78)}
+:root[data-theme="dark"] .m-addk,:root[data-theme="dark"] .m-addk:hover{background:color-mix(in srgb,var(--accent) 68%,#3a3d44)}
 .m-addk:active{scale:.96}
 .m-addk svg{width:18px;height:18px;stroke-width:2.5}
 body.mobile .dv-madd{display:flex;align-items:center;gap:5px;margin-left:auto;padding:5px 12px 5px 9px;border:0;border-radius:99px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -369,13 +371,12 @@ body.mobile #grid.settle>.m-less{transition:translate .18s ease-out}   /* (pulle
 /* a chip, group or "…" going: a copy fading out where it was, over the day (mFadeOut) */
 body.mobile #grid .m-fade{position:absolute;z-index:1;margin:0;box-sizing:border-box;pointer-events:none}
 @media (prefers-reduced-motion: reduce){#grid.m-anim,#grid.m-anim :is(.day,.m-ride){transition:none}body.mobile .m-less{animation:none}}
-/* the task menu's links (mLinkRows): which two tasks, then a segmented row (Not linked / Same day / Next day) */
-.m-lk{padding:4px 12px 8px}
-.m-lk+.m-lk{padding-top:6px}
-.m-lk-h{display:flex;align-items:center;gap:8px;margin:0 0 6px 2px;font-size:13px;color:var(--muted);min-width:0}
-.m-lk-h svg{flex:none;width:14px;height:14px}
-.m-lk-h span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.m-lk-h b{font-weight:600;color:var(--ink)}
-.m-lk-seg{display:flex;gap:2px;padding:2px;border-radius:10px;background:var(--hover)}
-body.mobile #menu .m-lk-seg button{flex:1;min-width:0;justify-content:center;padding:8px 4px;border-radius:8px;font-size:13.5px;font-weight:560;color:var(--muted);white-space:nowrap;-webkit-tap-highlight-color:transparent}
-body.mobile #menu .m-lk-seg button.on{background:color-mix(in srgb,var(--accent) 16%,var(--panel));color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+/* the task menu's link to the previous task (mLinkRow): a row like the others, with a small switch of three at its end */
+.m-lk{display:flex;align-items:center;gap:8px;padding:7px 10px 7px 12px;min-width:0}
+.m-lk .k{flex:none}
+.m-lk-t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.m-lk-t small{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-lk-seg{flex:none;display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+body.mobile #menu .m-lk-seg button{width:auto;padding:5px 8px;border-radius:0;font-size:12.5px;color:var(--muted);white-space:nowrap;-webkit-tap-highlight-color:transparent}
+body.mobile #menu .m-lk-seg button+button{border-left:1px solid var(--line)}
+body.mobile #menu .m-lk-seg button.on{background:var(--hover);color:var(--ink);font-weight:600}

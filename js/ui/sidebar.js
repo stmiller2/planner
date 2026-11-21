@@ -165,7 +165,7 @@ function openTaskMenu(id, btn, at, el) {
       + (f.task.date && ui.dayView !== f.task.date ? menuBtn('k-day', id, ICON.day, `Open ${fmtShort(f.task.date)}`) : '')
       + menuBtn('k-resched', id, ICON.calendar, 'Reschedule…')
       + (ui.dayView && f.task.date === ui.dayView ? menuBtn('k-time', id, ICON.day, planOf(f.task) ? 'Change time…' : 'Set a time…') : '')
-      + menuBtn('k-rename', id, M_PENCIL, 'Rename…') + '<hr>' + (f.t.tasks.length > 1 ? mLinkRows(f) + '<hr>' : '') : '')
+      + menuBtn('k-rename', id, M_PENCIL, 'Rename…') + mLinkRow(f) + '<hr>' : '')
     + menuBtn('k-notes', id, ICON.notes, f.task.notes ? (MOBILE ? 'View/edit notes' : 'Edit notes') : 'Add notes')
     + (f.task.date ? menuBtn('k-unsched', id, ICON.nodate, 'Unschedule') + menuBtn('k-fail', id, ICON.failed, 'Mark failed') : '')
     + (fails.length ? '<hr>' + unfailBtn(f.task, fails[0], true) + fails.map(x => failRmBtn(x, fails.length > 1)).join('') : '')

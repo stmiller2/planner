@@ -198,34 +198,37 @@ function mBackEnd(cancelled) {
   }, 230);
 }
 /* Into and out of day view by a tap (a day, its "+N more", Open day, the view switcher; the back button, the view
-   switcher, Esc): a zoom. Going in, the calendar grows around the day's square as if coming closer to it, fading, while
-   day view grows out of that square to fill the screen, fading in; going back, the reverse (the calendar drawn first,
-   as mBackMove does), day view shrinking back into the day's square. (A day whose square isn't on screen: a plain zoom
-   about the middle.) Sliding sideways is only for the edge swipe (mBackMove). Meanwhile the calendar shows under day view
-   (css #app.m-zoom). openDay calls mDayIn after drawing day view; closeDay(now) hands over to mDayOut, which calls
-   closeDay(true) once it's out. The header's title changes with it, faded across. mDayA: the zoom under way. */
-const M_DAYIN = 380, M_DAYOUT = 320, M_ZEASE = 'cubic-bezier(.32,.72,0,1)';
+   switcher, Esc). Going in, day view opens out of the day's own square on the calendar: it starts as that square, its
+   outline picked out, and grows to fill the screen (a clip, so nothing in it is stretched), the calendar staying put
+   under it; day view's own contents fade in as it opens. Going back, the reverse (the calendar drawn first, as mBackMove
+   does): its contents fade, and it shrinks back into the day's square and fades away there. (A day whose square isn't
+   on screen: a square in the middle.) Sliding sideways is only for the edge swipe (mBackMove). Meanwhile the calendar
+   shows under day view (css #app.m-zoom). openDay calls mDayIn after drawing day view; closeDay(now) hands over to
+   mDayOut, which calls closeDay(true) once it's out. The header's title changes with it, faded across. mDayA: the
+   animation under way. */
+const M_DAYIN = 420, M_DAYOUT = 340, M_ZEASE = 'cubic-bezier(.32,.72,0,1)';
 let mDayA = null;
 const mTitleFade = () => { const r = $('#range'); if (r.animate && MOTION()) r.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' }); };
 function mDayZoom(out) {
-  const main = $('main'), box = dvBox.getBoundingClientRect(), mr = main.getBoundingClientRect();
+  const box = dvBox.getBoundingClientRect(), mr = $('main').getBoundingClientRect();
   const cell = $(`#grid .day:not(.nb)[data-date="${ui.dayView}"]`), cr = cell && cell.getBoundingClientRect();
   const seen = cr && cr.width && cr.bottom > mr.top && cr.top < mr.bottom;
-  // P: the day's square (its middle), C: day view's middle; S: how much the calendar grows (the square to about the screen)
-  const C = { x: box.left + box.width / 2, y: box.top + box.height / 2 }, P = seen ? { x: cr.left + cr.width / 2, y: cr.top + cr.height / 2 } : C;
-  const S = seen ? clamp(Math.min(box.width / cr.width, box.height / cr.height), 1.6, 4) : 1.25;
-  const calT = `translate(${(C.x - P.x).toFixed(1)}px,${(C.y - P.y).toFixed(1)}px) scale(${S.toFixed(3)})`, dvT = `translate(${(P.x - C.x).toFixed(1)}px,${(P.y - C.y).toFixed(1)}px) scale(${(1 / S).toFixed(3)})`;
-  main.style.transformOrigin = `${(P.x - mr.left).toFixed(1)}px ${(P.y - mr.top).toFixed(1)}px`;
+  const r = seen ? cr : { left: box.left + box.width * .36, right: box.right - box.width * .36, top: box.top + box.height * .36, bottom: box.bottom - box.height * .36 };
+  // the day's square, as a clip of day view's box (top right bottom left), and the whole box
+  const px = v => Math.max(0, v).toFixed(1) + 'px';
+  const sq = `inset(${px(r.top - box.top)} ${px(box.right - r.right)} ${px(box.bottom - r.bottom)} ${px(r.left - box.left)} round 4px)`, all = 'inset(0px 0px 0px 0px round 0px)';
+  const ring = 'inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent)', none = 'inset 0 0 0 1.5px transparent';
   $('#app').classList.add('m-zoom');
   const o = { duration: out ? M_DAYOUT : M_DAYIN, easing: M_ZEASE, fill: 'both' };
-  const cal = main.animate(out ? [{ transform: calT, opacity: 0 }, { opacity: 0, offset: .25 }, { transform: 'none', opacity: 1 }]
-    : [{ transform: 'none', opacity: 1 }, { opacity: 0, offset: .55 }, { transform: calT, opacity: 0 }], o);
-  const a = dvBox.animate(out ? [{ transform: 'none', opacity: 1 }, { opacity: 1, offset: .3 }, { transform: dvT, opacity: 0 }]
-    : [{ transform: dvT, opacity: 0 }, { opacity: 1, offset: .45 }, { transform: 'none', opacity: 1 }], o);
+  const a = dvBox.animate(out
+    ? [{ clipPath: all, boxShadow: none, opacity: 1 }, { opacity: 1, offset: .75 }, { clipPath: sq, boxShadow: ring, opacity: 0 }]
+    : [{ clipPath: sq, boxShadow: ring, opacity: 0 }, { opacity: 1, offset: .18 }, { clipPath: all, boxShadow: none, opacity: 1 }], o);
+  // its contents (the timeline, the task list's sheet): fading in once it has opened a way, or out first
+  const fades = [...dvBox.children].map(el => el.animate(out ? [{ opacity: 1 }, { opacity: 0, offset: .4 }, { opacity: 0 }] : [{ opacity: 0 }, { opacity: 0, offset: .35 }, { opacity: 1 }], o));
   const h = mDayA = { a, out, done() {
     if (mDayA !== h) return; mDayA = null;
     if (out) closeDay(true);
-    a.cancel(); cal.cancel(); main.style.transformOrigin = ''; $('#app').classList.remove('m-zoom');
+    a.cancel(); fades.forEach(f => f.cancel()); $('#app').classList.remove('m-zoom');
   } };
   a.onfinish = h.done;
 }
@@ -1119,13 +1122,12 @@ function mDvDrop(s, cancelled) {
 }
 
 /* ---------- the task menu ---------- */
-/* its links: to the task before it in its thread and to the one after, each a row of three (Not linked, Same day,
-   Next day: the later task's linkToPrev, setLink; app.js m-link). A tap changes it; the menu stays open, drawn again. */
-function mLinkRows(f) {
-  const ks = f.t.tasks, prev = ks[f.i - 1], next = ks[f.i + 1];
-  const row = (k, head) => `<div class="m-lk"><div class="m-lk-h">${ICON.link}<span>${head}</span></div><div class="m-lk-seg">${
-    [['', 'Not linked'], ['sameDay', 'Same day'], ['nextDay', 'Next day']].map(([v, l]) => `<button data-act="m-link" data-id="${k.id}" data-v="${v}" class="${(k.linkToPrev || '') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
-  return (prev ? row(f.task, `<b>${esc(prev.title)}</b> → this task`) : '') + (next ? row(next, `This task → <b>${esc(next.title)}</b>`) : '');
+/* its link to the task before it in its thread, as one of the menu's rows: a compact switch of three (Off, Same day,
+   Next day: its linkToPrev, setLink; app.js m-link). A tap changes it; the menu stays open, drawn again. */
+function mLinkRow(f) {
+  const prev = f.t.tasks[f.i - 1]; if (!prev) return '';
+  return `<div class="m-lk"><span class="k">${ICON.link}</span><span class="m-lk-t">Link to previous<small>${esc(prev.title)}</small></span><span class="m-lk-seg">${
+    [['', 'Off'], ['sameDay', 'Same day'], ['nextDay', 'Next day']].map(([v, l]) => `<button data-act="m-link" data-id="${f.task.id}" data-v="${v}" class="${(f.task.linkToPrev || '') === v ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
 }
 // its title bar: which task (and where it sits), as a block in the task's color, like its chip (done: as a done chip);
 // it's also where the menu is swiped down from
